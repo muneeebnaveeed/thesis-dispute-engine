@@ -37,7 +37,11 @@ test('the root remembers the tenant, and a work email finds it for a fresh brows
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
   await page.getByLabel('Work email').fill('someone@otpbank.hu')
-  await page.getByRole('button', { name: 'Continue' }).click()
+  // Cookies are gone, so Keycloak must show its form; waiting for it keeps the login helper from seeing '/' as done.
+  await Promise.all([
+    page.waitForURL(/\/protocol\/openid-connect\/auth/),
+    page.getByRole('button', { name: 'Continue' }).click(),
+  ])
   await completeKeycloakLogin(page)
   await expect(page).toHaveURL(/\/otp$/)
 

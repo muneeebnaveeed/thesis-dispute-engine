@@ -2,10 +2,13 @@ import { createFileRoute, useRouteContext, useRouter } from '@tanstack/react-rou
 import { useMemo, useState } from 'react'
 
 import { createBrowserApi } from '#/api/browser'
-import type { Problem } from '#/api/problem'
+import { call } from '#/api/call'
+import { classify, type Failure } from '#/api/failure'
+import { CreateTenantKeyRequest } from '#/api/schemas.gen'
 import type { components } from '#/api/schema.gen'
 import { AppShell } from '#/components/app-shell'
-import { ProblemBanner } from '#/components/problem-banner'
+import { FailureBanner, FieldError } from '#/components/failure-banner'
+import { serverFields, validateForm } from '#/forms/validate-form'
 import { TenantMismatch } from '#/components/tenant-mismatch'
 import { listTenantKeys } from '#/server/tenant-keys'
 
@@ -35,7 +38,8 @@ function KeysPage() {
       ),
     [config.apiUrl, tenant],
   )
-  const [problem, setProblem] = useState<Problem | null>(null)
+  const [failure, setFailure] = useState<Failure | null>(null)
+  const [fields, setFields] = useState<Record<string, string>>({})
   const [issued, setIssued] = useState<{ label: string; secret: string } | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -43,27 +47,32 @@ function KeysPage() {
   const isAdmin = viewer?.roles.includes('tenant-admin') ?? false
 
   async function create(form: FormData) {
-    const raw = form.get('label')
-    const label = typeof raw === 'string' ? raw.trim() : ''
-    if (!label) return
-    setBusy('create')
-    setProblem(null)
+    setFailure(null)
     setIssued(null)
-    const { data, error } = await api.POST('/tenant-keys', { body: { label } })
+    const checked = validateForm(CreateTenantKeyRequest, form)
+    setFields(checked.fields)
+    if (!checked.value) return
+    setBusy('create')
+    const res = await call(() => api.POST('/tenant-keys', { body: checked.value }))
     setBusy(null)
-    if (error) setProblem(error)
-    else if (data) {
-      setIssued({ label: data.label, secret: data.secret })
+    if (res.failure) {
+      setFailure(res.failure)
+      if (res.failure.kind === 'validation')
+        setFields({ ...res.failure.fields, ...serverFields(res.failure.problem) })
+    } else {
+      setIssued({ label: res.data.label, secret: res.data.secret })
       await router.invalidate()
     }
   }
 
   async function revoke(id: string) {
     setBusy(id)
-    setProblem(null)
-    const { error } = await api.DELETE('/tenant-keys/{keyId}', { params: { path: { keyId: id } } })
+    setFailure(null)
+    const res = await call(() => api.DELETE('/tenant-keys/{keyId}', { params: { path: { keyId: id } } }), {
+      idempotent: true,
+    })
     setBusy(null)
-    if (error) setProblem(error)
+    if (res.failure) setFailure(res.failure)
     else await router.invalidate()
   }
 
@@ -88,14 +97,17 @@ function KeysPage() {
             >
               <input
                 name="label"
-                className={input}
+                className={`${input} ${fields.label ? 'border-red-400' : ''}`}
                 placeholder="core banking production"
                 aria-label="Label"
+                aria-invalid={fields.label ? true : undefined}
+                aria-describedby={fields.label ? 'label-error' : undefined}
               />
               <button type="submit" className={button} disabled={busy !== null}>
                 Issue
               </button>
             </form>
+            <FieldError id="label-error" message={fields.label} />
             {issued && (
               <output className="mt-4 block rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm">
                 <p className="font-medium">
@@ -106,16 +118,24 @@ function KeysPage() {
                 </code>
               </output>
             )}
-            {problem && (
+            {failure && failure.kind !== 'validation' && (
               <div className="mt-4">
-                <ProblemBanner problem={problem} />
+                <FailureBanner failure={failure} onRetry={() => setFailure(null)} />
               </div>
             )}
           </section>
           <section>
             <h2 className="mb-2 text-lg font-medium">Keys</h2>
             {outcome.problem ? (
-              <ProblemBanner problem={outcome.problem} />
+              <FailureBanner
+                failure={
+                  classify({ error: outcome.problem }) ?? {
+                    kind: 'unexpected',
+                    status: 0,
+                    message: 'no data',
+                  }
+                }
+              />
             ) : (
               <KeyTable keys={outcome.value ?? []} busy={busy} onRevoke={(id) => void revoke(id)} />
             )}

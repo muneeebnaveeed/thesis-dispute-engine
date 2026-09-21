@@ -2,10 +2,11 @@ import { createFileRoute, useRouteContext, useRouter } from '@tanstack/react-rou
 import { useMemo, useState } from 'react'
 
 import { createBrowserApi } from '#/api/browser'
-import type { Problem } from '#/api/problem'
+import { call } from '#/api/call'
+import { classify, type Failure } from '#/api/failure'
 import { AppShell } from '#/components/app-shell'
 import { EventLog } from '#/components/event-log'
-import { ProblemBanner } from '#/components/problem-banner'
+import { FailureBanner } from '#/components/failure-banner'
 import { TenantMismatch } from '#/components/tenant-mismatch'
 import { getDispute, type Dispute } from '#/server/disputes'
 
@@ -27,28 +28,40 @@ function DisputePage() {
     [config.apiUrl, tenant],
   )
   const router = useRouter()
-  const [problem, setProblem] = useState<Problem | null>(null)
+  const [failure, setFailure] = useState<Failure | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
 
   if (viewer && viewer.tenantSlug !== tenant) return <TenantMismatch wanted={tenant} />
   if (outcome.problem || !outcome.value) {
+    const f = outcome.problem ? classify({ error: outcome.problem }) : null
     return (
-      <AppShell title="Dispute">{outcome.problem && <ProblemBanner problem={outcome.problem} />}</AppShell>
+      <AppShell title="Dispute">
+        {f && <FailureBanner failure={f} onRetry={() => void router.invalidate()} />}
+      </AppShell>
     )
   }
   const d = outcome.value
 
+  // The idempotency key makes the call safe to repeat, so a short outage or budget hit is retried once for the person.
   async function apply(event: Dispute['allowedEvents'][number]) {
     setBusy(event)
-    setProblem(null)
-    const { error } = await api.POST('/disputes/{disputeId}/events', {
-      params: { path: { disputeId: d.id } },
-      body: { event, actor: 'analyst' },
-      headers: { 'Idempotency-Key': crypto.randomUUID() },
-    })
+    setFailure(null)
+    const key = crypto.randomUUID()
+    const res = await call(
+      () =>
+        api.POST('/disputes/{disputeId}/events', {
+          params: { path: { disputeId: d.id } },
+          body: { event, actor: 'analyst' },
+          headers: { 'Idempotency-Key': key },
+        }),
+      { idempotent: true },
+    )
     setBusy(null)
-    if (error) setProblem(error)
-    else await router.invalidate()
+    if (res.failure) {
+      setFailure(res.failure)
+      // A conflict means the state moved under us; show the truth alongside the message.
+      if (res.failure.kind === 'conflict') await router.invalidate()
+    } else await router.invalidate()
   }
 
   return (
@@ -79,9 +92,9 @@ function DisputePage() {
             ))}
           </div>
         )}
-        {problem && (
+        {failure && (
           <div className="mt-4">
-            <ProblemBanner problem={problem} />
+            <FailureBanner failure={failure} onRetry={() => setFailure(null)} />
           </div>
         )}
       </section>

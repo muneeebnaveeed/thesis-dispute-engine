@@ -1,10 +1,12 @@
 import { Link, createFileRoute, useNavigate, useRouteContext } from '@tanstack/react-router'
 import { useState } from 'react'
 
-import type { Problem } from '#/api/problem'
+import { classify, type Failure } from '#/api/failure'
+import { CreateDisputeRequest } from '#/api/schemas.gen'
 import { AppShell } from '#/components/app-shell'
-import { ProblemBanner } from '#/components/problem-banner'
+import { FailureBanner, FieldError } from '#/components/failure-banner'
 import { TenantMismatch } from '#/components/tenant-mismatch'
+import { serverFields, validateForm } from '#/forms/validate-form'
 import { createDispute } from '#/server/disputes'
 import { Value } from '@sinclair/typebox/value'
 
@@ -39,17 +41,24 @@ function Workbench() {
   const { state, cursor } = Route.useSearch()
   const { viewer } = useRouteContext({ from: '__root__' })
   const navigate = useNavigate()
-  const [problem, setProblem] = useState<Problem | null>(null)
+  const [failure, setFailure] = useState<Failure | null>(null)
+  const [fields, setFields] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   if (viewer && viewer.tenantSlug !== tenant) return <TenantMismatch wanted={tenant} />
 
+  // Validate with the contract's schema before any request; server-side field errors land in the same place.
   async function open(form: FormData) {
+    setFailure(null)
+    const checked = validateForm(CreateDisputeRequest, form)
+    setFields(checked.fields)
+    if (!checked.value) return
     setBusy(true)
-    setProblem(null)
-    const res = await createDispute({ data: { transactionId: form.get('transactionId'), actor: 'analyst' } })
+    const res = await createDispute({ data: { ...checked.value, actor: 'analyst' } })
     setBusy(false)
-    if (res.problem) setProblem(res.problem)
-    else if (res.value)
+    if (res.problem) {
+      setFailure(classify({ error: res.problem }))
+      setFields(serverFields(res.problem))
+    } else if (res.value)
       void navigate({ to: '/$tenant/disputes/$disputeId', params: { tenant, disputeId: res.value.id } })
   }
 
@@ -92,7 +101,11 @@ function Workbench() {
           </form>
         </div>
         {page.problem ? (
-          <ProblemBanner problem={page.problem} />
+          <FailureBanner
+            failure={
+              classify({ error: page.problem }) ?? { kind: 'unexpected', status: 0, message: 'no data' }
+            }
+          />
         ) : page.value && page.value.items.length > 0 ? (
           <>
             <table className="w-full text-left text-sm">
@@ -164,17 +177,20 @@ function Workbench() {
               Transaction ID
               <input
                 name="transactionId"
-                className={input}
+                className={`${input} ${fields.transactionId ? 'border-red-400' : ''}`}
                 placeholder="00000000-0000-8000-8000-000000000101"
+                aria-invalid={fields.transactionId ? true : undefined}
+                aria-describedby={fields.transactionId ? 'transactionId-error' : undefined}
               />
             </label>
+            <FieldError id="transactionId-error" message={fields.transactionId} />
             <button type="submit" className={button} disabled={busy}>
               Open
             </button>
           </form>
-          {problem && (
+          {failure && (failure.kind !== 'validation' || Object.keys(fields).length === 0) && (
             <div className="mt-4">
-              <ProblemBanner problem={problem} />
+              <FailureBanner failure={failure} />
             </div>
           )}
         </section>
