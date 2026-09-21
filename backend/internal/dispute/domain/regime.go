@@ -2,8 +2,6 @@
 package domain
 
 import (
-	"time"
-
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
 )
 
@@ -34,12 +32,11 @@ const (
 	RefundNoQuestionsAsked  RefundPath = "NQA_REFUND"
 )
 
-// Rules is what a regime contributes to the state machine (see docs/adr/0002).
+// Rules is what a regime contributes to the state machine (see docs/adr/0002) and its clocks (docs/adr/0013).
 type Rules struct {
 	Regime             Regime
 	Refund             RefundPath
-	RefundSLA          time.Duration
-	ResolutionSLA      time.Duration
+	Clocks             []Clock
 	HasAdjudication    bool
 	MerchantMayContest bool
 	LiabilityCapMinor  int64
@@ -53,20 +50,16 @@ func (r Rules) HasProvisionalCredit() bool { return r.Refund == RefundProvisiona
 // HasRefundStep reports whether any refund state is part of the lifecycle.
 func (r Rules) HasRefundStep() bool { return r.Refund != RefundNone }
 
-const (
-	day            = 24 * time.Hour
-	businessDay    = day // calendar approximation until the SLA engine has a business-day calendar
-	week           = 7 * day
-	approxMonth    = 30 * day
-	defaultAppeals = 1
-)
+const defaultAppeals = 1
 
 var rules = map[Regime]Rules{
 	RegimeEUSEPADirectDebit: {
-		Regime:             RegimeEUSEPADirectDebit,
-		Refund:             RefundNoQuestionsAsked,
-		RefundSLA:          8 * week,
-		ResolutionSLA:      13 * approxMonth,
+		Regime: RegimeEUSEPADirectDebit,
+		Refund: RefundNoQuestionsAsked,
+		Clocks: []Clock{
+			{Kind: DeadlineRefund, Count: 10, Unit: BusinessDays, Basis: "PSD2 art. 77(1): refund or justification within 10 business days of the request"},
+			{Kind: DeadlineResolution, Count: 15, Unit: BusinessDays, Basis: "PSD2 art. 101(2): final reply to a complaint within 15 business days"},
+		},
 		HasAdjudication:    false,
 		MerchantMayContest: false,
 		LiabilityCapMinor:  0,
@@ -74,10 +67,12 @@ var rules = map[Regime]Rules{
 		MaxAppeals:         defaultAppeals,
 	},
 	RegimeEUPSD2Card: {
-		Regime:             RegimeEUPSD2Card,
-		Refund:             RefundFast,
-		RefundSLA:          1 * businessDay,
-		ResolutionSLA:      approxMonth,
+		Regime: RegimeEUPSD2Card,
+		Refund: RefundFast,
+		Clocks: []Clock{
+			{Kind: DeadlineRefund, Count: 1, Unit: BusinessDays, Basis: "PSD2 art. 73(1): refund by the end of the following business day"},
+			{Kind: DeadlineResolution, Count: 15, Unit: BusinessDays, Basis: "PSD2 art. 101(2): final reply to a complaint within 15 business days"},
+		},
 		HasAdjudication:    true,
 		MerchantMayContest: true,
 		LiabilityCapMinor:  50_00,
@@ -85,10 +80,12 @@ var rules = map[Regime]Rules{
 		MaxAppeals:         defaultAppeals,
 	},
 	RegimeUSRegE: {
-		Regime:             RegimeUSRegE,
-		Refund:             RefundProvisionalCredit,
-		RefundSLA:          10 * businessDay,
-		ResolutionSLA:      45 * day,
+		Regime: RegimeUSRegE,
+		Refund: RefundProvisionalCredit,
+		Clocks: []Clock{
+			{Kind: DeadlineRefund, Count: 10, Unit: BusinessDays, Basis: "12 CFR 1005.11(c)(1): provisional credit within 10 business days"},
+			{Kind: DeadlineResolution, Count: 45, Unit: CalendarDays, Basis: "12 CFR 1005.11(c)(2): investigation complete within 45 days"},
+		},
 		HasAdjudication:    true,
 		MerchantMayContest: true,
 		LiabilityCapMinor:  50_00,
@@ -96,10 +93,12 @@ var rules = map[Regime]Rules{
 		MaxAppeals:         defaultAppeals,
 	},
 	RegimeUSRegZ: {
-		Regime:             RegimeUSRegZ,
-		Refund:             RefundNone,
-		RefundSLA:          0,
-		ResolutionSLA:      90 * day,
+		Regime: RegimeUSRegZ,
+		Refund: RefundNone,
+		Clocks: []Clock{
+			{Kind: DeadlineAcknowledge, Count: 30, Unit: CalendarDays, Basis: "12 CFR 1026.13(c)(1): written acknowledgement within 30 days"},
+			{Kind: DeadlineResolution, Count: 90, Unit: CalendarDays, Basis: "12 CFR 1026.13(c)(2): resolution within two billing cycles, at most 90 days"},
+		},
 		HasAdjudication:    true,
 		MerchantMayContest: true,
 		LiabilityCapMinor:  0,

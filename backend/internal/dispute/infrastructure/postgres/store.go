@@ -58,6 +58,19 @@ func (s *Store) CountByState(ctx context.Context) ([]application.StateCount, err
 	return out, nil
 }
 
+// CountOverdue implements application.Store.
+func (s *Store) CountOverdue(ctx context.Context) ([]application.OverdueCount, error) {
+	rows, err := sqlcgen.New(s.pool).CountDeadlinesOverdue(ctx)
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	out := make([]application.OverdueCount, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, application.OverdueCount{TenantID: r.TenantID, Regime: domain.Regime(r.Regime), Kind: domain.DeadlineKind(r.Kind), N: r.N})
+	}
+	return out, nil
+}
+
 // PurgeLockID is the advisory lock the idempotency sweep takes; arbitrary but fixed, distinct from the migration lock.
 const PurgeLockID = 72040002
 
@@ -206,7 +219,7 @@ func mapErr(err error) error {
 }
 
 func (t *txn) ListDisputes(ctx context.Context, q application.ListQuery) ([]application.DisputeRecord, error) {
-	params := sqlcgen.ListDisputesParams{PageSize: int32Of(q.Limit)}
+	params := sqlcgen.ListDisputesParams{PageSize: int32Of(q.Limit), Overdue: q.Overdue, Now: q.Now}
 	if q.State != nil {
 		st := string(*q.State)
 		params.State = &st
@@ -225,4 +238,64 @@ func (t *txn) ListDisputes(ctx context.Context, q application.ListQuery) ([]appl
 			TransactionID: r.TransactionID, DisputedAmount: r.DisputedAmount, Currency: r.Currency, OpenedAt: r.OpenedAt, UpdatedAt: r.UpdatedAt})
 	}
 	return out, nil
+}
+
+func (t *txn) TenantCalendar(ctx context.Context) (domain.Calendar, error) {
+	row, err := t.q.GetTenantCalendar(ctx)
+	if err != nil {
+		return domain.Calendar{}, mapErr(err)
+	}
+	return domain.NewCalendar(row.Timezone, row.Holidays)
+}
+
+func (t *txn) InsertDeadlines(ctx context.Context, disputeID uuid.UUID, ds []domain.Deadline) error {
+	for _, d := range ds {
+		if err := t.q.InsertDeadline(ctx, sqlcgen.InsertDeadlineParams{DisputeID: disputeID, Kind: string(d.Kind), Cycle: int32Of(d.Cycle),
+			StartedAt: d.StartedAt, DueAt: d.DueAt, Basis: d.Basis}); err != nil {
+			return mapErr(err)
+		}
+	}
+	return nil
+}
+
+func (t *txn) ListDeadlines(ctx context.Context, disputeID uuid.UUID) ([]domain.Deadline, error) {
+	rows, err := t.q.ListDeadlines(ctx, disputeID)
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	out := make([]domain.Deadline, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, deadlineOf(r.Kind, r.Cycle, r.StartedAt, r.DueAt, r.MetAt, r.VoidedAt, r.Basis))
+	}
+	return out, nil
+}
+
+func (t *txn) SettleDeadline(ctx context.Context, disputeID uuid.UUID, kind domain.DeadlineKind, cycle int, met bool, at time.Time) error {
+	_, err := t.q.SettleDeadline(ctx, sqlcgen.SettleDeadlineParams{Met: met, At: at, DisputeID: disputeID, Kind: string(kind), Cycle: int32Of(cycle)})
+	return mapErr(err)
+}
+
+func (t *txn) NextDeadlines(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]domain.Deadline, error) {
+	rows, err := t.q.NextDeadlines(ctx, ids)
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	out := make(map[uuid.UUID]domain.Deadline, len(rows))
+	for _, r := range rows {
+		out[r.DisputeID] = deadlineOf(r.Kind, r.Cycle, r.StartedAt, r.DueAt, r.MetAt, r.VoidedAt, r.Basis)
+	}
+	return out, nil
+}
+
+func deadlineOf(kind string, cycle int32, started, due time.Time, met, voided pgtype.Timestamptz, basis string) domain.Deadline {
+	d := domain.Deadline{Kind: domain.DeadlineKind(kind), Cycle: int(cycle), StartedAt: started, DueAt: due, Basis: basis}
+	if met.Valid {
+		t := met.Time
+		d.MetAt = &t
+	}
+	if voided.Valid {
+		t := voided.Time
+		d.VoidedAt = &t
+	}
+	return d
 }

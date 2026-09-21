@@ -217,8 +217,11 @@ func TestRulesAreConsistent(t *testing.T) {
 		if r.Regime != regime {
 			t.Errorf("%s: Rules.Regime = %s", regime, r.Regime)
 		}
-		if r.HasRefundStep() != (r.RefundSLA > 0) {
-			t.Errorf("%s: refund step %v but RefundSLA %v", regime, r.HasRefundStep(), r.RefundSLA)
+		if r.HasRefundStep() != r.hasClock(DeadlineRefund) {
+			t.Errorf("%s: refund step %v but refund clock %v", regime, r.HasRefundStep(), r.hasClock(DeadlineRefund))
+		}
+		if !r.hasClock(DeadlineResolution) {
+			t.Errorf("%s: no resolution clock", regime)
 		}
 		if r.MerchantMayContest && !r.HasAdjudication {
 			t.Errorf("%s: merchant may contest but there is no adjudication", regime)

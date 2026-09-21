@@ -85,3 +85,32 @@ test("the workbench lists the tenant's newest disputes, filters by state, and li
   await row.getByRole('link').click()
   await expect(page).toHaveURL(new RegExp(`/otp/disputes/${id}$`))
 })
+
+test('the regime clocks appear at opening, settle with the transition that satisfies them, and show on the list', async ({
+  page,
+}) => {
+  const id = await openDisputeViaApi(page.request, 'otp')
+  await page.goto(`/otp/disputes/${id}`)
+  const clocks = page.getByRole('list', { name: 'Regulatory clocks' })
+  const refund = clocks.getByRole('listitem').filter({ hasText: 'Make the customer whole' })
+  const resolution = clocks.getByRole('listitem').filter({ hasText: 'Resolve the dispute' })
+  await expect(refund).toContainText('running')
+  await expect(refund).toContainText('PSD2 art. 73(1)')
+  await expect(resolution).toContainText('running')
+
+  await page.getByRole('button', { name: 'OPEN_INVESTIGATION' }).click()
+  await page.getByRole('button', { name: 'ISSUE_REFUND' }).click()
+  await expect(refund).toContainText('met')
+  await expect(refund).toContainText('met 20')
+  await expect(resolution).toContainText('running')
+
+  // The list carries the clock that runs out next; the overdue filter has nothing for a fresh dispute.
+  await page.goto('/otp')
+  const row = page.getByRole('row').filter({ has: page.locator(`a[href$="/${id}"]`) })
+  await expect(row).toContainText('running')
+  await expect(row).toContainText(/days left|due today/)
+  await page.getByLabel('overdue only').check()
+  await page.getByRole('button', { name: 'Filter' }).click()
+  await expect(page).toHaveURL(/overdue=true/)
+  await expect(row).toHaveCount(0)
+})

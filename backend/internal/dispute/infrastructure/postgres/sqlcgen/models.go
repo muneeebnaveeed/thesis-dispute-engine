@@ -20,6 +20,13 @@ type Account struct {
 	TenantID   uuid.UUID
 }
 
+type DeadlinesOverdue struct {
+	TenantID uuid.UUID
+	Regime   string
+	Kind     string
+	N        int64
+}
+
 type Dispute struct {
 	ID             uuid.UUID
 	Regime         string
@@ -33,6 +40,18 @@ type Dispute struct {
 	OpenedAt       time.Time
 	UpdatedAt      time.Time
 	TenantID       uuid.UUID
+}
+
+type DisputeDeadline struct {
+	TenantID  uuid.UUID
+	DisputeID uuid.UUID
+	Kind      string
+	Cycle     int32
+	StartedAt time.Time
+	DueAt     time.Time
+	MetAt     pgtype.Timestamptz
+	VoidedAt  pgtype.Timestamptz
+	Basis     string
 }
 
 type DisputeEvent struct {

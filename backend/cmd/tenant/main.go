@@ -16,6 +16,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres/sqlcgen"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/config"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/postgres"
@@ -52,11 +53,17 @@ func run(args []string) error {
 		name := fs.String("name", "", "display name")
 		issuer := fs.String("issuer", "", "OIDC issuer; defaults to KEYCLOAK_URL/realms/<slug>")
 		domains := fs.String("domains", "", "comma-separated work-email domains")
+		timezone := fs.String("timezone", "", "IANA zone the regulatory clocks count days in (default UTC)")
+		holidays := fs.String("holidays", "", "comma-separated YYYY-MM-DD dates business-day clocks skip")
 		if err := fs.Parse(args[1:]); err != nil {
 			return err
 		}
 		if *slug == "" || *name == "" {
 			return fmt.Errorf("upsert needs --slug and --name")
+		}
+		// Validated here so a typo is refused at onboarding rather than failing the first dispute.
+		if _, err := domain.NewCalendar(*timezone, splitList(*holidays)); err != nil {
+			return err
 		}
 		id, err := parseOrNewID(*idRaw)
 		if err != nil {
@@ -70,6 +77,9 @@ func run(args []string) error {
 			return err
 		}
 		if _, err := q.SetTenantEmailDomains(ctx, sqlcgen.SetTenantEmailDomainsParams{ID: id, EmailDomains: splitList(*domains)}); err != nil {
+			return err
+		}
+		if _, err := q.SetTenantCalendar(ctx, sqlcgen.SetTenantCalendarParams{ID: id, Timezone: *timezone, Holidays: splitList(*holidays)}); err != nil {
 			return err
 		}
 		fmt.Printf("id:     %s\nslug:   %s\nissuer: %s\n", id, *slug, iss)

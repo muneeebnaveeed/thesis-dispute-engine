@@ -50,6 +50,15 @@ var (
 	}
 )
 
+// hungarianHolidays are the public holidays of 2026 and 2027 (Act I of 2012, section 102) plus the bridging rest
+// days declared for 2026; they are seed data, not a calendar service.
+var hungarianHolidays = []string{
+	"2026-01-01", "2026-01-02", "2026-03-15", "2026-04-03", "2026-04-06", "2026-05-01", "2026-05-25", "2026-08-20", "2026-08-21",
+	"2026-10-23", "2026-11-01", "2026-12-24", "2026-12-25", "2026-12-26",
+	"2027-01-01", "2027-03-15", "2027-03-26", "2027-03-29", "2027-05-01", "2027-05-17", "2027-08-20", "2027-10-23", "2027-11-01",
+	"2027-12-25", "2027-12-26",
+}
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "seed:", err)
@@ -86,6 +95,10 @@ func run() error {
 		}
 		// Work-email domains let the sign-in page find the tenant without a link (docs/authentication.md).
 		if _, err := q.SetTenantEmailDomains(ctx, sqlcgen.SetTenantEmailDomainsParams{ID: uuid.MustParse(t.id), EmailDomains: []string{t.domain}}); err != nil {
+			return err
+		}
+		// Both seed banks are Hungarian: regulatory clocks count Budapest business days and skip public holidays.
+		if _, err := q.SetTenantCalendar(ctx, sqlcgen.SetTenantCalendarParams{ID: uuid.MustParse(t.id), Timezone: "Europe/Budapest", Holidays: hungarianHolidays}); err != nil {
 			return err
 		}
 	}

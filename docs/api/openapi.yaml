@@ -54,6 +54,10 @@ paths:
           in: query
           description: Opaque; from the previous page's nextCursor.
           schema: { type: string }
+        - name: overdue
+          in: query
+          description: Only disputes with at least one regulatory clock past its due time and still open.
+          schema: { type: boolean }
       responses:
         "200":
           description: One page.
@@ -493,6 +497,9 @@ components:
         currency: { type: string, minLength: 3, maxLength: 3 }
         openedAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        nextDeadline:
+          description: The open regulatory clock that runs out first; absent once every clock is settled.
+          $ref: "#/components/schemas/Deadline"
     DisputePage:
       type: object
       required: [items]
@@ -503,7 +510,7 @@ components:
         nextCursor: { type: string, description: Present when there is another page. }
     Dispute:
       type: object
-      required: [id, regime, state, appeals, version, transactionId, accountId, disputedAmount, currency, openedAt, updatedAt, allowedEvents, events]
+      required: [id, regime, state, appeals, version, transactionId, accountId, disputedAmount, currency, openedAt, updatedAt, allowedEvents, events, deadlines]
       properties:
         id: { type: string, format: uuid }
         regime: { $ref: "#/components/schemas/Regime" }
@@ -522,3 +529,25 @@ components:
         events:
           type: array
           items: { $ref: "#/components/schemas/LoggedEvent" }
+        deadlines:
+          description: Every regulatory clock the regime started for this dispute, opening clocks first, then per appeal.
+          type: array
+          items: { $ref: "#/components/schemas/Deadline" }
+    DeadlineKind:
+      type: string
+      enum: [REFUND, ACKNOWLEDGE, RESOLUTION]
+    DeadlineStatus:
+      type: string
+      description: RUNNING and BREACHED are open; MET and LATE are satisfied (before or after due); VOID no longer applies.
+      enum: [RUNNING, MET, LATE, BREACHED, VOID]
+    Deadline:
+      type: object
+      required: [kind, cycle, startedAt, dueAt, status, basis]
+      properties:
+        kind: { $ref: "#/components/schemas/DeadlineKind" }
+        cycle: { type: integer, description: 0 for the clocks started at opening; the appeal number for a restarted clock. }
+        startedAt: { type: string, format: date-time }
+        dueAt: { type: string, format: date-time, description: End of the last permitted day in the tenant's calendar. }
+        metAt: { type: string, format: date-time }
+        status: { $ref: "#/components/schemas/DeadlineStatus" }
+        basis: { type: string, description: The regulatory provision the clock comes from. }

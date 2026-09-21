@@ -5,6 +5,7 @@ import { createBrowserApi } from '#/api/browser'
 import { call } from '#/api/call'
 import { classify, type Failure } from '#/api/failure'
 import { AppShell } from '#/components/app-shell'
+import { Deadlines } from '#/components/deadlines'
 import { EventLog } from '#/components/event-log'
 import { FailureBanner } from '#/components/failure-banner'
 import { TenantMismatch } from '#/components/tenant-mismatch'
@@ -72,6 +73,11 @@ function DisputePage() {
         <Field label="Amount" value={`${d.disputedAmount} ${d.currency}`} />
         <Field label="Appeals used" value={String(d.appeals)} />
       </dl>
+
+      <section className="mb-8">
+        <h2 className="mb-2 text-lg font-medium">Regulatory clocks</h2>
+        <Deadlines deadlines={d.deadlines} />
+      </section>
 
       <section className="mb-8">
         <h2 className="mb-2 text-lg font-medium">Actions</h2>

@@ -31,6 +31,9 @@ type MemStore struct {
 	Disputes     map[uuid.UUID]application.DisputeRecord
 	Events       map[uuid.UUID][]application.EventRecord
 	Idempotent   map[string]application.StoredResponse
+	Deadlines    map[uuid.UUID][]domain.Deadline
+	// Calendars holds a tenant's business-day calendar; a tenant without one gets the default.
+	Calendars map[uuid.UUID]domain.Calendar
 }
 
 // NewMemStore returns an empty store.
@@ -40,6 +43,8 @@ func NewMemStore() *MemStore {
 		Disputes:     map[uuid.UUID]application.DisputeRecord{},
 		Events:       map[uuid.UUID][]application.EventRecord{},
 		Idempotent:   map[string]application.StoredResponse{},
+		Deadlines:    map[uuid.UUID][]domain.Deadline{},
+		Calendars:    map[uuid.UUID]domain.Calendar{},
 	}
 }
 
@@ -108,10 +113,15 @@ type snapshotT struct {
 	disputes   map[uuid.UUID]application.DisputeRecord
 	events     map[uuid.UUID][]application.EventRecord
 	idempotent map[string]application.StoredResponse
+	deadlines  map[uuid.UUID][]domain.Deadline
 }
 
 func (m *MemStore) snapshot() snapshotT {
-	s := snapshotT{disputes: map[uuid.UUID]application.DisputeRecord{}, events: map[uuid.UUID][]application.EventRecord{}, idempotent: map[string]application.StoredResponse{}}
+	s := snapshotT{disputes: map[uuid.UUID]application.DisputeRecord{}, events: map[uuid.UUID][]application.EventRecord{},
+		idempotent: map[string]application.StoredResponse{}, deadlines: map[uuid.UUID][]domain.Deadline{}}
+	for k, v := range m.Deadlines {
+		s.deadlines[k] = append([]domain.Deadline(nil), v...)
+	}
 	for k, v := range m.Disputes {
 		s.disputes[k] = v
 	}
@@ -125,7 +135,28 @@ func (m *MemStore) snapshot() snapshotT {
 }
 
 func (m *MemStore) restore(s snapshotT) {
-	m.Disputes, m.Events, m.Idempotent = s.disputes, s.events, s.idempotent
+	m.Disputes, m.Events, m.Idempotent, m.Deadlines = s.disputes, s.events, s.idempotent, s.deadlines
+}
+
+// CountOverdue implements application.Store.
+func (m *MemStore) CountOverdue(_ context.Context) ([]application.OverdueCount, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	now := time.Now()
+	counts := map[[3]string]int64{}
+	for id, ds := range m.Deadlines {
+		d := m.Disputes[id]
+		for _, dl := range ds {
+			if dl.Status(now) == domain.DeadlineBreached {
+				counts[[3]string{d.TenantID.String(), string(d.Regime), string(dl.Kind)}]++
+			}
+		}
+	}
+	out := make([]application.OverdueCount, 0, len(counts))
+	for k, n := range counts {
+		out = append(out, application.OverdueCount{TenantID: uuid.MustParse(k[0]), Regime: domain.Regime(k[1]), Kind: domain.DeadlineKind(k[2]), N: n})
+	}
+	return out, nil
 }
 
 type memTx struct {
@@ -201,6 +232,9 @@ func (t *memTx) ListDisputes(_ context.Context, q application.ListQuery) ([]appl
 		if d.TenantID != t.tenant || (q.State != nil && d.State != *q.State) {
 			continue
 		}
+		if q.Overdue && !t.overdue(d.ID, q.Now) {
+			continue
+		}
 		if q.After != nil && d.OpenedAt.After(q.After.OpenedAt) {
 			continue
 		}
@@ -219,4 +253,71 @@ func (t *memTx) ListDisputes(_ context.Context, q application.ListQuery) ([]appl
 		all = all[:q.Limit]
 	}
 	return all, nil
+}
+
+func (t *memTx) overdue(id uuid.UUID, now time.Time) bool {
+	for _, d := range t.s.Deadlines[id] {
+		if d.Open() && now.After(d.DueAt) {
+			return true
+		}
+	}
+	return false
+}
+
+func (t *memTx) TenantCalendar(_ context.Context) (domain.Calendar, error) {
+	if c, ok := t.s.Calendars[t.tenant]; ok {
+		return c, nil
+	}
+	return domain.DefaultCalendar(), nil
+}
+
+func (t *memTx) InsertDeadlines(_ context.Context, id uuid.UUID, ds []domain.Deadline) error {
+	if _, err := t.GetDispute(context.Background(), id); err != nil {
+		return err
+	}
+	t.s.Deadlines[id] = append(t.s.Deadlines[id], ds...)
+	return nil
+}
+
+func (t *memTx) ListDeadlines(_ context.Context, id uuid.UUID) ([]domain.Deadline, error) {
+	if _, err := t.GetDispute(context.Background(), id); err != nil {
+		return nil, err
+	}
+	return append([]domain.Deadline(nil), t.s.Deadlines[id]...), nil
+}
+
+func (t *memTx) SettleDeadline(_ context.Context, id uuid.UUID, kind domain.DeadlineKind, cycle int, met bool, at time.Time) error {
+	if _, err := t.GetDispute(context.Background(), id); err != nil {
+		return err
+	}
+	ds := t.s.Deadlines[id]
+	for i := range ds {
+		if ds[i].Kind == kind && ds[i].Cycle == cycle && ds[i].Open() {
+			stamp := at
+			if met {
+				ds[i].MetAt = &stamp
+			} else {
+				ds[i].VoidedAt = &stamp
+			}
+		}
+	}
+	return nil
+}
+
+func (t *memTx) NextDeadlines(_ context.Context, ids []uuid.UUID) (map[uuid.UUID]domain.Deadline, error) {
+	out := map[uuid.UUID]domain.Deadline{}
+	for _, id := range ids {
+		if d, ok := t.s.Disputes[id]; !ok || d.TenantID != t.tenant {
+			continue
+		}
+		for _, dl := range t.s.Deadlines[id] {
+			if !dl.Open() {
+				continue
+			}
+			if cur, ok := out[id]; !ok || dl.DueAt.Before(cur.DueAt) {
+				out[id] = dl
+			}
+		}
+	}
+	return out, nil
 }
