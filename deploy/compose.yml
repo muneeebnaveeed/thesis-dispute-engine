@@ -9,6 +9,7 @@
 #
 #   make db-up      postgres only (the usual `make run` loop)
 #   make up         postgres + the API built from backend/Dockerfile
+#   make docker-dev postgres + the API in a Go toolchain container with live reload
 #   make otel-up    the above plus Jaeger; the API exports traces to it
 services:
   postgres:
@@ -48,6 +49,24 @@ services:
       OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-}
       OTEL_METRICS_EXPORTER: ${OTEL_METRICS_EXPORTER:-}
 
+  # Toolchain container for a fully dockerised dev loop; air watches the bind mount.
+  api-dev:
+    image: golang:${GO_VERSION:-1.27.1}
+    network_mode: host
+    profiles: [dev]
+    working_dir: /src
+    command: sh -c "go run github.com/air-verse/air@v1.67.4"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../backend:/src
+      - gomod:/go/pkg/mod
+      - gobuild:/root/.cache/go-build
+    environment:
+      DISPUTE_ADDR: ":8090"
+      DISPUTE_DATABASE_URL: postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable
+
   # Jaeger v2 speaks OTLP natively (4317 gRPC, 4318 HTTP) and serves its UI on
   # 16686, so no separate collector is needed for local tracing.
   jaeger:
@@ -57,3 +76,5 @@ services:
 
 volumes:
   pgdata:
+  gomod:
+  gobuild:

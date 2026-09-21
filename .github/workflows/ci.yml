@@ -142,10 +142,8 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
-      # Phase 4 replaces this with pnpm/action-setup + actions/setup-node
-      # (cache: pnpm), `pnpm install --frozen-lockfile`, then a matrix of
-      # lint / typecheck / test like the backend job above.
-      - name: Placeholder until Phase 4
+      # Replace with pnpm/action-setup + setup-node (cache: pnpm) and a check matrix once frontend/ exists.
+      - name: Placeholder
         run: |
           if [ -f package.json ]; then echo "frontend exists: add real steps"; exit 1; fi
           echo "no frontend yet"

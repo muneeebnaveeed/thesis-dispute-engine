@@ -1,15 +1,17 @@
-# Root task runner. Backend targets delegate into backend/; frontend targets
-# arrive with Phase 4 (pnpm + Node in frontend/).
+# Root task runner; backend targets delegate into backend/.
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
 BACKEND := backend
 GO      := cd $(BACKEND) && go
 
-.PHONY: help run dev build test test-race lint vet fmt fmt-fix tidy vuln versions db-up db-down db-logs up down otel-up otel-down image ci
+.PHONY: help hooks run dev build test test-race lint vet fmt fmt-fix tidy vuln versions db-up db-down db-logs up down docker-dev otel-up otel-down image pr ci-logs pr-comments ci
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
+
+hooks: ## Point git at .githooks (pre-commit: format + lint staged Go, version drift check)
+	git config core.hooksPath .githooks
 
 run: ## Run the API natively (reads DISPUTE_* / OTEL_* env vars; defaults target deploy/compose.yml)
 	$(GO) run ./cmd/api
@@ -59,6 +61,9 @@ db-logs: ## Tail PostgreSQL logs
 up: ## PostgreSQL + the API built from backend/Dockerfile
 	docker compose -f deploy/compose.yml --profile app up -d --build
 
+docker-dev: ## PostgreSQL + the API in a Go toolchain container with live reload (bind mount)
+	docker compose -f deploy/compose.yml --profile dev up --build
+
 down: ## Stop everything started by up/otel-up (keeps the DB volume)
 	docker compose -f deploy/compose.yml --profile app --profile otel down
 
@@ -73,5 +78,14 @@ otel-down: ## Stop the otel stack
 # out. Runtime containers get the same via compose. CI does not need it.
 image: ## Build the API image locally
 	docker build --network host -t dispute-engine-api:local --build-arg VERSION=$$(git rev-parse --short HEAD) $(BACKEND)
+
+pr: ## Open a PR: make pr ARGS='--summary ... --why ... --testing ...'
+	scripts/create-pr $(ARGS)
+
+ci-logs: ## Download failing CI logs for the current PR into notes/ (ARGS='--pr N --wait')
+	scripts/fetch-ci-logs $(ARGS)
+
+pr-comments: ## Export review comments for the current PR into notes/ (ARGS='--pr N')
+	scripts/fetch-pr-comments $(ARGS)
 
 ci: versions fmt vet lint test tidy ## Everything CI runs, locally (race detector needs cgo; see test-race)

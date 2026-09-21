@@ -33,3 +33,6 @@ frontend/.vinxi/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Agent working notes (CI logs, PR comment exports)
+notes/

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Pre-commit: format and lint only the Go packages with staged changes, then re-stage formatting.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+mapfile -t files < <(git diff --cached --name-only --diff-filter=ACMR -- 'backend/*.go' 'backend/**/*.go')
+((${#files[@]})) || exit 0
+mapfile -t pkgs < <(printf '%s\n' "${files[@]}" | sed 's|^backend/||; s|/[^/]*$||' | sort -u | sed 's|^|./|')
+(cd backend && golangci-lint fmt "${pkgs[@]}" && golangci-lint run "${pkgs[@]}")
+git add -- "${files[@]}"

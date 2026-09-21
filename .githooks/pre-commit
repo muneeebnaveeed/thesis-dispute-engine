@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+scripts/lint-staged
+scripts/check-runtime-versions.sh >/dev/null

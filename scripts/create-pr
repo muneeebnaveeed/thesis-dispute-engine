@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Opens a PR for the current branch with a conventional-commit title and the repo template filled in.
+#
+#   scripts/create-pr --summary "..." --why "..." --testing "..." [--notes "..."] \
+#                     [--title "type(scope): subject"] [--base main] [--draft] [--dry-run]
+#
+# The title defaults to the subject of the branch's only commit; with several commits it is required.
+set -euo pipefail
+source "$(dirname "$0")/lib/common.sh"
+require_gh_account
+
+title="" summary="" why="" testing="" notes="" base="" draft=0 dry=0
+while (($#)); do
+  case "$1" in
+    --title) title="$2"; shift 2 ;;
+    --summary) summary="$2"; shift 2 ;;
+    --why) why="$2"; shift 2 ;;
+    --testing) testing="$2"; shift 2 ;;
+    --notes) notes="$2"; shift 2 ;;
+    --base) base="$2"; shift 2 ;;
+    --draft) draft=1; shift ;;
+    --dry-run|-n) dry=1; shift ;;
+    -h|--help) sed -n '2,7p' "$0"; exit 0 ;;
+    *) die "unknown flag $1" ;;
+  esac
+done
+
+require_feature_branch
+require_clean_tree
+[[ -z "$base" ]] && base=$(default_branch)
+branch=$(current_branch)
+
+commits=$(git rev-list --count "origin/$base..HEAD" 2>/dev/null || git rev-list --count "$base..HEAD")
+if [[ -z "$title" ]]; then
+  ((commits == 1)) || die "branch has $commits commits; pass --title"
+  title=$(git log -1 --format=%s)
+fi
+[[ "$title" =~ ^(feat|fix|chore|refactor|docs|test|perf|build|ci|style)(\([a-z0-9/._-]+\))?!?:\ .+ ]] \
+  || die "title must be conventional-commit shaped, got: $title"
+[[ -n "$summary" && -n "$why" && -n "$testing" ]] || die "--summary, --why and --testing are required"
+
+body=$(cat <<BODY
+## Summary
+
+$summary
+
+## Why
+
+$why
+
+## Testing
+
+$testing
+BODY
+)
+[[ -n "$notes" ]] && body+=$'\n\n## Notes\n\n'"$notes"
+
+if ((dry)); then
+  printf 'branch: %s -> %s\ntitle: %s\n\n%s\n' "$branch" "$base" "$title" "$body"
+  exit 0
+fi
+
+if [[ -z "$(git ls-remote --heads origin "$branch")" ]]; then
+  git push -u origin "$branch"
+else
+  git push origin "$branch"
+fi
+args=(--base "$base" --title "$title" --body "$body")
+((draft)) && args+=(--draft)
+gh pr create "${args[@]}"
