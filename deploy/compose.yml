@@ -95,7 +95,7 @@ services:
 
   # Synthetic traffic so the dashboards are populated during a demo; needs `make db-seed` (otel-up runs it).
   probe:
-    image: curlimages/curl:8.16.0
+    image: curlimages/curl:8.22.0
     network_mode: host
     profiles: [otel]
     depends_on: [api]
