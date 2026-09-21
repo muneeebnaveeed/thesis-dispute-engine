@@ -115,6 +115,7 @@ void _Dispute
 export const ErrorCode = Type.Union(
   [
     Type.Literal('unauthenticated'),
+    Type.Literal('rate-limited'),
     Type.Literal('malformed-request'),
     Type.Literal('contract-violation'),
     Type.Literal('not-found'),
@@ -192,6 +193,8 @@ export const SessionBlob = Type.Object(
         format: 'uuid',
       }),
     ),
+    subject: Type.Optional(Type.String({ description: "The analyst's subject at the realm" })),
+    sid: Type.Optional(Type.String({ description: "The realm's session id from the ID token" })),
     ciphertext: Type.String({ format: 'byte', maxLength: 16384 }),
     expiresAt: Type.String({ format: 'date-time' }),
   },
@@ -202,3 +205,16 @@ export const SessionBlob = Type.Object(
 export type SessionBlob = Static<typeof SessionBlob>
 const _SessionBlob: Same<SessionBlob, components['schemas']['SessionBlob']> = true
 void _SessionBlob
+
+export const TenantSummary = Type.Object({
+  id: Type.String({ format: 'uuid' }),
+  slug: Type.String(),
+  name: Type.String(),
+  issuer: Type.Optional(Type.String({ description: "OIDC issuer of the tenant's realm." })),
+  emailDomains: Type.Array(Type.String(), {
+    description: 'Work-email domains that map to this tenant at sign-in.',
+  }),
+})
+export type TenantSummary = Static<typeof TenantSummary>
+const _TenantSummary: Same<TenantSummary, components['schemas']['TenantSummary']> = true
+void _TenantSummary

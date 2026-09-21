@@ -14,6 +14,24 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+const bumpTenantRateWindow = `-- name: BumpTenantRateWindow :one
+INSERT INTO tenant_rate_windows (tenant_id, window_start, count) VALUES ($1, $2, 1)
+ON CONFLICT (tenant_id, window_start) DO UPDATE SET count = tenant_rate_windows.count + 1
+RETURNING count
+`
+
+type BumpTenantRateWindowParams struct {
+	TenantID    uuid.UUID
+	WindowStart time.Time
+}
+
+func (q *Queries) BumpTenantRateWindow(ctx context.Context, arg BumpTenantRateWindowParams) (int32, error) {
+	row := q.db.QueryRow(ctx, bumpTenantRateWindow, arg.TenantID, arg.WindowStart)
+	var count int32
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countDisputesByState = `-- name: CountDisputesByState :many
 SELECT tenant_id, regime, state, n FROM disputes_by_state
 `
@@ -49,6 +67,47 @@ DELETE FROM web_sessions WHERE id = $1
 
 func (q *Queries) DeleteWebSession(ctx context.Context, id uuid.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteWebSession, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteWebSessionsBySid = `-- name: DeleteWebSessionsBySid :execrows
+DELETE FROM web_sessions WHERE sid = $1
+`
+
+func (q *Queries) DeleteWebSessionsBySid(ctx context.Context, sid *string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteWebSessionsBySid, sid)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteWebSessionsBySubject = `-- name: DeleteWebSessionsBySubject :execrows
+DELETE FROM web_sessions WHERE tenant_id = $1 AND subject = $2
+`
+
+type DeleteWebSessionsBySubjectParams struct {
+	TenantID pgtype.UUID
+	Subject  *string
+}
+
+func (q *Queries) DeleteWebSessionsBySubject(ctx context.Context, arg DeleteWebSessionsBySubjectParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteWebSessionsBySubject, arg.TenantID, arg.Subject)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteWebSessionsByTenant = `-- name: DeleteWebSessionsByTenant :execrows
+DELETE FROM web_sessions WHERE tenant_id = $1
+`
+
+func (q *Queries) DeleteWebSessionsByTenant(ctx context.Context, tenantID pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteWebSessionsByTenant, tenantID)
 	if err != nil {
 		return 0, err
 	}
@@ -190,7 +249,7 @@ func (q *Queries) GetIdempotencyKey(ctx context.Context, arg GetIdempotencyKeyPa
 }
 
 const getTenantByIssuer = `-- name: GetTenantByIssuer :one
-SELECT id, slug FROM tenants WHERE oidc_issuer = $1
+SELECT id, slug FROM tenants WHERE oidc_issuer = $1 AND disabled_at IS NULL
 `
 
 type GetTenantByIssuerRow struct {
@@ -206,8 +265,9 @@ func (q *Queries) GetTenantByIssuer(ctx context.Context, oidcIssuer *string) (Ge
 }
 
 const getTenantByTenantKeyHash = `-- name: GetTenantByTenantKeyHash :one
-SELECT id, tenant_id FROM tenant_keys
-WHERE key_hash = $1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())
+SELECT k.id, k.tenant_id FROM tenant_keys k
+JOIN tenants t ON t.id = k.tenant_id AND t.disabled_at IS NULL
+WHERE k.key_hash = $1 AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at > now())
 `
 
 type GetTenantByTenantKeyHashRow struct {
@@ -549,8 +609,50 @@ func (q *Queries) ListTenantKeys(ctx context.Context) ([]ListTenantKeysRow, erro
 	return items, nil
 }
 
+const listTenantKeysByTenant = `-- name: ListTenantKeysByTenant :many
+SELECT id, prefix, label, created_at, last_used_at, expires_at, revoked_at FROM tenant_keys WHERE tenant_id = $1 ORDER BY created_at
+`
+
+type ListTenantKeysByTenantRow struct {
+	ID         uuid.UUID
+	Prefix     string
+	Label      string
+	CreatedAt  time.Time
+	LastUsedAt pgtype.Timestamptz
+	ExpiresAt  pgtype.Timestamptz
+	RevokedAt  pgtype.Timestamptz
+}
+
+func (q *Queries) ListTenantKeysByTenant(ctx context.Context, tenantID uuid.UUID) ([]ListTenantKeysByTenantRow, error) {
+	rows, err := q.db.Query(ctx, listTenantKeysByTenant, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTenantKeysByTenantRow{}
+	for rows.Next() {
+		var i ListTenantKeysByTenantRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Prefix,
+			&i.Label,
+			&i.CreatedAt,
+			&i.LastUsedAt,
+			&i.ExpiresAt,
+			&i.RevokedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTenants = `-- name: ListTenants :many
-SELECT id, name, slug, oidc_issuer FROM tenants ORDER BY name
+SELECT id, name, slug, oidc_issuer, disabled_at FROM tenants ORDER BY name
 `
 
 type ListTenantsRow struct {
@@ -558,6 +660,7 @@ type ListTenantsRow struct {
 	Name       string
 	Slug       string
 	OidcIssuer *string
+	DisabledAt pgtype.Timestamptz
 }
 
 func (q *Queries) ListTenants(ctx context.Context) ([]ListTenantsRow, error) {
@@ -574,6 +677,45 @@ func (q *Queries) ListTenants(ctx context.Context) ([]ListTenantsRow, error) {
 			&i.Name,
 			&i.Slug,
 			&i.OidcIssuer,
+			&i.DisabledAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTenantsForDiscovery = `-- name: ListTenantsForDiscovery :many
+SELECT id, name, slug, oidc_issuer, email_domains FROM tenants WHERE disabled_at IS NULL ORDER BY name
+`
+
+type ListTenantsForDiscoveryRow struct {
+	ID           uuid.UUID
+	Name         string
+	Slug         string
+	OidcIssuer   *string
+	EmailDomains []string
+}
+
+func (q *Queries) ListTenantsForDiscovery(ctx context.Context) ([]ListTenantsForDiscoveryRow, error) {
+	rows, err := q.db.Query(ctx, listTenantsForDiscovery)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTenantsForDiscoveryRow{}
+	for rows.Next() {
+		var i ListTenantsForDiscoveryRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Slug,
+			&i.OidcIssuer,
+			&i.EmailDomains,
 		); err != nil {
 			return nil, err
 		}
@@ -596,6 +738,18 @@ func (q *Queries) PurgeIdempotencyKeys(ctx context.Context, before time.Time) (i
 	return n, err
 }
 
+const purgeTenantRateWindows = `-- name: PurgeTenantRateWindows :execrows
+DELETE FROM tenant_rate_windows WHERE window_start < $1
+`
+
+func (q *Queries) PurgeTenantRateWindows(ctx context.Context, windowStart time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, purgeTenantRateWindows, windowStart)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const purgeWebSessions = `-- name: PurgeWebSessions :execrows
 DELETE FROM web_sessions WHERE expires_at < now()
 `
@@ -609,9 +763,10 @@ func (q *Queries) PurgeWebSessions(ctx context.Context) (int64, error) {
 }
 
 const putWebSession = `-- name: PutWebSession :exec
-INSERT INTO web_sessions (id, tenant_id, ciphertext, expires_at)
-VALUES ($1, $2, $3, $4)
-ON CONFLICT (id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id, ciphertext = EXCLUDED.ciphertext, expires_at = EXCLUDED.expires_at, updated_at = now()
+INSERT INTO web_sessions (id, tenant_id, ciphertext, expires_at, subject, sid)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id, ciphertext = EXCLUDED.ciphertext, expires_at = EXCLUDED.expires_at,
+  subject = EXCLUDED.subject, sid = EXCLUDED.sid, updated_at = now()
 `
 
 type PutWebSessionParams struct {
@@ -619,6 +774,8 @@ type PutWebSessionParams struct {
 	TenantID   pgtype.UUID
 	Ciphertext []byte
 	ExpiresAt  time.Time
+	Subject    *string
+	Sid        *string
 }
 
 func (q *Queries) PutWebSession(ctx context.Context, arg PutWebSessionParams) error {
@@ -627,6 +784,8 @@ func (q *Queries) PutWebSession(ctx context.Context, arg PutWebSessionParams) er
 		arg.TenantID,
 		arg.Ciphertext,
 		arg.ExpiresAt,
+		arg.Subject,
+		arg.Sid,
 	)
 	return err
 }
@@ -637,6 +796,40 @@ UPDATE tenant_keys SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL
 
 func (q *Queries) RevokeTenantKey(ctx context.Context, id uuid.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, revokeTenantKey, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setTenantDisabled = `-- name: SetTenantDisabled :execrows
+UPDATE tenants SET disabled_at = CASE WHEN $1::boolean THEN COALESCE(disabled_at, now()) ELSE NULL END WHERE id = $2
+`
+
+type SetTenantDisabledParams struct {
+	Disabled bool
+	ID       uuid.UUID
+}
+
+func (q *Queries) SetTenantDisabled(ctx context.Context, arg SetTenantDisabledParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setTenantDisabled, arg.Disabled, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setTenantEmailDomains = `-- name: SetTenantEmailDomains :execrows
+UPDATE tenants SET email_domains = $2 WHERE id = $1
+`
+
+type SetTenantEmailDomainsParams struct {
+	ID           uuid.UUID
+	EmailDomains []string
+}
+
+func (q *Queries) SetTenantEmailDomains(ctx context.Context, arg SetTenantEmailDomainsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setTenantEmailDomains, arg.ID, arg.EmailDomains)
 	if err != nil {
 		return 0, err
 	}

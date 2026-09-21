@@ -106,6 +106,40 @@ export type paths = {
     patch?: never
     trace?: never
   }
+  '/internal/sessions': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /** End every session matching a realm session id or a tenant's subject */
+    delete: operations['deleteSessions']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/internal/tenants': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Active tenants with what the sign-in page needs to find their realm */
+    get: operations['listTenants']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export type components = {
@@ -123,6 +157,7 @@ export type components = {
      */
     ErrorCode:
       | 'unauthenticated'
+      | 'rate-limited'
       | 'malformed-request'
       | 'contract-violation'
       | 'not-found'
@@ -157,6 +192,16 @@ export type components = {
       field: string
       message: string
     }
+    TenantSummary: {
+      /** Format: uuid */
+      id: string
+      slug: string
+      name: string
+      /** @description OIDC issuer of the tenant's realm. */
+      issuer?: string
+      /** @description Work-email domains that map to this tenant at sign-in. */
+      emailDomains: string[]
+    }
     /** @description Ciphertext the frontend server produced; the API stores it without being able to read it. */
     SessionBlob: {
       /**
@@ -164,6 +209,10 @@ export type components = {
        * @description Set once the session belongs to a signed-in analyst; informational.
        */
       tenantId?: string
+      /** @description The analyst's subject at the realm */
+      subject?: string
+      /** @description The realm's session id from the ID token */
+      sid?: string
       /** Format: byte */
       ciphertext: string
       /** Format: date-time */
@@ -265,6 +314,16 @@ export type components = {
     /** @description Malformed request. */
     BadRequest: {
       headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/problem+json': components['schemas']['Problem']
+      }
+    }
+    /** @description The tenant's request budget for the current minute is spent; retryAfterSeconds says when to try again. */
+    TooManyRequests: {
+      headers: {
+        'Retry-After'?: number
         [name: string]: unknown
       }
       content: {
@@ -388,6 +447,7 @@ export interface operations {
       401: components['responses']['Unauthorized']
       404: components['responses']['NotFound']
       422: components['responses']['Unprocessable']
+      429: components['responses']['TooManyRequests']
     }
   }
   getDispute: {
@@ -412,6 +472,7 @@ export interface operations {
       }
       401: components['responses']['Unauthorized']
       404: components['responses']['NotFound']
+      429: components['responses']['TooManyRequests']
     }
   }
   applyDisputeEvent: {
@@ -454,6 +515,7 @@ export interface operations {
         }
       }
       422: components['responses']['Unprocessable']
+      429: components['responses']['TooManyRequests']
     }
   }
   getSession: {
@@ -523,6 +585,55 @@ export interface operations {
           [name: string]: unknown
         }
         content?: never
+      }
+      401: components['responses']['Unauthorized']
+    }
+  }
+  deleteSessions: {
+    parameters: {
+      query?: {
+        sid?: string
+        tenantId?: string
+        subject?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description How many sessions were ended. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            deleted: number
+          }
+        }
+      }
+      400: components['responses']['BadRequest']
+      401: components['responses']['Unauthorized']
+    }
+  }
+  listTenants: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Active tenants. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TenantSummary'][]
+        }
       }
       401: components['responses']['Unauthorized']
     }

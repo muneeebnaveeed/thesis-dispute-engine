@@ -17,6 +17,7 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/config"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/httpserver"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/postgres"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/ratelimit"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/telemetry"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/websession"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/migrations"
@@ -78,13 +79,21 @@ func run(cfg config.Config, logger *slog.Logger) error {
 	go application.RunIdempotencyPurge(ctx, store, cfg.IdempotencyTTL, logger)
 
 	mux := http.NewServeMux()
+	keys := disputepg.NewKeyStore(pool)
 	sessions := websession.NewStore(pool)
 	go websession.RunPurge(ctx, sessions, logger)
-	if err := disputehttp.Mount(mux, svc, pool.Ping, disputehttp.WithSessions(sessions)); err != nil {
+	if err := disputehttp.Mount(mux, svc, pool.Ping, disputehttp.WithSessions(sessions), disputehttp.WithTenants(keys)); err != nil {
 		return err
 	}
-	keys := disputepg.NewKeyStore(pool)
-	srv := httpserver.New(cfg.Addr, logger, mux, httpserver.CORS(cfg.CORSOrigins), auth.Bearer(keys, auth.NewOIDC(keys)), auth.ServiceKey(cfg.ServiceKey))
+	limiter := ratelimit.NewPGCounter(pool)
+	go ratelimit.RunPurge(ctx, limiter, logger)
+	srv := httpserver.New(cfg.Addr, logger, mux,
+		httpserver.InternalOnly("/internal/", cfg.InternalCIDRs),
+		httpserver.CORS(cfg.CORSOrigins),
+		auth.Bearer(keys, auth.NewOIDC(keys)),
+		auth.ServiceKey(cfg.ServiceKey),
+		ratelimit.Middleware(limiter, cfg.RatePerMinute, logger),
+	)
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()

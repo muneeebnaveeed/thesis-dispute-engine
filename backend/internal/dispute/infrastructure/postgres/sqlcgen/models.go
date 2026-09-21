@@ -68,12 +68,14 @@ type IdempotencyKey struct {
 }
 
 type Tenant struct {
-	ID         uuid.UUID
-	Name       string
-	Settings   []byte
-	CreatedAt  time.Time
-	Slug       string
-	OidcIssuer *string
+	ID           uuid.UUID
+	Name         string
+	Settings     []byte
+	CreatedAt    time.Time
+	Slug         string
+	OidcIssuer   *string
+	DisabledAt   pgtype.Timestamptz
+	EmailDomains []string
 }
 
 type TenantKey struct {
@@ -86,6 +88,12 @@ type TenantKey struct {
 	Prefix     string
 	LastUsedAt pgtype.Timestamptz
 	ExpiresAt  pgtype.Timestamptz
+}
+
+type TenantRateWindow struct {
+	TenantID    uuid.UUID
+	WindowStart time.Time
+	Count       int32
 }
 
 type Transaction struct {
@@ -106,4 +114,6 @@ type WebSession struct {
 	ExpiresAt  time.Time
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+	Subject    *string
+	Sid        *string
 }

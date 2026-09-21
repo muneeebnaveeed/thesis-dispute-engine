@@ -60,6 +60,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /disputes/{disputeId}:
     get:
       operationId: getDispute
@@ -75,6 +76,7 @@ paths:
               schema: { $ref: "#/components/schemas/Dispute" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /disputes/{disputeId}/events:
     post:
       operationId: applyDisputeEvent
@@ -97,6 +99,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
         "409":
           description: The event is not allowed from the current state, or a concurrent update won.
           content:
@@ -144,6 +147,43 @@ paths:
       responses:
         "204": { description: Removed, or never existed. }
         "401": { $ref: "#/components/responses/Unauthorized" }
+  /internal/sessions:
+    delete:
+      operationId: deleteSessions
+      summary: End every session matching a realm session id or a tenant's subject
+      tags: [internal]
+      security: [{ serviceKey: [] }]
+      parameters:
+        - { name: sid, in: query, schema: { type: string } }
+        - { name: tenantId, in: query, schema: { type: string, format: uuid } }
+        - { name: subject, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: How many sessions were ended.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted: { type: integer }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /internal/tenants:
+    get:
+      operationId: listTenants
+      summary: Active tenants with what the sign-in page needs to find their realm
+      tags: [internal]
+      security: [{ serviceKey: [] }]
+      responses:
+        "200":
+          description: Active tenants.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TenantSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
 components:
   securitySchemes:
     bearerAuth:
@@ -170,6 +210,14 @@ components:
   responses:
     BadRequest:
       description: Malformed request.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    TooManyRequests:
+      description: The tenant's request budget for the current minute is spent; retryAfterSeconds says when to try again.
+      headers:
+        Retry-After:
+          schema: { type: integer }
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -202,6 +250,7 @@ components:
       description: Stable machine-readable failure identifier; branch on this, never on text.
       enum:
         - unauthenticated
+        - rate-limited
         - malformed-request
         - contract-violation
         - not-found
@@ -243,12 +292,23 @@ components:
       properties:
         field: { type: string, example: "/transactionId" }
         message: { type: string }
+    TenantSummary:
+      type: object
+      required: [id, slug, name, emailDomains]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        issuer: { type: string, description: OIDC issuer of the tenant's realm. }
+        emailDomains: { type: array, items: { type: string }, description: Work-email domains that map to this tenant at sign-in. }
     SessionBlob:
       type: object
       description: Ciphertext the frontend server produced; the API stores it without being able to read it.
       required: [ciphertext, expiresAt]
       properties:
         tenantId: { type: string, format: uuid, description: Set once the session belongs to a signed-in analyst; informational. }
+        subject: { type: string, description: The analyst's subject at the realm, so all of a user's sessions can be ended. }
+        sid: { type: string, description: The realm's session id from the ID token, for back-channel logout. }
         ciphertext: { type: string, format: byte, maxLength: 16384 }
         expiresAt: { type: string, format: date-time }
     Regime:

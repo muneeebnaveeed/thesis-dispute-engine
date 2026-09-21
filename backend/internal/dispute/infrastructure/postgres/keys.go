@@ -55,3 +55,29 @@ func (k *KeyStore) TenantForIssuer(ctx context.Context, issuer string) (uuid.UUI
 	}
 	return row.ID, nil
 }
+
+// TenantSummary is what the sign-in page needs to send an analyst to the right realm.
+type TenantSummary struct {
+	ID           uuid.UUID
+	Slug         string
+	Name         string
+	Issuer       string
+	EmailDomains []string
+}
+
+// ActiveTenants lists tenants that are not disabled.
+func (k *KeyStore) ActiveTenants(ctx context.Context) ([]TenantSummary, error) {
+	rows, err := sqlcgen.New(k.pool).ListTenantsForDiscovery(ctx)
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	out := make([]TenantSummary, 0, len(rows))
+	for _, r := range rows {
+		t := TenantSummary{ID: r.ID, Slug: r.Slug, Name: r.Name, EmailDomains: r.EmailDomains}
+		if r.OidcIssuer != nil {
+			t.Issuer = *r.OidcIssuer
+		}
+		out = append(out, t)
+	}
+	return out, nil
+}

@@ -22,15 +22,6 @@ type IssuerResolver interface {
 	TenantForIssuer(ctx context.Context, issuer string) (uuid.UUID, error)
 }
 
-// Principal is what an analyst token resolves to.
-type Principal struct {
-	Tenant  uuid.UUID
-	Subject string
-	Email   string
-	Name    string
-	Roles   []string
-}
-
 // OIDC verifies analyst access tokens. Verifiers are built per issuer on first sight and cached; each fetches
 // the realm's discovery document and JWKS through go-oidc, which refreshes keys on rotation.
 type OIDC struct {
@@ -72,6 +63,7 @@ func (o *OIDC) Verify(ctx context.Context, raw string) (Principal, error) {
 	}
 	var claims struct {
 		TenantID string   `json:"tenant_id"`
+		Sid      string   `json:"sid"`
 		Email    string   `json:"email"`
 		Name     string   `json:"preferred_username"`
 		Roles    []string `json:"roles"`
@@ -83,7 +75,7 @@ func (o *OIDC) Verify(ctx context.Context, raw string) (Principal, error) {
 	if claims.TenantID != "" && claims.TenantID != tenant.String() {
 		return Principal{}, ErrUnauthenticated
 	}
-	return Principal{Tenant: tenant, Subject: tok.Subject, Email: claims.Email, Name: claims.Name, Roles: claims.Roles}, nil
+	return Principal{Tenant: tenant, Subject: tok.Subject, Sid: claims.Sid, Email: claims.Email, Name: claims.Name, Roles: claims.Roles}, nil
 }
 
 func (o *OIDC) verifier(ctx context.Context, issuer string) (*oidc.IDTokenVerifier, error) {

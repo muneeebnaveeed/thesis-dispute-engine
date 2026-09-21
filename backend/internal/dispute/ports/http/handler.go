@@ -17,6 +17,7 @@ import (
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
+	disputepg "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/ports/http/oapi"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/auth"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
@@ -32,6 +33,7 @@ type Handler struct {
 	svc      *application.Service
 	ready    Readiness
 	sessions SessionStore
+	tenants  TenantDirectory
 }
 
 // SessionStore is the opaque blob store behind /internal/sessions; nil disables those routes with a 404.
@@ -39,7 +41,16 @@ type SessionStore interface {
 	Put(ctx context.Context, id uuid.UUID, b websession.Blob) error
 	Get(ctx context.Context, id uuid.UUID) (websession.Blob, error)
 	Delete(ctx context.Context, id uuid.UUID) error
+	DeleteMatching(ctx context.Context, sel websession.Selector) (int64, error)
 }
+
+// TenantDirectory backs /internal/tenants; nil disables it with a 404.
+type TenantDirectory interface {
+	ActiveTenants(ctx context.Context) ([]disputepg.TenantSummary, error)
+}
+
+// WithTenants enables the internal tenant listing.
+func WithTenants(d TenantDirectory) Option { return func(h *Handler) { h.tenants = d } }
 
 // Option configures Mount.
 type Option func(*Handler)
@@ -120,7 +131,14 @@ func (h *Handler) PutSession(ctx context.Context, req oapi.PutSessionRequestObje
 		t := *req.Body.TenantId
 		tenantID = &t
 	}
-	if err := h.sessions.Put(ctx, req.SessionId, websession.Blob{TenantID: tenantID, Ciphertext: req.Body.Ciphertext, ExpiresAt: req.Body.ExpiresAt}); err != nil {
+	blob := websession.Blob{TenantID: tenantID, Ciphertext: req.Body.Ciphertext, ExpiresAt: req.Body.ExpiresAt}
+	if req.Body.Subject != nil {
+		blob.Subject = *req.Body.Subject
+	}
+	if req.Body.Sid != nil {
+		blob.Sid = *req.Body.Sid
+	}
+	if err := h.sessions.Put(ctx, req.SessionId, blob); err != nil {
 		return nil, err
 	}
 	return oapi.PutSession204Response{}, nil
@@ -139,6 +157,59 @@ func (h *Handler) GetSession(ctx context.Context, req oapi.GetSessionRequestObje
 	if b.TenantID != nil {
 		t := *b.TenantID
 		out.TenantId = &t
+	}
+	if b.Subject != "" {
+		out.Subject = &b.Subject
+	}
+	if b.Sid != "" {
+		out.Sid = &b.Sid
+	}
+	return out, nil
+}
+
+// DeleteSessions ends sessions by realm session id, or by tenant and subject.
+func (h *Handler) DeleteSessions(ctx context.Context, req oapi.DeleteSessionsRequestObject) (oapi.DeleteSessionsResponseObject, error) {
+	if h.sessions == nil {
+		return nil, application.ErrNotFound
+	}
+	sel := websession.Selector{}
+	if req.Params.Sid != nil {
+		sel.Sid = *req.Params.Sid
+	}
+	if req.Params.TenantId != nil {
+		t := *req.Params.TenantId
+		sel.TenantID = &t
+	}
+	if req.Params.Subject != nil {
+		sel.Subject = *req.Params.Subject
+	}
+	if sel.Sid == "" && sel.TenantID == nil {
+		return nil, errs.New(errs.Invalid, "contract-violation", "give sid, or tenantId with an optional subject")
+	}
+	n, err := h.sessions.DeleteMatching(ctx, sel)
+	if err != nil {
+		return nil, err
+	}
+	return oapi.DeleteSessions200JSONResponse{Deleted: int(n)}, nil
+}
+
+// ListTenants is the sign-in page's directory.
+func (h *Handler) ListTenants(ctx context.Context, _ oapi.ListTenantsRequestObject) (oapi.ListTenantsResponseObject, error) {
+	if h.tenants == nil {
+		return nil, application.ErrNotFound
+	}
+	list, err := h.tenants.ActiveTenants(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(oapi.ListTenants200JSONResponse, 0, len(list))
+	for _, t := range list {
+		item := oapi.TenantSummary{Id: t.ID, Slug: t.Slug, Name: t.Name, EmailDomains: t.EmailDomains}
+		if t.Issuer != "" {
+			issuer := t.Issuer
+			item.Issuer = &issuer
+		}
+		out = append(out, item)
 	}
 	return out, nil
 }

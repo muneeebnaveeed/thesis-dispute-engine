@@ -57,8 +57,9 @@ SELECT tenant_id, regime, state, n FROM disputes_by_state;
 INSERT INTO tenant_keys (id, tenant_id, key_hash, prefix, label, expires_at) VALUES ($1, $2, $3, $4, $5, $6);
 
 -- name: GetTenantByTenantKeyHash :one
-SELECT id, tenant_id FROM tenant_keys
-WHERE key_hash = $1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now());
+SELECT k.id, k.tenant_id FROM tenant_keys k
+JOIN tenants t ON t.id = k.tenant_id AND t.disabled_at IS NULL
+WHERE k.key_hash = $1 AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at > now());
 
 -- name: TouchTenantKey :exec
 UPDATE tenant_keys SET last_used_at = now() WHERE id = $1;
@@ -80,15 +81,16 @@ INSERT INTO tenants (id, name, slug, oidc_issuer) VALUES ($1, $2, $3, $4)
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, slug = EXCLUDED.slug, oidc_issuer = EXCLUDED.oidc_issuer;
 
 -- name: GetTenantByIssuer :one
-SELECT id, slug FROM tenants WHERE oidc_issuer = $1;
+SELECT id, slug FROM tenants WHERE oidc_issuer = $1 AND disabled_at IS NULL;
 
 -- name: ListTenants :many
-SELECT id, name, slug, oidc_issuer FROM tenants ORDER BY name;
+SELECT id, name, slug, oidc_issuer, disabled_at FROM tenants ORDER BY name;
 
 -- name: PutWebSession :exec
-INSERT INTO web_sessions (id, tenant_id, ciphertext, expires_at)
-VALUES ($1, $2, $3, $4)
-ON CONFLICT (id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id, ciphertext = EXCLUDED.ciphertext, expires_at = EXCLUDED.expires_at, updated_at = now();
+INSERT INTO web_sessions (id, tenant_id, ciphertext, expires_at, subject, sid)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id, ciphertext = EXCLUDED.ciphertext, expires_at = EXCLUDED.expires_at,
+  subject = EXCLUDED.subject, sid = EXCLUDED.sid, updated_at = now();
 
 -- name: GetWebSession :one
 SELECT id, tenant_id, ciphertext, expires_at FROM web_sessions WHERE id = $1 AND expires_at > now();
@@ -98,3 +100,32 @@ DELETE FROM web_sessions WHERE id = $1;
 
 -- name: PurgeWebSessions :execrows
 DELETE FROM web_sessions WHERE expires_at < now();
+
+-- name: BumpTenantRateWindow :one
+INSERT INTO tenant_rate_windows (tenant_id, window_start, count) VALUES ($1, $2, 1)
+ON CONFLICT (tenant_id, window_start) DO UPDATE SET count = tenant_rate_windows.count + 1
+RETURNING count;
+
+-- name: PurgeTenantRateWindows :execrows
+DELETE FROM tenant_rate_windows WHERE window_start < $1;
+
+-- name: ListTenantsForDiscovery :many
+SELECT id, name, slug, oidc_issuer, email_domains FROM tenants WHERE disabled_at IS NULL ORDER BY name;
+
+-- name: SetTenantDisabled :execrows
+UPDATE tenants SET disabled_at = CASE WHEN sqlc.arg(disabled)::boolean THEN COALESCE(disabled_at, now()) ELSE NULL END WHERE id = sqlc.arg(id);
+
+-- name: SetTenantEmailDomains :execrows
+UPDATE tenants SET email_domains = $2 WHERE id = $1;
+
+-- name: DeleteWebSessionsBySubject :execrows
+DELETE FROM web_sessions WHERE tenant_id = $1 AND subject = $2;
+
+-- name: DeleteWebSessionsBySid :execrows
+DELETE FROM web_sessions WHERE sid = $1;
+
+-- name: DeleteWebSessionsByTenant :execrows
+DELETE FROM web_sessions WHERE tenant_id = $1;
+
+-- name: ListTenantKeysByTenant :many
+SELECT id, prefix, label, created_at, last_used_at, expires_at, revoked_at FROM tenant_keys WHERE tenant_id = $1 ORDER BY created_at;

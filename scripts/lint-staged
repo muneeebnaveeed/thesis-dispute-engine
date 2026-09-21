@@ -10,9 +10,12 @@ if ((${#gofiles[@]})); then
   git add -- "${gofiles[@]}"
 fi
 
-mapfile -t fefiles < <(git diff --cached --name-only --diff-filter=ACMR -- 'frontend/**/*.ts' 'frontend/**/*.tsx' 'frontend/*.ts' 'frontend/*.json' 'frontend/**/*.json' 'frontend/**/*.css' | grep -v 'routeTree.gen.ts\|pnpm-lock' || true)
+# Generated files are formatted by their generator and ignored by the linter; lint-staged leaves them alone.
+mapfile -t fefiles < <(git diff --cached --name-only --diff-filter=ACMR -- 'frontend/**/*.ts' 'frontend/**/*.tsx' 'frontend/*.ts' 'frontend/*.json' 'frontend/**/*.json' 'frontend/**/*.css' | grep -v '\.gen\.ts$\|pnpm-lock' || true)
 if ((${#fefiles[@]})) && [[ -d frontend/node_modules ]]; then
   rel=("${fefiles[@]#frontend/}")
-  (cd frontend && pnpm exec oxfmt "${rel[@]}" && pnpm exec oxlint "${rel[@]}")
+  (cd frontend && pnpm exec oxfmt "${rel[@]}")
+  mapfile -t lintable < <(printf '%s\n' "${rel[@]}" | grep -E '\.(ts|tsx)$' || true)
+  ((${#lintable[@]})) && (cd frontend && pnpm exec oxlint "${lintable[@]}")
   git add -- "${fefiles[@]}"
 fi

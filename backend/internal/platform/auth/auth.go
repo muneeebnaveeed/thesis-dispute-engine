@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -43,6 +44,19 @@ func Prefix(key string) string {
 	return key[:PrefixLen]
 }
 
+// Principal is what an analyst token resolves to.
+type Principal struct {
+	Tenant  uuid.UUID
+	Subject string
+	Sid     string
+	Email   string
+	Name    string
+	Roles   []string
+}
+
+// HasRole reports whether the realm granted the role.
+func (p Principal) HasRole(role string) bool { return slices.Contains(p.Roles, role) }
+
 type ctxKey struct{}
 type principalKey struct{}
 
@@ -77,6 +91,7 @@ func Bearer(keys Resolver, oidc *OIDC) httpserver.Middleware {
 					id = p.Tenant
 					ctx = context.WithValue(ctx, principalKey{}, p)
 					trace.SpanFromContext(ctx).SetAttributes(attribute.String("enduser.id", p.Subject))
+					httpserver.Annotate(ctx, "user", p.Subject)
 				}
 			} else {
 				id, err = keys.TenantForKeyHash(ctx, HashKey(cred))

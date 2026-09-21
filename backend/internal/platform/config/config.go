@@ -2,6 +2,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -21,6 +22,12 @@ type Config struct {
 	CORSOrigins []string
 	// ServiceKey guards /internal/*, used only by the frontend server; empty disables those routes' authentication.
 	ServiceKey string
+	// InternalCIDRs are the peers allowed to see /internal/* at all; everyone else gets 404.
+	InternalCIDRs []string
+	// RatePerMinute is each tenant's request budget; 0 disables the limiter.
+	RatePerMinute int
+	// Production turns dev defaults into startup errors.
+	Production bool
 	LogLevel   slog.Level
 }
 
@@ -35,6 +42,30 @@ func Load() (Config, error) {
 		IdempotencyTTL:     24 * time.Hour,
 		CORSOrigins:        strings.Split(getenv("DISPUTE_CORS_ORIGINS", "http://localhost:3002"), ","),
 		ServiceKey:         getenv("DISPUTE_SERVICE_KEY", "dev-service-key"),
+		InternalCIDRs:      strings.Split(getenv("DISPUTE_INTERNAL_CIDRS", "127.0.0.0/8,::1/128"), ","),
+		RatePerMinute:      600,
+		Production:         os.Getenv("DISPUTE_ENV") == "production",
+	}
+
+	if raw := os.Getenv("DISPUTE_RATE_PER_MINUTE"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 0 {
+			return Config{}, fmt.Errorf("config: DISPUTE_RATE_PER_MINUTE must be a non-negative integer, got %q", raw)
+		}
+		cfg.RatePerMinute = n
+	}
+
+	// Dev defaults are fine on a laptop and a breach in production; refuse to start rather than hope.
+	if cfg.Production {
+		if cfg.ServiceKey == "dev-service-key" || len(cfg.ServiceKey) < 32 {
+			return Config{}, errors.New("config: DISPUTE_ENV=production needs DISPUTE_SERVICE_KEY of at least 32 characters, not the dev default")
+		}
+		if strings.Contains(cfg.DatabaseURL, "dispute_api:dispute_api@") || strings.Contains(cfg.MigrateDatabaseURL, "dispute:dispute@") {
+			return Config{}, errors.New("config: DISPUTE_ENV=production with the dev database credentials")
+		}
+		if strings.Contains(cfg.DatabaseURL, "sslmode=disable") {
+			return Config{}, errors.New("config: DISPUTE_ENV=production must not disable TLS to the database")
+		}
 	}
 
 	if raw := os.Getenv("DISPUTE_IDEMPOTENCY_TTL"); raw != "" {

@@ -21,6 +21,7 @@ const (
 	Unauthorized
 	Forbidden
 	Unavailable
+	RateLimited
 )
 
 // Code identifies one failure for machines; it is the stable part of the contract.
@@ -118,7 +119,7 @@ func UserMessage(err error) string {
 // Retryable reports whether the same or a re-evaluated request can succeed later.
 func Retryable(err error) bool {
 	switch KindOf(err) {
-	case Unavailable:
+	case Unavailable, RateLimited:
 		return true
 	case Conflict:
 		return CodeOf(err) == "concurrent-update"

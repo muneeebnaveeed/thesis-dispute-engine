@@ -16,6 +16,7 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application/apptest"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
+	disputepg "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres"
 	disputehttp "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/ports/http"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/auth"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/httpserver"
@@ -36,7 +37,8 @@ func newAPI(t *testing.T, ready disputehttp.Readiness) api {
 		t.Fatal(err)
 	}
 	mux := http.NewServeMux()
-	if err := disputehttp.Mount(mux, svc, ready, disputehttp.WithSessions(memSessions{})); err != nil {
+	directory := memTenants{{ID: apptest.TenantA, Slug: "otp", Name: "OTP Bank", Issuer: "http://kc/realms/otp", EmailDomains: []string{"otpbank.hu"}}}
+	if err := disputehttp.Mount(mux, svc, ready, disputehttp.WithSessions(memSessions{}), disputehttp.WithTenants(directory)); err != nil {
 		t.Fatal(err)
 	}
 	keys := keyResolver{"key-a": apptest.TenantA, "key-b": apptest.TenantB}
@@ -252,6 +254,20 @@ func (m memSessions) Get(_ context.Context, id uuid.UUID) (websession.Blob, erro
 	return b, nil
 }
 func (m memSessions) Delete(_ context.Context, id uuid.UUID) error { delete(m, id); return nil }
+func (m memSessions) DeleteMatching(_ context.Context, sel websession.Selector) (int64, error) {
+	var n int64
+	for id, b := range m {
+		if (sel.Sid != "" && b.Sid == sel.Sid) || (sel.TenantID != nil && b.TenantID != nil && *b.TenantID == *sel.TenantID && (sel.Subject == "" || b.Subject == sel.Subject)) {
+			delete(m, id)
+			n++
+		}
+	}
+	return n, nil
+}
+
+type memTenants []disputepg.TenantSummary
+
+func (m memTenants) ActiveTenants(context.Context) ([]disputepg.TenantSummary, error) { return m, nil }
 
 func TestInternalSessionsRequireTheServiceKey(t *testing.T) {
 	a := newAPI(t, func(context.Context) error { return nil })
@@ -282,5 +298,45 @@ func TestInternalSessionsRequireTheServiceKey(t *testing.T) {
 	// The service key opens only the internal routes; dispute routes still need a tenant.
 	if rec, _ := a.do(http.MethodGet, "/disputes/"+id, nil, svc); rec.Code != http.StatusUnauthorized {
 		t.Errorf("service key on a tenant route: %d", rec.Code)
+	}
+}
+
+func TestInternalBulkSessionDeleteAndTenantDirectory(t *testing.T) {
+	a := newAPI(t, func(context.Context) error { return nil })
+	svc := map[string]string{"Authorization": "", "X-Service-Key": "svc-secret"}
+	put := func(id, sid, subject string) {
+		body := map[string]any{"ciphertext": "aGVsbG8=", "expiresAt": time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
+			"tenantId": apptest.TenantA.String(), "sid": sid, "subject": subject}
+		if rec, _ := a.do(http.MethodPut, "/internal/sessions/"+id, body, svc); rec.Code != http.StatusNoContent {
+			t.Fatalf("put %s: %d", id, rec.Code)
+		}
+	}
+	put(uuid.NewString(), "sid-1", "alice")
+	put(uuid.NewString(), "sid-2", "alice")
+	put(uuid.NewString(), "sid-3", "bob")
+
+	rec, out := a.do(http.MethodDelete, "/internal/sessions?sid=sid-1", nil, svc)
+	if rec.Code != http.StatusOK || out["deleted"] != float64(1) {
+		t.Fatalf("by sid: %d %v", rec.Code, out)
+	}
+	rec, out = a.do(http.MethodDelete, "/internal/sessions?tenantId="+apptest.TenantA.String()+"&subject=alice", nil, svc)
+	if rec.Code != http.StatusOK || out["deleted"] != float64(1) {
+		t.Fatalf("by subject: %d %v", rec.Code, out)
+	}
+	if rec, _ := a.do(http.MethodDelete, "/internal/sessions", nil, svc); rec.Code != http.StatusBadRequest {
+		t.Errorf("no selector: %d", rec.Code)
+	}
+	rec, _ = a.do(http.MethodDelete, "/internal/sessions?sid=x", nil, nil)
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("tenant key on bulk delete: %d", rec.Code)
+	}
+
+	rec = httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/internal/tenants", nil)
+	req.Header.Set("X-Service-Key", "svc-secret")
+	a.h.ServeHTTP(rec, req)
+	var tenants []map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &tenants); err != nil || rec.Code != http.StatusOK || len(tenants) != 1 || tenants[0]["slug"] != "otp" {
+		t.Fatalf("tenants: %d %s", rec.Code, rec.Body.String())
 	}
 }
