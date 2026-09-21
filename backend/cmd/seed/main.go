@@ -3,14 +3,17 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/shopspring/decimal"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres/sqlcgen"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/auth"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/config"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/postgres"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/migrations"
@@ -31,6 +34,8 @@ var (
 	// serves in single-tenant mode; tenantB exists so isolation can be demonstrated.
 	tenantA    = "00000000-0000-8000-8000-00000000a001"
 	tenantB    = "00000000-0000-8000-8000-00000000a002"
+	devKeyA    = "dk_dev_tenant_a"
+	devKeyB    = "dk_dev_tenant_b"
 	accountEUR = "00000000-0000-8000-8000-000000000001"
 	accountUSD = "00000000-0000-8000-8000-000000000002"
 	accountB   = "00000000-0000-8000-8000-000000000003"
@@ -77,6 +82,15 @@ func run() error {
 			return err
 		}
 	}
+	// Fixed dev keys so the probe, docs and curl examples can use them; production keys come from cmd/apikey.
+	for _, k := range []struct{ id, tenant, secret string }{
+		{"00000000-0000-8000-8000-00000000c001", tenantA, devKeyA},
+		{"00000000-0000-8000-8000-00000000c002", tenantB, devKeyB},
+	} {
+		if err := q.InsertAPIKey(ctx, sqlcgen.InsertAPIKeyParams{ID: uuid.MustParse(k.id), TenantID: uuid.MustParse(k.tenant), KeyHash: auth.HashKey(k.secret), Label: "dev"}); err != nil && !isUniqueViolation(err) {
+			return err
+		}
+	}
 	for _, a := range []struct{ id, tenant, holder, currency string }{
 		{accountEUR, tenantA, "Kovács Anna", "EUR"},
 		{accountUSD, tenantA, "Jordan Lee", "USD"},
@@ -95,9 +109,14 @@ func run() error {
 			return err
 		}
 	}
-	fmt.Printf("seeded 2 tenants, 3 accounts and %d transactions\n", len(seedTxns))
+	fmt.Printf("seeded 2 tenants (API keys %s, %s), 3 accounts and %d transactions\n", devKeyA, devKeyB, len(seedTxns))
 	for _, t := range seedTxns {
 		fmt.Printf("  %s  tenant %s  %-11s %8s %s  %s\n", t.id, t.tenant[len(t.tenant)-4:], t.rail, t.amount, t.currency, t.merchant)
 	}
 	return nil
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }

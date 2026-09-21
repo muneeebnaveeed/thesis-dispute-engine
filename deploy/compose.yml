@@ -122,6 +122,7 @@ services:
       - ./probe.sh:/probe.sh:ro
     entrypoint: ["sh", "/probe.sh"]
     environment:
+      API_KEY: ${PROBE_API_KEY:-dk_dev_tenant_a}
       INTERVAL: ${PROBE_INTERVAL:-60}
 
 volumes:
