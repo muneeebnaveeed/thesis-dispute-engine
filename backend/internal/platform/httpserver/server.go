@@ -1,3 +1,4 @@
+// Package httpserver is the HTTP layer: stdlib ServeMux routing and middleware (see docs/adr/0001).
 package httpserver
 
 import (
@@ -17,17 +18,12 @@ type Server struct {
 	logger *slog.Logger
 }
 
-// New builds the routed, middleware-wrapped server. Routes are registered in
-// routes.go so this constructor stays a pure wiring step.
+// New builds the routed, middleware-wrapped server.
 func New(addr string, logger *slog.Logger) *Server {
 	mux := http.NewServeMux()
 	registerRoutes(mux)
 
-	// Outermost: the OpenTelemetry server span, so every middleware below runs
-	// inside it and the request log can carry its IDs. Matched routes rename
-	// the span to their pattern (see route in routes.go); anything that falls
-	// through keeps this method-only name so unmatched URLs cannot explode
-	// span cardinality.
+	// Unmatched requests keep a method-only span name so arbitrary URLs cannot explode cardinality.
 	handler := otelhttp.NewHandler(
 		Chain(mux,
 			Recover(logger),
@@ -56,7 +52,7 @@ func New(addr string, logger *slog.Logger) *Server {
 // Handler exposes the composed handler for in-process tests.
 func (s *Server) Handler() http.Handler { return s.http.Handler }
 
-// ListenAndServe blocks until the server stops. A closed server is not an error.
+// ListenAndServe blocks until the server stops; a graceful close is not an error.
 func (s *Server) ListenAndServe() error {
 	s.logger.Info("listening", "addr", s.http.Addr)
 	if err := s.http.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -70,13 +66,10 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.http.Shutdown(ctx)
 }
 
-// writeJSON is the single place responses are encoded, so every handler agrees
-// on content type and encoding errors are not silently dropped.
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
-		// Headers are already out; nothing better than noting it can be done.
 		slog.Default().Error("encode response", "err", err)
 	}
 }

@@ -1,12 +1,4 @@
-// Package telemetry wires OpenTelemetry tracing and metrics.
-//
-// Configuration is entirely through the standard OTEL_* environment variables
-// (OTEL_SERVICE_NAME, OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_TRACES_EXPORTER,
-// OTEL_METRICS_EXPORTER, OTEL_RESOURCE_ATTRIBUTES, ...), so any collector or
-// backend that speaks OTLP works without code changes. When none of them is
-// set, providers are still installed (instrumentation runs, spans and
-// metrics are created) but nothing is exported and nothing is logged about
-// it, so a plain `make run` stays quiet.
+// Package telemetry installs OpenTelemetry providers configured only through OTEL_* variables (see docs/adr/0003).
 package telemetry
 
 import (
@@ -25,19 +17,16 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// ServiceName is the default OTEL_SERVICE_NAME when the environment sets none.
+// ServiceName is used when OTEL_SERVICE_NAME is unset.
 const ServiceName = "dispute-engine"
 
-// Version is stamped onto every resource; overridden at build time via
-// -ldflags "-X .../telemetry.Version=<git sha>".
+// Version is stamped on the resource; set at build time with -ldflags -X.
 var Version = "dev"
 
-// Shutdown flushes and stops every provider Setup installed.
+// Shutdown flushes and stops everything Setup installed.
 type Shutdown func(context.Context) error
 
-// Setup installs global tracer and meter providers and W3C context
-// propagation. It returns a Shutdown that must be called before exit so the
-// last spans and metrics are flushed.
+// Setup installs global tracer and meter providers and W3C propagation.
 func Setup(ctx context.Context, logger *slog.Logger) (Shutdown, error) {
 	res, err := resource.Merge(resource.Default(), resource.NewWithAttributes(
 		semconv.SchemaURL,
@@ -54,7 +43,6 @@ func Setup(ctx context.Context, logger *slog.Logger) (Shutdown, error) {
 	))
 
 	shutdowns := make([]Shutdown, 0, 2)
-
 	tracerOpts := []sdktrace.TracerProviderOption{sdktrace.WithResource(res)}
 	meterOpts := []metric.Option{metric.WithResource(res)}
 
@@ -88,8 +76,6 @@ func Setup(ctx context.Context, logger *slog.Logger) (Shutdown, error) {
 
 	return func(ctx context.Context) error {
 		var errs []error
-		// Reverse order: stop metrics before the tracer that may still be
-		// recording the shutdown itself.
 		for i := len(shutdowns) - 1; i >= 0; i-- {
 			errs = append(errs, shutdowns[i](ctx))
 		}
@@ -97,8 +83,7 @@ func Setup(ctx context.Context, logger *slog.Logger) (Shutdown, error) {
 	}, nil
 }
 
-// SpanIDs returns the trace and span IDs of the current span for log
-// correlation, or empty strings when there is no recording span.
+// SpanIDs returns the current trace and span IDs for log correlation, or empty strings.
 func SpanIDs(ctx context.Context) (traceID, spanID string) {
 	sc := trace.SpanContextFromContext(ctx)
 	if !sc.IsValid() {
@@ -107,10 +92,7 @@ func SpanIDs(ctx context.Context) (traceID, spanID string) {
 	return sc.TraceID().String(), sc.SpanID().String()
 }
 
-// exportEnabled reports whether the environment asked for any exporter. With
-// nothing set, autoexport would default to OTLP against localhost:4318 and
-// log connection failures forever; staying silent is the better default for a
-// service most often run without a collector.
+// exportEnabled avoids autoexport's OTLP default, which would log connection failures forever when no collector runs.
 func exportEnabled() bool {
 	for _, key := range []string{
 		"OTEL_EXPORTER_OTLP_ENDPOINT",

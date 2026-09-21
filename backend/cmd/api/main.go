@@ -1,4 +1,4 @@
-// Command api runs the dispute engine's HTTP API.
+// Command api runs the dispute engine HTTP API.
 package main
 
 import (
@@ -8,9 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/config"
-	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/httpserver"
-	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/telemetry"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/config"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/httpserver"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/telemetry"
 )
 
 func main() {

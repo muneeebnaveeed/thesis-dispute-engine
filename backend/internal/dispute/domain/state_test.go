@@ -1,4 +1,4 @@
-package dispute
+package domain
 
 import (
 	"errors"
@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// run applies events in order and fails on the first rejection.
 func run(t *testing.T, regime Regime, events ...Event) Dispute {
 	t.Helper()
 	d, err := New(regime)
@@ -164,8 +163,7 @@ func TestAllowedMatchesApply(t *testing.T) {
 	}
 }
 
-// TestReachableStates pins the exact set of states each regime can visit. A
-// change here is a change to the lifecycle and belongs in ADR 0002.
+// A change to these sets is a lifecycle change and belongs in docs/adr/0002.
 func TestReachableStates(t *testing.T) {
 	want := map[Regime][]State{
 		RegimeEUSEPADirectDebit: {
@@ -237,8 +235,6 @@ func TestRulesAreConsistent(t *testing.T) {
 	}
 }
 
-// reachable is a breadth-first walk over the transition table from INITIATED,
-// excluding appeals (which only ever lead back to INVESTIGATING).
 func reachable(t *testing.T, regime Regime) []State {
 	t.Helper()
 	start, err := New(regime)

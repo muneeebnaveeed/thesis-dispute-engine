@@ -1,7 +1,4 @@
-// Package config reads the service configuration from the environment.
-//
-// Every value has a default that works for local development against the
-// compose file in deploy/, so `make run` needs no environment at all.
+// Package config reads service configuration from the environment.
 package config
 
 import (
@@ -11,17 +8,14 @@ import (
 	"time"
 )
 
-// Config is the fully resolved service configuration.
+// Config is the resolved service configuration.
 type Config struct {
-	// Addr is the listen address of the HTTP API, e.g. ":8090".
-	Addr string
-	// DatabaseURL is the PostgreSQL connection string.
-	DatabaseURL string
-	// ShutdownTimeout bounds graceful shutdown on SIGINT/SIGTERM.
+	Addr            string
+	DatabaseURL     string
 	ShutdownTimeout time.Duration
 }
 
-// Load resolves the configuration from environment variables.
+// Load resolves Config from DISPUTE_* variables; defaults match deploy/compose.yml.
 func Load() (Config, error) {
 	cfg := Config{
 		Addr:            getenv("DISPUTE_ADDR", ":8090"),

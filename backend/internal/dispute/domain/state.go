@@ -1,15 +1,14 @@
-package dispute
+package domain
 
 import (
 	"errors"
 	"fmt"
 )
 
-// State is a position in the dispute lifecycle. Which states a dispute can
-// reach depends on its regime; see next.
+// State is a position in the dispute lifecycle.
 type State string
 
-// Lifecycle states, in the order they typically occur.
+// Lifecycle states.
 const (
 	StateInitiated                 State = "INITIATED"
 	StateInvestigating             State = "INVESTIGATING"
@@ -28,16 +27,15 @@ const (
 	StateClosed                    State = "CLOSED"
 )
 
-// Event is something that happens to a dispute and may move it to a new state.
+// Event is an occurrence that may move a dispute to a new state.
 type Event string
 
-// Events. Names are what happened, not where it goes; the destination depends
-// on the regime.
+// Events; the destination of each depends on the regime.
 const (
 	EventOpenInvestigation        Event = "OPEN_INVESTIGATION"
 	EventSendQuestionnaire        Event = "SEND_QUESTIONNAIRE"
 	EventReceiveQuestionnaire     Event = "RECEIVE_QUESTIONNAIRE"
-	EventIssueRefund              Event = "ISSUE_REFUND" // the regime's refund path
+	EventIssueRefund              Event = "ISSUE_REFUND"
 	EventFileChargeback           Event = "FILE_CHARGEBACK"
 	EventAcknowledgeChargeback    Event = "ACKNOWLEDGE_CHARGEBACK"
 	EventSubmitEvidence           Event = "SUBMIT_EVIDENCE"
@@ -49,7 +47,7 @@ const (
 	EventAppeal                   Event = "APPEAL"
 )
 
-// AllEvents lists every event, for enumeration in tests and API docs.
+// AllEvents lists every event.
 func AllEvents() []Event {
 	return []Event{
 		EventOpenInvestigation, EventSendQuestionnaire, EventReceiveQuestionnaire,
@@ -59,18 +57,17 @@ func AllEvents() []Event {
 	}
 }
 
-// Sentinel errors. Callers match with errors.Is; the message carries detail.
+// Sentinel errors; match with errors.Is.
 var (
-	ErrInvalidTransition = errors.New("dispute: transition not allowed")
-	ErrAppealsExhausted  = errors.New("dispute: appeals exhausted")
+	ErrInvalidTransition = errors.New("domain: transition not allowed")
+	ErrAppealsExhausted  = errors.New("domain: appeals exhausted")
 )
 
-// Dispute is the lifecycle-relevant part of a dispute: enough to decide which
-// events are allowed. Persistence, amounts and parties live elsewhere.
+// Dispute is the lifecycle state of a dispute.
 type Dispute struct {
 	Regime  Regime
 	State   State
-	Appeals int // appeals already used
+	Appeals int
 }
 
 // New starts a dispute under a regime.
@@ -81,9 +78,7 @@ func New(regime Regime) (Dispute, error) {
 	return Dispute{Regime: regime, State: StateInitiated}, nil
 }
 
-// Apply returns the dispute after event, or an error that wraps
-// ErrInvalidTransition or ErrAppealsExhausted. Dispute is a value; the receiver
-// is never mutated.
+// Apply returns the dispute after event; errors wrap ErrInvalidTransition or ErrAppealsExhausted.
 func (d Dispute) Apply(event Event) (Dispute, error) {
 	r, err := RulesFor(d.Regime)
 	if err != nil {
@@ -116,16 +111,14 @@ func (d Dispute) Allowed() []Event {
 	return out
 }
 
-// IsTerminal reports whether only an appeal can move the dispute on.
+// IsTerminal reports whether only an appeal can move the dispute.
 func (d Dispute) IsTerminal() bool { return d.State == StateClosed }
 
 func invalid(d Dispute, e Event) error {
 	return fmt.Errorf("%w: %s from %s under %s", ErrInvalidTransition, e, d.State, d.Regime)
 }
 
-// next is the transition table. Every arm that depends on the regime gates on
-// a Rules property, never on the Regime value, so a new regime is a new row in
-// rules and nothing here.
+// next gates on Rules properties, never on the Regime value, so a new regime is only a new row in rules.
 func next(r Rules, from State, e Event) (State, bool) {
 	switch from {
 	case StateInitiated:
@@ -133,8 +126,6 @@ func next(r Rules, from State, e Event) (State, bool) {
 		case EventOpenInvestigation:
 			return StateInvestigating, true
 		case EventIssueRefund:
-			// No-questions-asked regimes refund straight away; everything
-			// else investigates first.
 			if r.Refund == RefundNoQuestionsAsked {
 				return StateSEPANQARefundIssued, true
 			}
@@ -149,12 +140,11 @@ func next(r Rules, from State, e Event) (State, bool) {
 				return r.refundState(), true
 			}
 		case EventFileChargeback:
-			// Regimes without a refund step go to the network directly.
 			if r.HasAdjudication && !r.HasRefundStep() {
 				return StateChargebackFiled, true
 			}
 		case EventClose:
-			return StateClosed, true // denied or withdrawn
+			return StateClosed, true
 		}
 
 	case StateQuestionnaireSent:
@@ -162,7 +152,7 @@ func next(r Rules, from State, e Event) (State, bool) {
 		case EventReceiveQuestionnaire:
 			return StateQuestionnaireReceived, true
 		case EventClose:
-			return StateClosed, true // abandoned by the customer
+			return StateClosed, true
 		}
 
 	case StateQuestionnaireReceived:
@@ -186,7 +176,7 @@ func next(r Rules, from State, e Event) (State, bool) {
 				return StateChargebackFiled, true
 			}
 		case EventClose:
-			return StateClosed, true // issuer absorbs, or nothing to recover
+			return StateClosed, true
 		}
 
 	case StateChargebackFiled:
@@ -244,7 +234,7 @@ func next(r Rules, from State, e Event) (State, bool) {
 		}
 
 	case StateClosed:
-		// Only EventAppeal, handled in Apply because it needs the counter.
+		// Appeal is handled in Apply because it needs the counter.
 	}
 	return "", false
 }
