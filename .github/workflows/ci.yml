@@ -89,7 +89,7 @@ jobs:
           cache-dependency-path: backend/go.sum
       - name: Install golangci-lint
         if: matrix.name == 'lint' || matrix.name == 'format'
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
           version: v${{ needs.changes.outputs.golangci }}
           working-directory: backend
