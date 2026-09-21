@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# Stacked PRs: each child PR targets its parent's branch; this walks and maintains that chain.
+#
+#   scripts/stack show                      chain from the default branch to the current branch's PR
+#   scripts/stack restack [--push]          rebase each branch in the chain onto its (updated) parent
+#   scripts/stack retarget [--pr <number>]  after a parent merges: point the child at the parent's base, rebase, push
+#
+# Create a child with: scripts/create-pr --base <parent-branch> ...
+set -euo pipefail
+source "$(dirname "$0")/lib/common.sh"
+require_gh_account
+
+# Prints "number base head state" for the open PR whose head is $1, or nothing.
+pr_for_head() {
+  gh pr list --head "$1" --state all --limit 1 --json number,baseRefName,headRefName,state,mergedAt \
+    --jq '.[0] | select(. != null) | "\(.number) \(.baseRefName) \(.headRefName) \(.state)"'
+}
+
+# Walks from the current branch up to the default branch, printing parents first.
+chain() {
+  local base head line; base=$(default_branch); head=$(current_branch)
+  local -a rows=()
+  while [[ "$head" != "$base" ]]; do
+    line=$(pr_for_head "$head") || true
+    [[ -n "$line" ]] || die "no PR for branch $head; the chain must be PRs all the way down"
+    rows=("$line" "${rows[@]}")
+    head=$(cut -d' ' -f2 <<<"$line")
+  done
+  ((${#rows[@]})) && printf '%s\n' "${rows[@]}"
+  return 0
+}
+
+cmd_show() {
+  local base; base=$(default_branch)
+  printf '%s\n' "$base"
+  local depth=1
+  while read -r number pbase phead state; do
+    printf '%*s%s  #%s  (%s)\n' $((depth * 2)) '' "$phead" "$number" "$state"
+    depth=$((depth + 1))
+  done < <(chain)
+}
+
+cmd_restack() {
+  local push=0; [[ "${1:-}" == "--push" ]] && push=1
+  require_clean_tree
+  local start; start=$(current_branch)
+  git fetch -q origin
+  while read -r number pbase phead state; do
+    [[ "$state" == "OPEN" ]] || die "#$number ($phead) is $state; run retarget on its child first"
+    info "rebasing $phead onto $pbase"
+    git checkout -q "$phead"
+    git rebase -q --onto "origin/$pbase" "$(git merge-base "$phead" "origin/$pbase")" \
+      || die "rebase of $phead stopped; resolve, 'git rebase --continue', then rerun"
+    ((push)) && git push -q --force-with-lease origin "$phead"
+  done < <(chain)
+  git checkout -q "$start"
+  ((push)) || info "rebased locally; rerun with --push to update the PRs"
+}
+
+cmd_retarget() {
+  local pr=""; [[ "${1:-}" == "--pr" ]] && pr="$2"
+  pr=$(resolve_pr "$pr")
+  local head base parent_state parent_base
+  read -r head base < <(gh pr view "$pr" --json headRefName,baseRefName --jq '"\(.headRefName) \(.baseRefName)"')
+  [[ "$base" != "$(default_branch)" ]] && parent_state=$(pr_for_head "$base" | cut -d' ' -f4) || die "#$pr already targets $(default_branch)"
+  [[ "$parent_state" == "MERGED" ]] || die "parent branch $base is $parent_state, not merged; use restack instead"
+  parent_base=$(pr_for_head "$base" | cut -d' ' -f2)
+  require_clean_tree
+  git fetch -q origin
+  git checkout -q "$head"
+  # The parent's commits now live on its base via squash, so drop them from the child before rebasing.
+  git rebase -q --onto "origin/$parent_base" "origin/$base" \
+    || die "rebase stopped; resolve, 'git rebase --continue', then push with --force-with-lease and run: gh pr edit $pr --base $parent_base"
+  git push -q --force-with-lease origin "$head"
+  gh pr edit "$pr" --base "$parent_base" >/dev/null
+  info "#$pr now targets $parent_base; the branch $base can be deleted"
+}
+
+case "${1:-}" in
+  show) cmd_show ;;
+  restack) shift; cmd_restack "$@" ;;
+  retarget) shift; cmd_retarget "$@" ;;
+  -h|--help|"") sed -n '2,8p' "$0" ;;
+  *) die "unknown command $1" ;;
+esac

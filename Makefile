@@ -5,7 +5,7 @@ SHELL := /bin/bash
 BACKEND := backend
 GO      := cd $(BACKEND) && go
 
-.PHONY: help hooks run dev build test test-race lint vet fmt fmt-fix tidy vuln versions db-up db-down db-logs up down docker-dev otel-up otel-down image pr ci-logs pr-comments ci
+.PHONY: help hooks run dev build test test-race lint vet fmt fmt-fix tidy vuln versions db-up db-down db-logs up down docker-dev otel-up otel-down image pr ci-logs pr-comments stack ci
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -84,6 +84,9 @@ pr: ## Open a PR: make pr ARGS='--summary ... --why ... --testing ...'
 
 ci-logs: ## Download failing CI logs for the current PR into notes/ (ARGS='--pr N --wait')
 	scripts/fetch-ci-logs $(ARGS)
+
+stack: ## Stacked PRs: make stack ARGS='show|restack --push|retarget'
+	scripts/stack $(ARGS)
 
 pr-comments: ## Export review comments for the current PR into notes/ (ARGS='--pr N')
 	scripts/fetch-pr-comments $(ARGS)
