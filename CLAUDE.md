@@ -16,7 +16,7 @@ How to work in this repo. What the system does is in `README.md` and `docs/adr/`
 - `make ci`: everything CI runs (versions, generate-check, fmt, vet, lint, test, tidy). Run
   before every push. `make test-integration` runs the Postgres-backed suites against
   `make db-up` (CI runs them with a service container); without `DISPUTE_TEST_DATABASE_URL`
-  those tests skip.
+  those tests skip. `make cover` prints the coverage table CI posts on every PR.
 - `make generate`: regenerate sqlc queries and the OpenAPI server; commit the output.
 - `make db-seed`: fixed dev accounts and transactions (idempotent; migrates first).
 - `make test` / `make lint` / `make fmt-fix`: the individual steps. `make test-race` needs cgo;

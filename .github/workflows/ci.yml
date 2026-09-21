@@ -89,11 +89,23 @@ jobs:
         with:
           go-version: ${{ needs.changes.outputs.go }}
           cache-dependency-path: backend/go.sum
-      - name: Install sqlc
+      - name: Cache sqlc
         if: matrix.name == 'generate'
+        id: sqlc-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.local/bin/sqlc
+          key: sqlc-${{ runner.os }}-${{ needs.changes.outputs.sqlc }}
+      - name: Install sqlc
+        if: matrix.name == 'generate' && steps.sqlc-cache.outputs.cache-hit != 'true'
         run: |
-          curl -fsSL "https://github.com/sqlc-dev/sqlc/releases/download/v${{ needs.changes.outputs.sqlc }}/sqlc_${{ needs.changes.outputs.sqlc }}_linux_amd64.tar.gz" | sudo tar -xz -C /usr/local/bin sqlc
-          sqlc version
+          mkdir -p ~/.local/bin
+          curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 \
+            "https://github.com/sqlc-dev/sqlc/releases/download/v${{ needs.changes.outputs.sqlc }}/sqlc_${{ needs.changes.outputs.sqlc }}_linux_amd64.tar.gz" \
+            | tar -xz -C ~/.local/bin sqlc
+      - name: sqlc version
+        if: matrix.name == 'generate'
+        run: sqlc version
       - name: Install golangci-lint
         if: matrix.name == 'lint' || matrix.name == 'format'
         uses: golangci/golangci-lint-action@v9
@@ -112,6 +124,9 @@ jobs:
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
     services:
       postgres:
         image: postgres:17-alpine
@@ -132,10 +147,46 @@ jobs:
         with:
           go-version: ${{ needs.changes.outputs.go }}
           cache-dependency-path: backend/go.sum
+      # The profile from the last push to main is the baseline PRs report their delta against.
+      - name: Restore baseline coverage
+        if: github.event_name == 'pull_request'
+        uses: actions/cache/restore@v6
+        with:
+          path: backend/coverage.out
+          key: coverage-main-${{ github.event.pull_request.base.sha }}
+          restore-keys: coverage-main-
+      - name: Keep baseline aside
+        if: github.event_name == 'pull_request'
+        run: '[ -f coverage.out ] && mv coverage.out coverage-base.out || true'
       - name: go test -race (unit + Postgres integration)
         env:
           DISPUTE_TEST_DATABASE_URL: postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable
-        run: go test -race -count=1 ./...
+        run: go test -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
+      - name: Coverage report
+        run: |
+          ../scripts/coverage-report coverage.out coverage-base.out | tee coverage.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Save baseline coverage
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v6
+        with:
+          path: backend/coverage.out
+          key: coverage-main-${{ github.sha }}
+      # One sticky comment per PR, found again by its marker. Forks get a read-only token, so skip them.
+      - name: Comment coverage on the PR
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          marker='<!-- coverage-report -->'
+          { echo "$marker"; cat coverage.md; } > comment.md
+          id=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" --paginate \
+            --jq "map(select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\")))) | .[0].id // empty" | head -n1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${id}" -F body=@comment.md > /dev/null
+          else
+            gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" -F body=@comment.md > /dev/null
+          fi
 
   image:
     name: backend image
