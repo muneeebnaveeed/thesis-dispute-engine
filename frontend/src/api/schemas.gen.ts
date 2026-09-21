@@ -6,6 +6,17 @@ import type { components } from './schema.gen'
 // Each schema is checked both ways against the openapi-typescript type, so the two generated files cannot drift.
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never
 
+export const AnswerType = Type.Union(
+  [Type.Literal('YES_NO'), Type.Literal('DATE'), Type.Literal('TEXT'), Type.Literal('AMOUNT')],
+  {
+    description:
+      'How an answer is validated; every answer travels as a string ("yes"/"no", YYYY-MM-DD, free text, decimal).',
+  },
+)
+export type AnswerType = Static<typeof AnswerType>
+const _AnswerType: Same<AnswerType, components['schemas']['AnswerType']> = true
+void _AnswerType
+
 export const DisputeEvent = Type.Union([
   Type.Literal('OPEN_INVESTIGATION'),
   Type.Literal('SEND_QUESTIONNAIRE'),
@@ -38,10 +49,11 @@ export const ApplyEventRequest = Type.Object({
       {
         liability: Type.Optional(Type.String({ example: '50.00' })),
         settlement: Type.Optional(SuspenseSettlement),
+        answers: Type.Optional(Type.Record(Type.String(), Type.String())),
       },
       {
         description:
-          "Event-specific facts, stored verbatim on the log entry. Two are read by the ledger: on ISSUE_REFUND, `liability` is the amount the customer bears (a decimal string, capped by the regime, refused with invalid-liability); on CLOSE, `settlement` says how an outstanding advance clears (RECOVERED or WRITTEN_OFF; the regime's default when absent; refused with invalid-settlement).",
+          "Event-specific facts, stored verbatim on the log entry. Two are read by the ledger: on ISSUE_REFUND, `liability` is the amount the customer bears (a decimal string, capped by the regime, refused with invalid-liability); on CLOSE, `settlement` says how an outstanding advance clears (RECOVERED or WRITTEN_OFF; the regime's default when absent; refused with invalid-settlement); on RECEIVE_QUESTIONNAIRE, `answers` maps question ids to answers and is validated against the questions that were sent (refused with invalid-answers, one error per question).",
       },
     ),
   ),
@@ -77,8 +89,19 @@ export type CoreReceipt = Static<typeof CoreReceipt>
 const _CoreReceipt: Same<CoreReceipt, components['schemas']['CoreReceipt']> = true
 void _CoreReceipt
 
+export const DisputeReason = Type.Union([
+  Type.Literal('UNAUTHORISED'),
+  Type.Literal('NOT_RECEIVED'),
+  Type.Literal('DUPLICATE'),
+  Type.Literal('AMOUNT_DIFFERS'),
+])
+export type DisputeReason = Static<typeof DisputeReason>
+const _DisputeReason: Same<DisputeReason, components['schemas']['DisputeReason']> = true
+void _DisputeReason
+
 export const CreateDisputeRequest = Type.Object({
   transactionId: Type.String({ format: 'uuid' }),
+  reason: Type.Optional(DisputeReason),
   actor: Type.Optional(
     Type.String({ description: 'Who opened it; defaults to customer.', default: 'customer' }),
   ),
@@ -231,9 +254,37 @@ export type LedgerEntry = Static<typeof LedgerEntry>
 const _LedgerEntry: Same<LedgerEntry, components['schemas']['LedgerEntry']> = true
 void _LedgerEntry
 
+export const Question = Type.Object({
+  id: Type.String(),
+  text: Type.String(),
+  type: AnswerType,
+  required: Type.Boolean(),
+})
+export type Question = Static<typeof Question>
+const _Question: Same<Question, components['schemas']['Question']> = true
+void _Question
+
+export const Questionnaire = Type.Object({
+  reason: DisputeReason,
+  questions: Type.Array(Question, {
+    description:
+      'The questions as they were asked; a later change to the set never affects a sent questionnaire.',
+  }),
+  answers: Type.Optional(Type.Record(Type.String(), Type.String())),
+  inconsistencies: Type.Array(Type.String(), {
+    description: 'Contradictions found between the answers; empty until received or when none.',
+  }),
+  sentAt: Type.String({ format: 'date-time' }),
+  receivedAt: Type.Optional(Type.String({ format: 'date-time' })),
+})
+export type Questionnaire = Static<typeof Questionnaire>
+const _Questionnaire: Same<Questionnaire, components['schemas']['Questionnaire']> = true
+void _Questionnaire
+
 export const Dispute = Type.Object({
   id: Type.String({ format: 'uuid' }),
   regime: Regime,
+  reason: DisputeReason,
   state: DisputeState,
   appeals: Type.Integer(),
   version: Type.Integer({ format: 'int64' }),
@@ -253,6 +304,7 @@ export const Dispute = Type.Object({
     description: 'Every movement the engine instructed on this dispute, in posting order.',
   }),
   balances: Balances,
+  questionnaire: Type.Optional(Questionnaire),
 })
 export type Dispute = Static<typeof Dispute>
 const _Dispute: Same<Dispute, components['schemas']['Dispute']> = true
@@ -261,6 +313,7 @@ void _Dispute
 export const DisputeSummary = Type.Object({
   id: Type.String({ format: 'uuid' }),
   regime: Regime,
+  reason: DisputeReason,
   state: DisputeState,
   transactionId: Type.String({ format: 'uuid' }),
   disputedAmount: Type.String({ description: 'Decimal as a string; never a float.' }),
@@ -294,6 +347,8 @@ export const ErrorCode = Type.Union(
     Type.Literal('invalid-liability'),
     Type.Literal('invalid-settlement'),
     Type.Literal('core-declined'),
+    Type.Literal('unknown-reason'),
+    Type.Literal('invalid-answers'),
     Type.Literal('concurrent-update'),
     Type.Literal('idempotency-key-reuse'),
     Type.Literal('no-regime'),

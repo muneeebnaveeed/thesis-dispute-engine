@@ -327,8 +327,13 @@ func (h *Handler) GetReadyz(ctx context.Context, _ oapi.GetReadyzRequestObject) 
 // CreateDispute opens a dispute; the idempotency hash covers the parsed body, so key order in the wire JSON does not matter.
 func (h *Handler) CreateDispute(ctx context.Context, req oapi.CreateDisputeRequestObject) (oapi.CreateDisputeResponseObject, error) {
 	body, _ := json.Marshal(req.Body)
+	var reason string
+	if req.Body.Reason != nil {
+		reason = string(*req.Body.Reason)
+	}
 	res, err := h.svc.CreateDispute(ctx, application.CreateDisputeInput{
 		TransactionID: req.Body.TransactionId,
+		Reason:        reason,
 		Actor:         orDefault(req.Body.Actor, "customer"),
 		Idempotency:   idempotency(req.Params.IdempotencyKey, body),
 	})
@@ -387,7 +392,7 @@ func (h *Handler) ListDisputes(ctx context.Context, req oapi.ListDisputesRequest
 	}
 	out := oapi.DisputePage{Items: make([]oapi.DisputeSummary, 0, len(page.Items))}
 	for _, d := range page.Items {
-		item := oapi.DisputeSummary{Id: d.ID, Regime: oapi.Regime(d.Regime), State: oapi.DisputeState(d.State),
+		item := oapi.DisputeSummary{Id: d.ID, Regime: oapi.Regime(d.Regime), Reason: oapi.DisputeReason(d.Reason), State: oapi.DisputeState(d.State),
 			TransactionId: d.TransactionID, DisputedAmount: d.DisputedAmount.StringFixed(4), Currency: d.Currency, OpenedAt: d.OpenedAt, UpdatedAt: d.UpdatedAt}
 		if d.NextDeadline != nil {
 			nd := toDeadline(*d.NextDeadline)
@@ -573,14 +578,27 @@ func toAPI(v application.DisputeView) oapi.Dispute {
 		}
 		ledger = append(ledger, entry)
 	}
-	return oapi.Dispute{
-		Id: v.ID, Regime: oapi.Regime(v.Regime), State: oapi.DisputeState(v.State), Appeals: v.Appeals,
+	out := oapi.Dispute{
+		Id: v.ID, Regime: oapi.Regime(v.Regime), Reason: oapi.DisputeReason(v.Reason), State: oapi.DisputeState(v.State), Appeals: v.Appeals,
 		Version: v.Version, TransactionId: v.TransactionID, AccountId: v.AccountID,
 		DisputedAmount: v.DisputedAmount.StringFixed(4), Currency: v.Currency, OpenedAt: v.OpenedAt, UpdatedAt: v.UpdatedAt,
 		AllowedEvents: allowed, Events: events, Deadlines: deadlines, Ledger: ledger,
 		Balances: oapi.Balances{Customer: v.Balances.Customer.StringFixed(4), Suspense: v.Balances.Suspense.StringFixed(4),
 			Recovery: v.Balances.Recovery.StringFixed(4), Loss: v.Balances.Loss.StringFixed(4)},
 	}
+	if q := v.Questionnaire; q != nil {
+		questions := make([]oapi.Question, 0, len(q.Questions))
+		for _, x := range q.Questions {
+			questions = append(questions, oapi.Question{Id: x.ID, Text: x.Text, Type: oapi.AnswerType(x.Type), Required: x.Required})
+		}
+		qv := oapi.Questionnaire{Reason: oapi.DisputeReason(q.Reason), Questions: questions, Inconsistencies: q.Inconsistencies, SentAt: q.SentAt, ReceivedAt: q.ReceivedAt}
+		if q.Answers != nil {
+			answers := q.Answers
+			qv.Answers = &answers
+		}
+		out.Questionnaire = &qv
+	}
+	return out
 }
 
 func toDeadline(d application.DeadlineView) oapi.Deadline {

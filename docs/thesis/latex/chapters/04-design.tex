@@ -184,3 +184,35 @@ rows under the same row-level security as the dispute, append-only at the databa
 log, each keyed to the event that caused it and carrying a reference unique within the tenant.
 That reference is the idempotency key the banking core adapter (section~\ref{sec:design-core})
 uses, so an instruction repeated after a timeout cannot move money twice.
+
+\section{Fraud scoring}
+\label{sec:design-fraud}
+% To write: ADR 0018. Stub so the questionnaire section's references resolve.
+
+% Distils ADR 0016.
+\section{The questionnaire}
+\label{sec:design-questionnaire}
+
+Two events, \code{SEND\_QUESTIONNAIRE} and \code{RECEIVE\_QUESTIONNAIRE}, have been in the state
+machine from the start; until this point nothing stood behind them. The questionnaire is where the
+customer's claim becomes structured data, and structure is what the investigation and the fraud
+scoring (section~\ref{sec:design-fraud}) consume. Three decisions give it its shape.
+
+First, a dispute has a \emph{reason} from the moment it opens: unauthorised transaction, goods or
+services not received, duplicate charge, or an amount that differs from what was agreed. The
+reason is immutable and selects the question set; the tenant systems that already open disputes
+without one get the unauthorised set, which is what they were implicitly claiming. Second, the
+questions are \emph{snapshotted} onto the dispute when sent. Question sets are code, and code
+changes; an answer must always be readable against the exact question the customer saw, so the
+sent set is stored with the dispute and a later change to the code changes nothing already sent.
+Third, answers are \emph{typed facts}, not text: yes or no, a date, an amount, or free text, each
+validated against the snapshot when received, with every problem reported at once and per
+question, and the transition refused as a whole when any is wrong. A questionnaire answered with
+``perhaps'' to a yes-or-no question is not partly received.
+
+The immediate consumer is the analyst, who sees the answers beside the actions; the panel that
+shows them is the same one that records them, since in this engine the analyst enters what the
+customer said. The second consumer is the contradiction check the domain runs over the answers:
+a customer who recognises the merchant, held the card, and shared it with nobody is claiming an
+unauthorised payment that the answers do not support. These are sentences an analyst can act on,
+and in section~\ref{sec:design-fraud} they become one of the signals a risk score is built from.

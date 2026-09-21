@@ -34,6 +34,7 @@ type DisputeRecord struct {
 	Currency       string
 	OpenedAt       time.Time
 	UpdatedAt      time.Time
+	Reason         domain.Reason
 }
 
 // Lifecycle projects the record onto the domain type.
@@ -98,6 +99,21 @@ type Tx interface {
 	ListLedger(ctx context.Context, disputeID uuid.UUID) ([]LedgerEntry, error)
 	// TenantCore is the current tenant's banking-core configuration; a zero value means book entries only.
 	TenantCore(ctx context.Context) (CoreConfig, error)
+	// SendQuestionnaire records the questions asked; asking again replaces them and clears any answers.
+	SendQuestionnaire(ctx context.Context, disputeID uuid.UUID, q Questionnaire) error
+	// AnswerQuestionnaire records the answers to an unanswered questionnaire.
+	AnswerQuestionnaire(ctx context.Context, disputeID uuid.UUID, answers map[string]string, at time.Time) error
+	// GetQuestionnaire returns ErrNotFound when none was sent.
+	GetQuestionnaire(ctx context.Context, disputeID uuid.UUID) (Questionnaire, error)
+}
+
+// Questionnaire is what was asked of the customer and, once received, what they answered.
+type Questionnaire struct {
+	Reason     domain.Reason
+	Questions  []domain.Question
+	Answers    map[string]string // nil until received
+	SentAt     time.Time
+	ReceivedAt *time.Time
 }
 
 // LedgerEntry is one persisted posting: the domain movement plus the event that caused it and the reference the

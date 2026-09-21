@@ -182,3 +182,45 @@ test("the tenant's banking core answers each credit, and a decline leaves the di
     .filter({ hasText: 'Refund to the customer' })
   await expect(row).toContainText(/[0-9A-F]{12}/)
 })
+
+test('the questionnaire follows the reason, incomplete answers are refused under each question, and contradictions are flagged', async ({
+  page,
+}) => {
+  await page.getByLabel('Transaction ID').fill(tenants.otp.transaction)
+  await page.getByLabel('Reason').selectOption('UNAUTHORISED')
+  await page.getByRole('button', { name: 'Open' }).click()
+  await expect(page).toHaveURL(/\/otp\/disputes\/[0-9a-f-]{36}$/)
+  await expect(page.getByRole('definition').filter({ hasText: 'UNAUTHORISED' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'OPEN_INVESTIGATION' }).click()
+  await page.getByRole('button', { name: 'SEND_QUESTIONNAIRE' }).click()
+  const merchant = page.getByLabel(/Do you recognise the merchant/)
+  await expect(merchant).toBeVisible()
+
+  // Only one answer given: every required question is called out, and the state has not moved.
+  await merchant.selectOption('yes')
+  await page.getByRole('button', { name: 'Record answers' }).click()
+  const noticed = page.getByLabel(/When did you notice/)
+  await expect(noticed).toHaveAttribute('aria-invalid', 'true')
+  await expect(page.locator('#answer-noticed_on-error')).toContainText(/required/)
+  await expect(
+    page
+      .getByRole('definition')
+      .filter({ hasText: /^[A-Z_]+$/ })
+      .first(),
+  ).toHaveText('QUESTIONNAIRE_SENT')
+
+  await page.getByLabel(/card in your possession/).selectOption('yes')
+  await page.getByLabel(/anyone else had access/).selectOption('no')
+  await page.getByLabel(/disputed a transaction with this merchant before/).selectOption('no')
+  await noticed.fill('2026-09-20')
+  await page.getByLabel(/lost or stolen/).selectOption('no')
+  await page.getByRole('button', { name: 'Record answers' }).click()
+  await expect(
+    page
+      .getByRole('definition')
+      .filter({ hasText: /^[A-Z_]+$/ })
+      .first(),
+  ).toHaveText('QUESTIONNAIRE_RECEIVED')
+  await expect(page.getByRole('list', { name: 'Inconsistencies' })).toContainText(/recognises the merchant/)
+})

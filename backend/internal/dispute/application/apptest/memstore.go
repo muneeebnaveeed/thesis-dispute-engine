@@ -34,6 +34,7 @@ type MemStore struct {
 	Idempotent   map[string]application.StoredResponse
 	Deadlines    map[uuid.UUID][]domain.Deadline
 	Ledger       map[uuid.UUID][]application.LedgerEntry
+	Questions    map[uuid.UUID]application.Questionnaire
 	// Calendars holds a tenant's business-day calendar; a tenant without one gets the default.
 	Calendars map[uuid.UUID]domain.Calendar
 	// Cores holds a tenant's banking-core configuration; a tenant without one books postings without a core.
@@ -49,6 +50,7 @@ func NewMemStore() *MemStore {
 		Idempotent:   map[string]application.StoredResponse{},
 		Deadlines:    map[uuid.UUID][]domain.Deadline{},
 		Ledger:       map[uuid.UUID][]application.LedgerEntry{},
+		Questions:    map[uuid.UUID]application.Questionnaire{},
 		Calendars:    map[uuid.UUID]domain.Calendar{},
 		Cores:        map[uuid.UUID]application.CoreConfig{},
 	}
@@ -121,12 +123,16 @@ type snapshotT struct {
 	idempotent map[string]application.StoredResponse
 	deadlines  map[uuid.UUID][]domain.Deadline
 	ledger     map[uuid.UUID][]application.LedgerEntry
+	questions  map[uuid.UUID]application.Questionnaire
 }
 
 func (m *MemStore) snapshot() snapshotT {
 	s := snapshotT{disputes: map[uuid.UUID]application.DisputeRecord{}, events: map[uuid.UUID][]application.EventRecord{},
 		idempotent: map[string]application.StoredResponse{}, deadlines: map[uuid.UUID][]domain.Deadline{},
-		ledger: map[uuid.UUID][]application.LedgerEntry{}}
+		ledger: map[uuid.UUID][]application.LedgerEntry{}, questions: map[uuid.UUID]application.Questionnaire{}}
+	for k, v := range m.Questions {
+		s.questions[k] = v
+	}
 	for k, v := range m.Deadlines {
 		s.deadlines[k] = append([]domain.Deadline(nil), v...)
 	}
@@ -146,7 +152,7 @@ func (m *MemStore) snapshot() snapshotT {
 }
 
 func (m *MemStore) restore(s snapshotT) {
-	m.Disputes, m.Events, m.Idempotent, m.Deadlines, m.Ledger = s.disputes, s.events, s.idempotent, s.deadlines, s.ledger
+	m.Disputes, m.Events, m.Idempotent, m.Deadlines, m.Ledger, m.Questions = s.disputes, s.events, s.idempotent, s.deadlines, s.ledger, s.questions
 }
 
 // SuspenseBalances implements application.Store.
@@ -376,4 +382,37 @@ func (t *memTx) ListLedger(_ context.Context, id uuid.UUID) ([]application.Ledge
 
 func (t *memTx) TenantCore(_ context.Context) (application.CoreConfig, error) {
 	return t.s.Cores[t.tenant], nil
+}
+
+func (t *memTx) SendQuestionnaire(_ context.Context, id uuid.UUID, q application.Questionnaire) error {
+	if _, err := t.GetDispute(context.Background(), id); err != nil {
+		return err
+	}
+	q.Answers, q.ReceivedAt = nil, nil
+	t.s.Questions[id] = q
+	return nil
+}
+
+func (t *memTx) AnswerQuestionnaire(_ context.Context, id uuid.UUID, answers map[string]string, at time.Time) error {
+	q, err := t.GetQuestionnaire(context.Background(), id)
+	if err != nil {
+		return err
+	}
+	if q.ReceivedAt != nil {
+		return application.ErrNotFound
+	}
+	q.Answers, q.ReceivedAt = answers, &at
+	t.s.Questions[id] = q
+	return nil
+}
+
+func (t *memTx) GetQuestionnaire(_ context.Context, id uuid.UUID) (application.Questionnaire, error) {
+	if _, err := t.GetDispute(context.Background(), id); err != nil {
+		return application.Questionnaire{}, err
+	}
+	q, ok := t.s.Questions[id]
+	if !ok {
+		return application.Questionnaire{}, application.ErrNotFound
+	}
+	return q, nil
 }

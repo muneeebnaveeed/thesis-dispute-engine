@@ -211,6 +211,8 @@ export type components = {
       | 'invalid-liability'
       | 'invalid-settlement'
       | 'core-declined'
+      | 'unknown-reason'
+      | 'invalid-answers'
       | 'concurrent-update'
       | 'idempotency-key-reuse'
       | 'no-regime'
@@ -333,21 +335,28 @@ export type components = {
     CreateDisputeRequest: {
       /** Format: uuid */
       transactionId: string
+      /** @description Why the customer disputes it; selects the questionnaire. Defaults to UNAUTHORISED. */
+      reason?: components['schemas']['DisputeReason']
       /**
        * @description Who opened it; defaults to customer.
        * @default customer
        */
       actor?: string
     }
+    /** @enum {string} */
+    DisputeReason: 'UNAUTHORISED' | 'NOT_RECEIVED' | 'DUPLICATE' | 'AMOUNT_DIFFERS'
     ApplyEventRequest: {
       event: components['schemas']['DisputeEvent']
       /** @default system */
       actor?: string
-      /** @description Event-specific facts, stored verbatim on the log entry. Two are read by the ledger: on ISSUE_REFUND, `liability` is the amount the customer bears (a decimal string, capped by the regime, refused with invalid-liability); on CLOSE, `settlement` says how an outstanding advance clears (RECOVERED or WRITTEN_OFF; the regime's default when absent; refused with invalid-settlement). */
+      /** @description Event-specific facts, stored verbatim on the log entry. Two are read by the ledger: on ISSUE_REFUND, `liability` is the amount the customer bears (a decimal string, capped by the regime, refused with invalid-liability); on CLOSE, `settlement` says how an outstanding advance clears (RECOVERED or WRITTEN_OFF; the regime's default when absent; refused with invalid-settlement); on RECEIVE_QUESTIONNAIRE, `answers` maps question ids to answers and is validated against the questions that were sent (refused with invalid-answers, one error per question). */
       payload?: {
         /** @example 50.00 */
         liability?: string
         settlement?: components['schemas']['SuspenseSettlement']
+        answers?: {
+          [key: string]: string
+        }
       } & {
         [key: string]: unknown
       }
@@ -417,6 +426,7 @@ export type components = {
       /** Format: uuid */
       id: string
       regime: components['schemas']['Regime']
+      reason: components['schemas']['DisputeReason']
       state: components['schemas']['DisputeState']
       /** Format: uuid */
       transactionId: string
@@ -439,6 +449,7 @@ export type components = {
       /** Format: uuid */
       id: string
       regime: components['schemas']['Regime']
+      reason: components['schemas']['DisputeReason']
       state: components['schemas']['DisputeState']
       appeals: number
       /** Format: int64 */
@@ -464,6 +475,33 @@ export type components = {
       /** @description Every movement the engine instructed on this dispute, in posting order. */
       ledger: components['schemas']['LedgerEntry'][]
       balances: components['schemas']['Balances']
+      /** @description Present once SEND_QUESTIONNAIRE has been applied. */
+      questionnaire?: components['schemas']['Questionnaire']
+    }
+    /**
+     * @description How an answer is validated; every answer travels as a string ("yes"/"no", YYYY-MM-DD, free text, decimal).
+     * @enum {string}
+     */
+    AnswerType: 'YES_NO' | 'DATE' | 'TEXT' | 'AMOUNT'
+    Question: {
+      id: string
+      text: string
+      type: components['schemas']['AnswerType']
+      required: boolean
+    }
+    Questionnaire: {
+      reason: components['schemas']['DisputeReason']
+      /** @description The questions as they were asked; a later change to the set never affects a sent questionnaire. */
+      questions: components['schemas']['Question'][]
+      answers?: {
+        [key: string]: string
+      }
+      /** @description Contradictions found between the answers; empty until received or when none. */
+      inconsistencies: string[]
+      /** Format: date-time */
+      sentAt: string
+      /** Format: date-time */
+      receivedAt?: string
     }
     /** @enum {string} */
     DeadlineKind: 'REFUND' | 'ACKNOWLEDGE' | 'RESOLUTION'

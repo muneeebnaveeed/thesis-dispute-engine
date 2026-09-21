@@ -137,22 +137,34 @@ func NewService(store Store, now Clock, opts ...Option) (*Service, error) {
 
 // DisputeView is the API representation of a dispute and its log; it is also what idempotent replays return.
 type DisputeView struct {
-	ID             uuid.UUID       `json:"id"`
-	Regime         domain.Regime   `json:"regime"`
-	State          domain.State    `json:"state"`
-	Appeals        int             `json:"appeals"`
-	Version        int64           `json:"version"`
-	TransactionID  uuid.UUID       `json:"transactionId"`
-	AccountID      uuid.UUID       `json:"accountId"`
-	DisputedAmount decimal.Decimal `json:"disputedAmount"`
-	Currency       string          `json:"currency"`
-	OpenedAt       time.Time       `json:"openedAt"`
-	UpdatedAt      time.Time       `json:"updatedAt"`
-	AllowedEvents  []domain.Event  `json:"allowedEvents"`
-	Events         []EventView     `json:"events"`
-	Deadlines      []DeadlineView  `json:"deadlines"`
-	Ledger         []LedgerView    `json:"ledger"`
-	Balances       Balances        `json:"balances"`
+	ID             uuid.UUID          `json:"id"`
+	Regime         domain.Regime      `json:"regime"`
+	Reason         domain.Reason      `json:"reason"`
+	State          domain.State       `json:"state"`
+	Appeals        int                `json:"appeals"`
+	Version        int64              `json:"version"`
+	TransactionID  uuid.UUID          `json:"transactionId"`
+	AccountID      uuid.UUID          `json:"accountId"`
+	DisputedAmount decimal.Decimal    `json:"disputedAmount"`
+	Currency       string             `json:"currency"`
+	OpenedAt       time.Time          `json:"openedAt"`
+	UpdatedAt      time.Time          `json:"updatedAt"`
+	AllowedEvents  []domain.Event     `json:"allowedEvents"`
+	Events         []EventView        `json:"events"`
+	Deadlines      []DeadlineView     `json:"deadlines"`
+	Ledger         []LedgerView       `json:"ledger"`
+	Balances       Balances           `json:"balances"`
+	Questionnaire  *QuestionnaireView `json:"questionnaire,omitempty"`
+}
+
+// QuestionnaireView is the questionnaire as exposed by the API, with the contradictions found in the answers.
+type QuestionnaireView struct {
+	Reason          domain.Reason     `json:"reason"`
+	Questions       []domain.Question `json:"questions"`
+	Answers         map[string]string `json:"answers,omitempty"`
+	Inconsistencies []string          `json:"inconsistencies"`
+	SentAt          time.Time         `json:"sentAt"`
+	ReceivedAt      *time.Time        `json:"receivedAt,omitempty"`
 }
 
 // LedgerView is one posting as exposed by the API.
@@ -213,9 +225,10 @@ type Idempotency struct {
 	RequestBody []byte
 }
 
-// CreateDisputeInput opens a dispute against a transaction.
+// CreateDisputeInput opens a dispute against a transaction; an empty Reason means UNAUTHORISED.
 type CreateDisputeInput struct {
 	TransactionID uuid.UUID
+	Reason        string
 	Actor         string
 	Idempotency   Idempotency
 }
@@ -249,6 +262,10 @@ func (s *Service) CreateDispute(ctx context.Context, in CreateDisputeInput) (Res
 		if err != nil {
 			return DisputeView{}, err
 		}
+		reason, err := domain.ParseReason(in.Reason)
+		if err != nil {
+			return DisputeView{}, err
+		}
 		now := s.now()
 		id, err := uuid.NewV7()
 		if err != nil {
@@ -258,7 +275,7 @@ func (s *Service) CreateDispute(ctx context.Context, in CreateDisputeInput) (Res
 			ID: id, Regime: regime, State: domain.StateInitiated, Version: 1,
 			TransactionID: txn.ID, AccountID: txn.AccountID,
 			DisputedAmount: txn.Amount, Currency: txn.Currency,
-			OpenedAt: now, UpdatedAt: now,
+			OpenedAt: now, UpdatedAt: now, Reason: reason,
 		}
 		if err := tx.InsertDispute(ctx, rec); err != nil {
 			return DisputeView{}, err
@@ -322,6 +339,9 @@ func (s *Service) ApplyEvent(ctx context.Context, in ApplyEventInput) (Result, e
 		if err := tx.AppendEvent(ctx, rec.ID, ev); err != nil {
 			return DisputeView{}, err
 		}
+		if err := s.questionnaire(ctx, tx, rec, in.Event, payload, now); err != nil {
+			return DisputeView{}, err
+		}
 		if err := s.settleDeadlines(ctx, tx, rec, next, now); err != nil {
 			return DisputeView{}, err
 		}
@@ -379,10 +399,38 @@ func (s *Service) settleDeadlines(ctx context.Context, tx Tx, rec DisputeRecord,
 	return nil
 }
 
-// eventFacts are the analyst-supplied numbers an event may carry; anything else in the payload is kept verbatim.
+// eventFacts are the analyst-supplied facts an event may carry; anything else in the payload is kept verbatim.
 type eventFacts struct {
-	Liability  *string `json:"liability"`
-	Settlement string  `json:"settlement"`
+	Liability  *string           `json:"liability"`
+	Settlement string            `json:"settlement"`
+	Answers    map[string]string `json:"answers"`
+}
+
+// questionnaire sends the reason's question set or records the customer's answers, validated against the
+// questions that were actually asked.
+func (s *Service) questionnaire(ctx context.Context, tx Tx, rec DisputeRecord, event domain.Event, payload json.RawMessage, now time.Time) error {
+	switch event {
+	case domain.EventSendQuestionnaire:
+		return tx.SendQuestionnaire(ctx, rec.ID, Questionnaire{Reason: rec.Reason, Questions: domain.QuestionSet(rec.Reason), SentAt: now})
+	case domain.EventReceiveQuestionnaire:
+		var facts eventFacts
+		if err := json.Unmarshal(payload, &facts); err != nil {
+			return errs.New(errs.Invalid, "malformed-request", "the event payload is not an object").
+				WithFields(errs.FieldError{Field: "body.payload", Message: err.Error()})
+		}
+		q, err := tx.GetQuestionnaire(ctx, rec.ID)
+		if err != nil {
+			return err
+		}
+		if facts.Answers == nil {
+			facts.Answers = map[string]string{}
+		}
+		if err := domain.ValidateAnswers(q.Questions, facts.Answers); err != nil {
+			return err
+		}
+		return tx.AnswerQuestionnaire(ctx, rec.ID, facts.Answers, now)
+	}
+	return nil
 }
 
 // post writes the ledger movements the new state causes. The liability on a refund and the settlement on a
@@ -479,6 +527,7 @@ func postingsOf(entries []LedgerEntry) []domain.Posting {
 type DisputeSummary struct {
 	ID             uuid.UUID
 	Regime         domain.Regime
+	Reason         domain.Reason
 	State          domain.State
 	TransactionID  uuid.UUID
 	DisputedAmount decimal.Decimal
@@ -522,7 +571,7 @@ func (s *Service) ListDisputes(ctx context.Context, q ListQuery) (Page, error) {
 		}
 		page.Items = make([]DisputeSummary, 0, len(recs))
 		for _, r := range recs {
-			item := DisputeSummary{ID: r.ID, Regime: r.Regime, State: r.State, TransactionID: r.TransactionID,
+			item := DisputeSummary{ID: r.ID, Regime: r.Regime, Reason: r.Reason, State: r.State, TransactionID: r.TransactionID,
 				DisputedAmount: r.DisputedAmount, Currency: r.Currency, OpenedAt: r.OpenedAt, UpdatedAt: r.UpdatedAt}
 			if d, ok := next[r.ID]; ok {
 				v := deadlineView(d, now)
@@ -632,12 +681,23 @@ func (s *Service) view(ctx context.Context, tx Tx, rec DisputeRecord) (DisputeVi
 		bal.add(p.Debit, p.Amount)
 		bal.add(p.Credit, p.Amount.Neg())
 	}
-	return DisputeView{
-		ID: rec.ID, Regime: rec.Regime, State: rec.State, Appeals: rec.Appeals, Version: rec.Version,
+	view := DisputeView{
+		ID: rec.ID, Regime: rec.Regime, Reason: rec.Reason, State: rec.State, Appeals: rec.Appeals, Version: rec.Version,
 		TransactionID: rec.TransactionID, AccountID: rec.AccountID, DisputedAmount: rec.DisputedAmount,
 		Currency: rec.Currency, OpenedAt: rec.OpenedAt, UpdatedAt: rec.UpdatedAt,
 		AllowedEvents: allowed, Events: views, Deadlines: dviews, Ledger: lviews, Balances: bal,
-	}, nil
+	}
+	switch q, err := tx.GetQuestionnaire(ctx, rec.ID); {
+	case err == nil:
+		flags := domain.Inconsistencies(q.Reason, q.Answers)
+		if flags == nil {
+			flags = []string{}
+		}
+		view.Questionnaire = &QuestionnaireView{Reason: q.Reason, Questions: q.Questions, Answers: q.Answers, Inconsistencies: flags, SentAt: q.SentAt, ReceivedAt: q.ReceivedAt}
+	case !errors.Is(err, ErrNotFound):
+		return DisputeView{}, err
+	}
+	return view, nil
 }
 
 // add applies a debit (positive) or credit (negative) to an account; the customer's balance is shown from the
