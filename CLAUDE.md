@@ -56,6 +56,8 @@ Each area has its own CLAUDE.md, loaded when working under that path. `backend/C
 exists; `frontend/` and `docs/thesis/` get theirs when they gain content.
 
 - **Commits:** `type(scope): summary`, imperative, no trailer lines. Small, bisectable.
+  Merges are squash-only; the PR title and body become the commit on `main`, so they are
+  written to the same standard.
 - **Writing (docs, comments, commits, CI names):** no em dashes, no emojis.
 - **Comments:** as few as possible, one line, and only to say why; never to restate what the
   code does. Doc comments on exported identifiers stay, one line each.

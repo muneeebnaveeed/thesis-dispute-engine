@@ -18,4 +18,6 @@ scripts/create-pr --summary "..." --why "..." --testing "..." [--notes "..."] \
   deferred decisions, ADR links.
 - Use `--dry-run` to show the user the title and body before creating.
 - The script pushes the branch, so do not push separately.
+- The PR title and body become the squash commit on main verbatim (repo setting), so write
+  them as the permanent record; the branch's own commits stay only in the PR.
 - Report the PR URL. Then `scripts/fetch-ci-logs --wait` if asked to watch CI.
