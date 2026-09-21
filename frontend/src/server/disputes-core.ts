@@ -1,5 +1,5 @@
 import type { Api } from '#/api/client'
-import type { Problem } from '#/api/problem'
+import type { Problem } from '#/api/failure'
 import type { components } from '#/api/schema.gen'
 import { ApplyEventRequest, CreateDisputeRequest } from '#/api/schemas.gen'
 import { validate } from '#/api/validate'

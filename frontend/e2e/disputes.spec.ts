@@ -34,13 +34,20 @@ test('an analyst opens a dispute and drives it through allowed transitions from 
   await expect(page.getByRole('button', { name: 'CLOSE' })).toBeVisible()
 })
 
-test('structural mistakes are caught before the API and shown under the field', async ({ page }) => {
-  await page.getByLabel('Transaction ID').fill('not-a-uuid')
+test('structural mistakes are caught in the browser and shown under the field, with no request made', async ({
+  page,
+}) => {
+  const requests: string[] = []
+  page.on('request', (r) => {
+    if (r.url().startsWith(api)) requests.push(r.url())
+  })
+  const input = page.getByLabel('Transaction ID')
+  await input.fill('not-a-uuid')
   await page.getByRole('button', { name: 'Open' }).click()
-  const alert = page.getByRole('alert')
-  await expect(alert).toContainText('not valid')
-  await expect(alert).toContainText('transactionId')
-  await expect(alert).toContainText('will not help')
+  await expect(input).toHaveAttribute('aria-invalid', 'true')
+  await expect(page.locator('#transactionId-error')).toBeVisible()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  expect(requests.filter((u) => u.includes('/disputes')).length).toBe(0)
 })
 
 test("another tenant's data does not exist for this analyst", async ({ page, request }) => {

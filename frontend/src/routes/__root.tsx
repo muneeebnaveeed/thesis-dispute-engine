@@ -1,6 +1,7 @@
 import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 
+import { RouteError } from '#/components/route-error'
 import { getViewer } from '#/server/auth/session'
 import { publicConfig } from '#/server/public-config'
 import appCss from '../styles.css?url'
@@ -18,6 +19,7 @@ export const Route = createRootRoute({
   }),
   shellComponent: RootDocument,
   component: Outlet,
+  errorComponent: RouteError,
 })
 
 function RootDocument({ children }: { children: ReactNode }) {
