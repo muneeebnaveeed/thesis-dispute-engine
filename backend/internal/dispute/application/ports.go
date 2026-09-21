@@ -67,6 +67,7 @@ type StoredResponse struct {
 	RequestHash []byte
 	StatusCode  int
 	Body        []byte
+	CreatedAt   time.Time
 }
 
 // Tx is the set of storage operations available inside one transaction.
@@ -94,6 +95,9 @@ type Store interface {
 	WithTx(ctx context.Context, fn func(Tx) error) error
 	// CountByState feeds the disputes-by-state gauge; it runs outside any transaction.
 	CountByState(ctx context.Context) ([]StateCount, error)
+	// PurgeIdempotencyKeys deletes stored responses older than before and reports how many went; when another
+	// replica holds the sweep it returns 0 and no error.
+	PurgeIdempotencyKeys(ctx context.Context, before time.Time) (int64, error)
 }
 
 // Clock is injectable time for deterministic tests.

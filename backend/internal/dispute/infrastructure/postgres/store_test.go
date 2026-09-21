@@ -184,3 +184,49 @@ func TestRejectedTransitionLeavesNoTrace(t *testing.T) {
 		t.Errorf("rejected event wrote something: %+v", view)
 	}
 }
+
+func TestPurgeIdempotencyKeys(t *testing.T) {
+	svc, pool := newService(t)
+	ctx := context.Background()
+	txn := seed(t, pool, domain.RailSEPADD, "EUR")
+	body := []byte(`{"transactionId":"` + txn.String() + `"}`)
+	in := application.CreateDisputeInput{TransactionID: txn, Idempotency: application.Idempotency{Key: "k-old", RequestBody: body}}
+	if _, err := svc.CreateDispute(ctx, in); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE idempotency_keys SET created_at = now() - interval '2 days' WHERE key = 'k-old'`); err != nil {
+		t.Fatal(err)
+	}
+	in.Idempotency.Key = "k-new"
+	if _, err := svc.CreateDispute(ctx, in); err != nil {
+		t.Fatal(err)
+	}
+
+	store := disputepg.NewStore(pool)
+	n, err := store.PurgeIdempotencyKeys(ctx, time.Now().Add(-24*time.Hour))
+	if err != nil || n != 1 {
+		t.Fatalf("purge = %d, %v", n, err)
+	}
+	var left int
+	_ = pool.QueryRow(ctx, `SELECT count(*) FROM idempotency_keys`).Scan(&left)
+	if left != 1 {
+		t.Errorf("keys left = %d", left)
+	}
+
+	// While another session holds the sweep lock, a purge is a no-op rather than a second deleter.
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Release()
+	if _, err := conn.Exec(ctx, `SELECT pg_advisory_lock($1)`, disputepg.PurgeLockID); err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Exec(ctx, `SELECT pg_advisory_unlock($1)`, disputepg.PurgeLockID) //nolint:errcheck // test cleanup
+	if _, err := pool.Exec(ctx, `UPDATE idempotency_keys SET created_at = now() - interval '2 days'`); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := store.PurgeIdempotencyKeys(ctx, time.Now().Add(-24*time.Hour)); err != nil || n != 0 {
+		t.Fatalf("purge under contention = %d, %v", n, err)
+	}
+}

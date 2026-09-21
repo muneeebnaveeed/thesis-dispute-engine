@@ -46,6 +46,27 @@ func (s *Store) CountByState(ctx context.Context) ([]application.StateCount, err
 	return out, nil
 }
 
+// PurgeLockID is the advisory lock the idempotency sweep takes; arbitrary but fixed, distinct from the migration lock.
+const PurgeLockID = 72040002
+
+// PurgeIdempotencyKeys implements application.Store; it skips silently when another session holds PurgeLockID.
+func (s *Store) PurgeIdempotencyKeys(ctx context.Context, before time.Time) (int64, error) {
+	var n int64
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		var got bool
+		if err := tx.QueryRow(ctx, `SELECT pg_try_advisory_xact_lock($1)`, PurgeLockID).Scan(&got); err != nil {
+			return err
+		}
+		if !got {
+			return nil
+		}
+		var err error
+		n, err = sqlcgen.New(tx).DeleteIdempotencyKeysBefore(ctx, before)
+		return err
+	})
+	return n, mapErr(err)
+}
+
 type txn struct {
 	q *sqlcgen.Queries
 }
@@ -123,7 +144,7 @@ func (t *txn) GetIdempotent(ctx context.Context, scope, key string) (application
 	if err != nil {
 		return application.StoredResponse{}, mapErr(err)
 	}
-	return application.StoredResponse{RequestHash: row.RequestHash, StatusCode: int(row.StatusCode), Body: row.Response}, nil
+	return application.StoredResponse{RequestHash: row.RequestHash, StatusCode: int(row.StatusCode), Body: row.Response, CreatedAt: row.CreatedAt}, nil
 }
 
 func (t *txn) PutIdempotent(ctx context.Context, scope, key string, r application.StoredResponse) error {

@@ -54,6 +54,20 @@ func (m *MemStore) WithTx(_ context.Context, fn func(application.Tx) error) erro
 	return nil
 }
 
+// PurgeIdempotencyKeys implements application.Store.
+func (m *MemStore) PurgeIdempotencyKeys(_ context.Context, before time.Time) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var n int64
+	for k, r := range m.Idempotent {
+		if r.CreatedAt.Before(before) {
+			delete(m.Idempotent, k)
+			n++
+		}
+	}
+	return n, nil
+}
+
 // CountByState implements application.Store.
 func (m *MemStore) CountByState(_ context.Context) ([]application.StateCount, error) {
 	m.mu.Lock()
@@ -149,6 +163,9 @@ func (t *memTx) GetIdempotent(_ context.Context, scope, key string) (application
 }
 
 func (t *memTx) PutIdempotent(_ context.Context, scope, key string, r application.StoredResponse) error {
+	if r.CreatedAt.IsZero() {
+		r.CreatedAt = time.Now()
+	}
 	t.s.Idempotent[scope+"\x00"+key] = r
 	return nil
 }
