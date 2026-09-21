@@ -1,20 +1,25 @@
 # Thesis document
 
-Source of the written thesis. Tooling (LaTeX via Overleaf/latexmk, or Word) is decided once
-the supervisor answers how he prefers to receive drafts for his Grammarly review; until then
-this directory holds the chapter outline and the figures collected week by week.
+Source of the written thesis: outline with page budgets, figure register, evaluation protocol,
+reference list and the AI-use declaration. Tooling (LaTeX via Overleaf, or Word) is decided
+once the supervisor answers how he wants drafts; nothing here depends on it. Text is written
+as the work happens: one page plus a figure per week from the chapter this week touched.
 
-Faculty formal requirements (inf.unideb.hu/node/486): Times New Roman 12 pt, 1.5 spacing,
-margins 3/2/3/3 cm (L/R/T/B), 30–40 pages of main text, appendix ≤ 8–10 pages; title page
-from the faculty PDF template; sections: TOC, introduction (2–3 pp), discussion, conclusion
-(2–3 pp), bibliography, appendix, acknowledgements. Supervisor's guidance: ≥ 20–25 pages on
-the application and its development, ≤ 10 references, images ≤ ⅓ of the document, every
-figure/table numbered and referenced, code snippets count as figures, auto-generated TOC,
-AI use declared.
+Formal requirements (inf.unideb.hu/node/486): Times New Roman 12 pt, 1.5 spacing, margins
+3/2/3/3 cm (L/R/T/B), 30 to 40 pages of main text, appendix at most 8 to 10 pages, faculty
+title page, auto-generated table of contents, no lists of figures or tables. Supervisor's
+guidance: at least 20 to 25 pages on the application and its development, at most 10
+references, figures at most a third of the document, every figure and table numbered and
+referenced in the text (a code snippet is a figure), identifiers set like code in a final
+uniform pass, AI use declared. Grading: literature review, documentation of the work, applied
+techniques and results, professional standard including spelling and formatting.
 
-## Figures collected so far
-
-| # | What | Source |
-|---|---|---|
-| 1 | Regime configuration table | `docs/adr/0002-regime-parameterised-state-machine.md` |
-| 2 | Dispute lifecycle state machine | `docs/adr/0002-…` (diagram to draw from `internal/dispute`) |
+| File | What |
+| --- | --- |
+| `outline.md` | Chapters, page budgets, what each draws on |
+| `figures.md` | Figure register: number, caption, source, status |
+| `evaluation.md` | What is measured, how, and where the numbers land (`make eval`) |
+| `references.md` | The reference list, capped at ten |
+| `ai-declaration.md` | The declaration text, kept true as the work goes |
+| `data/` | Evaluation runs, one dated directory each |
+| `figures/` | Exported figures (diagrams, screenshots), named by figure number |

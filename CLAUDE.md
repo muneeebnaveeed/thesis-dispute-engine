@@ -14,6 +14,8 @@ How to work in this repo. What the system does is in `README.md` and `docs/adr/`
 
 ## Commands (run from the repo root)
 
+- `make eval`: the thesis evaluation run (correctness suites, paced load, Prometheus read-back) into
+  `docs/thesis/data/<date>/`; needs `make otel-up`. Runs are committed and cited by directory name.
 - `make e2e`: the Playwright browser suite against the full local stack; in GitHub it is the
   separate `e2e` workflow, informative on PRs and on main, never a required check.
 - `make ci`: everything the `ci` workflow runs (versions, generate-check, fmt, vet, lint, test, tidy, fe-check). Run
@@ -51,7 +53,7 @@ frontend/                                TanStack Start app (pnpm); see frontend
 docs/api/openapi.yaml                    the API contract; everything HTTP is generated from it
 deploy/                                  compose.yml (host networking, see below), otel.env, probe.sh, grafana/ and lgtm/ provisioning
 backend/internal/websession              opaque session store behind /internal/sessions (frontend's, ADR 0011)
-docs/adr, docs/thesis                    decisions; the design document
+docs/adr, docs/thesis                    decisions; the thesis outline, figure register, evaluation protocol and runs (make eval)
 docs/authentication.md, docs/operations.md, docs/observability.md  how callers become a tenant; operator runbooks; where telemetry lives
 ```
 
