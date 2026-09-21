@@ -3,7 +3,7 @@
 ALTER TABLE tenants ADD COLUMN slug        text;
 ALTER TABLE tenants ADD COLUMN oidc_issuer text;
 
-UPDATE tenants SET slug = 'alpha', name = 'Alpha Bank' WHERE id = '00000000-0000-8000-8000-00000000a001' AND slug IS NULL;
+UPDATE tenants SET slug = 'otp', name = 'OTP Bank' WHERE id = '00000000-0000-8000-8000-00000000a001' AND slug IS NULL;
 UPDATE tenants SET slug = replace(id::text, '-', '') WHERE slug IS NULL;
 
 ALTER TABLE tenants ALTER COLUMN slug SET NOT NULL;

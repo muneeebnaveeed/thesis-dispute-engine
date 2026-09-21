@@ -1,6 +1,6 @@
 {
-  "realm": "alpha",
-  "displayName": "Alpha Bank",
+  "realm": "erste",
+  "displayName": "Erste Bank",
   "enabled": true,
   "sslRequired": "none",
   "registrationAllowed": false,
@@ -35,7 +35,7 @@
           "consentRequired": false,
           "config": {
             "claim.name": "tenant_id",
-            "claim.value": "00000000-0000-8000-8000-00000000a001",
+            "claim.value": "00000000-0000-8000-8000-00000000a002",
             "jsonType.label": "String",
             "access.token.claim": "true",
             "id.token.claim": "true",
@@ -87,8 +87,8 @@
   "users": [
     {
       "username": "analyst",
-      "email": "analyst@alpha.example",
-      "firstName": "Alpha Bank",
+      "email": "analyst@erste.example",
+      "firstName": "Erste Bank",
       "lastName": "Analyst",
       "enabled": true,
       "emailVerified": true,

@@ -10,6 +10,6 @@ while IFS='|' read -r slug name tenant_id; do
     realm.template.json > "import/$slug.json"
   echo "rendered import/$slug.json"
 done <<'TENANTS'
-alpha|Alpha Bank|00000000-0000-8000-8000-00000000a001
-beta|Beta PSP|00000000-0000-8000-8000-00000000a002
+otp|OTP Bank|00000000-0000-8000-8000-00000000a001
+erste|Erste Bank|00000000-0000-8000-8000-00000000a002
 TENANTS

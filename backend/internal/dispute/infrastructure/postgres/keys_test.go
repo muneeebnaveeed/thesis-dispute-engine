@@ -22,7 +22,7 @@ func TestKeyStoreLifecycle(t *testing.T) {
 	app := pgtest.AppPool(t, schema)
 	ctx := context.Background()
 	q := sqlcgen.New(owner)
-	if err := q.UpsertTenant(ctx, sqlcgen.UpsertTenantParams{ID: apptest.TenantA, Name: "a", Slug: "alpha"}); err != nil {
+	if err := q.UpsertTenant(ctx, sqlcgen.UpsertTenantParams{ID: apptest.TenantA, Name: "a", Slug: "otp"}); err != nil {
 		t.Fatal(err)
 	}
 	insert := func(secret string, expires pgtype.Timestamptz) uuid.UUID {

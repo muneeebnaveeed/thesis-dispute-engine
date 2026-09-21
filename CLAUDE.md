@@ -29,7 +29,7 @@ How to work in this repo. What the system does is in `README.md` and `docs/adr/`
   Postgres + the API in a Go toolchain container with live reload. `make otel-up`: plus Grafana LGTM
   (Grafana at http://localhost:3001, admin/admin; traces in Tempo, metrics in Mimir, logs in Loki)
   plus a synthetic probe. Cheat sheet: `docs/observability.md`. `make auth-up`: plus Keycloak with
-  one realm per seeded tenant (`alpha`, `beta`; analyst/analyst; admin console admin/admin on :8180).
+  one realm per seeded tenant (`otp`, `erste`; analyst/analyst; admin console admin/admin on :8180).
 - `make image`: build `backend/Dockerfile` locally.
 
 Toolchain is pinned in `mise.toml` (Go, golangci-lint, air, sqlc); `go.mod` carries

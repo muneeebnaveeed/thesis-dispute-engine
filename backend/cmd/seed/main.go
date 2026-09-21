@@ -79,7 +79,7 @@ func run() error {
 
 	// Slugs double as Keycloak realm names (deploy/keycloak/render-realms.sh renders one realm per row here).
 	keycloak := getenv("KEYCLOAK_URL", "http://localhost:8180")
-	for _, t := range []struct{ id, name, slug string }{{tenantA, "Alpha Bank", "alpha"}, {tenantB, "Beta PSP", "beta"}} {
+	for _, t := range []struct{ id, name, slug string }{{tenantA, "OTP Bank", "otp"}, {tenantB, "Erste Bank", "erste"}} {
 		issuer := keycloak + "/realms/" + t.slug
 		if err := q.UpsertTenant(ctx, sqlcgen.UpsertTenantParams{ID: uuid.MustParse(t.id), Name: t.name, Slug: t.slug, OidcIssuer: &issuer}); err != nil {
 			return err
@@ -112,7 +112,7 @@ func run() error {
 			return err
 		}
 	}
-	fmt.Printf("seeded 2 tenants (alpha, beta; tenant keys %s, %s; analyst/analyst in each realm), 3 accounts and %d transactions\n", devKeyA, devKeyB, len(seedTxns))
+	fmt.Printf("seeded 2 tenants (otp, erste; tenant keys %s, %s; analyst/analyst in each realm), 3 accounts and %d transactions\n", devKeyA, devKeyB, len(seedTxns))
 	for _, t := range seedTxns {
 		fmt.Printf("  %s  tenant %s  %-11s %8s %s  %s\n", t.id, t.tenant[len(t.tenant)-4:], t.rail, t.amount, t.currency, t.merchant)
 	}
