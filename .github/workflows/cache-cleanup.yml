@@ -1,0 +1,25 @@
+name: cache cleanup
+
+# Caches written by a PR's runs are readable only from that PR, but they count against the repo's
+# 10 GB quota until GitHub evicts them after 7 idle days. Drop them as soon as the PR closes.
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  actions: write
+
+jobs:
+  cleanup:
+    name: Delete this PR's caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      REF: refs/pull/${{ github.event.pull_request.number }}/merge
+    steps:
+      - run: |
+          ids=$(gh cache list --ref "$REF" --limit 100 --json id --jq '.[].id')
+          [ -n "$ids" ] || { echo "no caches for $REF"; exit 0; }
+          for id in $ids; do gh cache delete "$id" && echo "deleted $id"; done
