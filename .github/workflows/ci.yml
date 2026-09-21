@@ -85,7 +85,7 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ needs.changes.outputs.go }}
           cache-dependency-path: backend/go.sum
@@ -128,7 +128,7 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ needs.changes.outputs.go }}
           cache-dependency-path: backend/go.sum
