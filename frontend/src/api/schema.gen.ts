@@ -85,6 +85,49 @@ export type paths = {
     patch?: never
     trace?: never
   }
+  '/tenant-keys': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The tenant's own keys, live and revoked
+     * @description Analysts with the tenant-admin role only; a tenant key cannot inspect keys.
+     */
+    get: operations['listTenantKeys']
+    put?: never
+    /**
+     * Issue a key for one of the tenant's systems
+     * @description The secret is in this response only; the server keeps its hash and prefix.
+     */
+    post: operations['createTenantKey']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/tenant-keys/{keyId}': {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        keyId: string
+      }
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /** Revoke a key; takes effect on the next request */
+    delete: operations['revokeTenantKey']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/internal/sessions/{sessionId}': {
     parameters: {
       query?: never
@@ -157,6 +200,7 @@ export type components = {
      */
     ErrorCode:
       | 'unauthenticated'
+      | 'forbidden'
       | 'rate-limited'
       | 'malformed-request'
       | 'contract-violation'
@@ -191,6 +235,36 @@ export type components = {
       /** @example /transactionId */
       field: string
       message: string
+    }
+    TenantKey: {
+      /** Format: uuid */
+      id: string
+      /** @description The first characters of the key */
+      prefix: string
+      label: string
+      /** Format: date-time */
+      createdAt: string
+      /** Format: date-time */
+      lastUsedAt?: string
+      /** Format: date-time */
+      expiresAt?: string
+      /** Format: date-time */
+      revokedAt?: string
+      /** @enum {string} */
+      status: 'live' | 'expired' | 'revoked'
+    }
+    CreateTenantKeyRequest: {
+      /** @description Which system will hold it. */
+      label: string
+      /**
+       * Format: date-time
+       * @description Optional; the key stops working after this.
+       */
+      expiresAt?: string
+    }
+    IssuedTenantKey: components['schemas']['TenantKey'] & {
+      /** @description Shown once. */
+      secret: string
     }
     TenantSummary: {
       /** Format: uuid */
@@ -332,6 +406,15 @@ export type components = {
     }
     /** @description Missing, unknown or revoked tenant key. */
     Unauthorized: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/problem+json': components['schemas']['Problem']
+      }
+    }
+    /** @description The credential is valid but may not do this (an analyst without the tenant-admin role, or a tenant key on an analyst-only operation). */
+    Forbidden: {
       headers: {
         [name: string]: unknown
       }
@@ -516,6 +599,78 @@ export interface operations {
       }
       422: components['responses']['Unprocessable']
       429: components['responses']['TooManyRequests']
+    }
+  }
+  listTenantKeys: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Keys, newest first. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TenantKey'][]
+        }
+      }
+      401: components['responses']['Unauthorized']
+      403: components['responses']['Forbidden']
+    }
+  }
+  createTenantKey: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateTenantKeyRequest']
+      }
+    }
+    responses: {
+      /** @description Issued. */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['IssuedTenantKey']
+        }
+      }
+      400: components['responses']['BadRequest']
+      401: components['responses']['Unauthorized']
+      403: components['responses']['Forbidden']
+    }
+  }
+  revokeTenantKey: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        keyId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Revoked */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      401: components['responses']['Unauthorized']
+      403: components['responses']['Forbidden']
+      404: components['responses']['NotFound']
     }
   }
   getSession: {

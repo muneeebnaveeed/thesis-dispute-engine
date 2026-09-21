@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -38,12 +39,28 @@ func newAPI(t *testing.T, ready disputehttp.Readiness) api {
 	}
 	mux := http.NewServeMux()
 	directory := memTenants{{ID: apptest.TenantA, Slug: "otp", Name: "OTP Bank", Issuer: "http://kc/realms/otp", EmailDomains: []string{"otpbank.hu"}}}
-	if err := disputehttp.Mount(mux, svc, ready, disputehttp.WithSessions(memSessions{}), disputehttp.WithTenants(directory)); err != nil {
+	if err := disputehttp.Mount(mux, svc, ready, disputehttp.WithSessions(memSessions{}), disputehttp.WithTenants(directory), disputehttp.WithKeys(&memKeys{})); err != nil {
 		t.Fatal(err)
 	}
 	keys := keyResolver{"key-a": apptest.TenantA, "key-b": apptest.TenantB}
-	h := httpserver.Chain(mux, httpserver.RequestID, auth.Bearer(keys, nil), auth.ServiceKey("svc-secret"))
+	h := httpserver.Chain(mux, httpserver.RequestID, auth.Bearer(keys, nil), analystHeader, auth.ServiceKey("svc-secret"))
 	return api{t: t, h: h, store: store}
+}
+
+// analystHeader stands in for an OIDC token in tests: "X-Test-Analyst: <tenant a|b>:<role,role>" becomes a principal.
+func analystHeader(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if v := r.Header.Get("X-Test-Analyst"); v != "" {
+			who, roles, _ := strings.Cut(v, ":")
+			tid := apptest.TenantA
+			if who == "b" {
+				tid = apptest.TenantB
+			}
+			p := auth.Principal{Tenant: tid, Subject: "analyst-" + who, Roles: strings.Split(roles, ",")}
+			r = r.WithContext(auth.WithPrincipal(r.Context(), p))
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // keyResolver stands in for the tenant_keys table; the handler tests care about the contract, not the lookup.
@@ -338,5 +355,115 @@ func TestInternalBulkSessionDeleteAndTenantDirectory(t *testing.T) {
 	var tenants []map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &tenants); err != nil || rec.Code != http.StatusOK || len(tenants) != 1 || tenants[0]["slug"] != "otp" {
 		t.Fatalf("tenants: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// memKeys is the key manager's contract in memory: tenant-scoped, secret returned once, revoke is idempotent.
+type memKeys struct {
+	mu   sync.Mutex
+	recs map[uuid.UUID]struct {
+		tenant uuid.UUID
+		rec    disputepg.KeyRecord
+	}
+}
+
+func (m *memKeys) ListForTenant(_ context.Context, tenantID uuid.UUID) ([]disputepg.KeyRecord, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []disputepg.KeyRecord
+	for _, e := range m.recs {
+		if e.tenant == tenantID {
+			out = append(out, e.rec)
+		}
+	}
+	return out, nil
+}
+
+func (m *memKeys) Issue(_ context.Context, tenantID uuid.UUID, label string, expiresAt *time.Time) (disputepg.KeyRecord, string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.recs == nil {
+		m.recs = map[uuid.UUID]struct {
+			tenant uuid.UUID
+			rec    disputepg.KeyRecord
+		}{}
+	}
+	secret, _ := auth.NewSecret()
+	rec := disputepg.KeyRecord{ID: uuid.New(), Prefix: auth.Prefix(secret), Label: label, CreatedAt: time.Now(), ExpiresAt: expiresAt}
+	m.recs[rec.ID] = struct {
+		tenant uuid.UUID
+		rec    disputepg.KeyRecord
+	}{tenantID, rec}
+	return rec, secret, nil
+}
+
+func (m *memKeys) Revoke(_ context.Context, tenantID, id uuid.UUID) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	e, ok := m.recs[id]
+	if !ok || e.tenant != tenantID {
+		return application.ErrNotFound
+	}
+	now := time.Now()
+	e.rec.RevokedAt = &now
+	m.recs[id] = e
+	return nil
+}
+
+func TestTenantKeySelfService(t *testing.T) {
+	a := newAPI(t, func(context.Context) error { return nil })
+	admin := map[string]string{"Authorization": "", "X-Test-Analyst": "a:analyst,tenant-admin"}
+	analyst := map[string]string{"Authorization": "", "X-Test-Analyst": "a:analyst"}
+	adminB := map[string]string{"Authorization": "", "X-Test-Analyst": "b:tenant-admin"}
+
+	// A tenant key is a machine credential and cannot mint keys; an analyst without the role cannot either.
+	if rec, p := a.do(http.MethodGet, "/tenant-keys", nil, nil); rec.Code != http.StatusForbidden || p["code"] != "forbidden" {
+		t.Fatalf("tenant key on /tenant-keys: %d %v", rec.Code, p)
+	}
+	if rec, _ := a.do(http.MethodPost, "/tenant-keys", map[string]any{"label": "x"}, analyst); rec.Code != http.StatusForbidden {
+		t.Fatalf("analyst without role: %d", rec.Code)
+	}
+
+	rec, issued := a.do(http.MethodPost, "/tenant-keys", map[string]any{"label": "core banking"}, admin)
+	if rec.Code != http.StatusCreated || issued["secret"] == nil || issued["status"] != "live" {
+		t.Fatalf("issue: %d %v", rec.Code, issued)
+	}
+	secret, _ := issued["secret"].(string)
+	prefix, _ := issued["prefix"].(string)
+	if !strings.HasPrefix(secret, "tk_") || !strings.HasPrefix(secret, prefix) {
+		t.Errorf("secret %q should start with tk_ and its prefix %q", secret, prefix)
+	}
+	if rec, _ := a.do(http.MethodPost, "/tenant-keys", map[string]any{"label": "old", "expiresAt": "2020-01-01T00:00:00Z"}, admin); rec.Code != http.StatusBadRequest {
+		t.Errorf("past expiry: %d", rec.Code)
+	}
+	if rec, _ := a.do(http.MethodPost, "/tenant-keys", map[string]any{}, admin); rec.Code != http.StatusBadRequest {
+		t.Errorf("missing label: %d", rec.Code)
+	}
+
+	rec = httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/tenant-keys", nil)
+	req.Header.Set("X-Test-Analyst", "a:tenant-admin")
+	a.h.ServeHTTP(rec, req)
+	var list []map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &list)
+	if rec.Code != http.StatusOK || len(list) != 1 || list[0]["secret"] != nil || list[0]["prefix"] != prefix {
+		t.Fatalf("list: %d %s", rec.Code, rec.Body.String())
+	}
+
+	id, _ := issued["id"].(string)
+	if rec, _ := a.do(http.MethodDelete, "/tenant-keys/"+id, nil, adminB); rec.Code != http.StatusNotFound {
+		t.Errorf("another tenant's admin revoking: %d, want 404 (ids must not leak)", rec.Code)
+	}
+	if rec, _ := a.do(http.MethodDelete, "/tenant-keys/"+id, nil, admin); rec.Code != http.StatusNoContent {
+		t.Errorf("revoke: %d", rec.Code)
+	}
+	rec = httptest.NewRecorder()
+	a.h.ServeHTTP(rec, req)
+	_ = json.Unmarshal(rec.Body.Bytes(), &list)
+	if list[0]["status"] != "revoked" {
+		t.Errorf("after revoke: %v", list[0])
+	}
+	if rec, _ := a.do(http.MethodDelete, "/tenant-keys/"+uuid.NewString(), nil, admin); rec.Code != http.StatusNotFound {
+		t.Errorf("unknown key: %d", rec.Code)
 	}
 }

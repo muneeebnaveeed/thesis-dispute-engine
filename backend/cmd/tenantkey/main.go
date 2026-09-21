@@ -9,8 +9,6 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"flag"
 	"fmt"
 	"os"
@@ -96,7 +94,7 @@ func create(ctx context.Context, q *sqlcgen.Queries, args []string) error {
 		}
 		expiresAt = pgtype.Timestamptz{Time: t, Valid: true}
 	}
-	secret, err := NewSecret()
+	secret, err := auth.NewSecret()
 	if err != nil {
 		return err
 	}
@@ -237,13 +235,4 @@ func state(revoked, expires pgtype.Timestamptz) string {
 	default:
 		return "live"
 	}
-}
-
-// NewSecret returns a 32-byte random key with a recognisable prefix so leaked keys can be grepped for.
-func NewSecret() (string, error) {
-	var b [32]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return "", err
-	}
-	return "tk_" + base64.RawURLEncoding.EncodeToString(b[:]), nil
 }

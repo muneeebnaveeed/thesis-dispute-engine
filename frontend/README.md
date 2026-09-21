@@ -63,7 +63,8 @@ through the API's internal session endpoints with `DISPUTE_SERVICE_KEY`; the bro
 HttpOnly cookie. Every route under `/<slug>` sends anonymous visitors through the realm and back
 to the page they asked for; Keycloak's back-channel logout ends sessions at `/auth/backchannel-logout`.
 `src/start.ts` sets the security headers, including a per-request CSP nonce that Start applies to
-its own scripts. For direct calls, `src/api/browser.ts` asks the server for the session's
+its own scripts. Analysts with the `tenant-admin` role get a Keys page (`/<slug>/keys`) to issue and
+revoke their organisation's tenant keys; the secret is shown once and never appears in the list. For direct calls, `src/api/browser.ts` asks the server for the session's
 access token, keeps it in memory, and retries once with a fresh token on 401; refresh only ever
 happens on the server (`src/server/auth/session-impl.ts`). `make auth-up` brings Keycloak with
 the `otp` and `erste` realms; sign in as `analyst` / `analyst`.

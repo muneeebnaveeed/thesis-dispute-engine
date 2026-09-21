@@ -48,9 +48,10 @@ validator enforces it.
 
 ## Not in place
 
-MFA (a realm policy, deferred by decision), TLS termination itself (a deployment concern; every setting assumes https
-in production), and authorisation beyond tenancy (roles ride in the token and the principal; the first consumer is
-self-service tenant key management).
+MFA (a realm policy, deferred by decision) and TLS termination itself (a deployment concern; every setting assumes
+https in production). Authorisation beyond tenancy exists for one surface so far: `/tenant-keys` requires an analyst
+token carrying the `tenant-admin` realm role (`auth.RequireRole`); a tenant key or a plain analyst gets 403
+`forbidden`. New role-gated operations follow the same pattern.
 
 ## Configuration
 

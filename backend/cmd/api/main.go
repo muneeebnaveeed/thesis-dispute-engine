@@ -82,7 +82,7 @@ func run(cfg config.Config, logger *slog.Logger) error {
 	keys := disputepg.NewKeyStore(pool)
 	sessions := websession.NewStore(pool)
 	go websession.RunPurge(ctx, sessions, logger)
-	if err := disputehttp.Mount(mux, svc, pool.Ping, disputehttp.WithSessions(sessions), disputehttp.WithTenants(keys)); err != nil {
+	if err := disputehttp.Mount(mux, svc, pool.Ping, disputehttp.WithSessions(sessions), disputehttp.WithTenants(keys), disputehttp.WithKeys(keys)); err != nil {
 		return err
 	}
 	limiter := ratelimit.NewPGCounter(pool)
