@@ -2,7 +2,8 @@
 # Tenant and analyst lifecycle, end to end: the tenant row (cmd/tenant), its Keycloak realm, its first keys
 # (cmd/tenantkey), its analysts, and their sessions (the API's internal endpoint).
 #
-#   scripts/tenant onboard  --slug <slug> --name "<name>" [--domains a.com,b.com] [--id <uuid>] [--no-keys]
+#   scripts/tenant onboard  --slug <slug> --name "<name>" [--domains a.com,b.com] [--timezone Europe/Budapest]
+#                           [--holidays 2026-10-23,2026-11-01] [--id <uuid>] [--no-keys]
 #   scripts/tenant offboard --slug <slug> [--yes]
 #   scripts/tenant user add    --slug <slug> --username <u> --email <e> [--name "First Last"] [--roles analyst,tenant-admin]
 #   scripts/tenant user remove --slug <slug> --username <u>
@@ -31,12 +32,14 @@ end_sessions() { # end_sessions <query>
 }
 
 cmd_onboard() {
-  local slug="" name="" domains="" id="" keys=1
+  local slug="" name="" domains="" timezone="" holidays="" id="" keys=1
   while (($#)); do
     case "$1" in
       --slug) slug=$2; shift 2 ;;
       --name) name=$2; shift 2 ;;
       --domains) domains=$2; shift 2 ;;
+      --timezone) timezone=$2; shift 2 ;;
+      --holidays) holidays=$2; shift 2 ;;
       --id) id=$2; shift 2 ;;
       --no-keys) keys=0; shift ;;
       *) die "unknown flag $1" ;;
@@ -45,7 +48,7 @@ cmd_onboard() {
   [[ -n "$slug" && -n "$name" ]] || die "onboard needs --slug and --name"
 
   info "tenant row"
-  local args=(upsert --slug "$slug" --name "$name" --domains "$domains")
+  local args=(upsert --slug "$slug" --name "$name" --domains "$domains" --timezone "$timezone" --holidays "$holidays")
   [[ -n "$id" ]] && args+=(--id "$id")
   gocmd tenant "${args[@]}"
   id=$(tenant_id_for "$slug")

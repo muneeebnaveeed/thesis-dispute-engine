@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { classify, type Failure } from '#/api/failure'
 import { CreateDisputeRequest } from '#/api/schemas.gen'
 import { AppShell } from '#/components/app-shell'
+import { DeadlineBadge, remaining } from '#/components/deadlines'
 import { FailureBanner, FieldError } from '#/components/failure-banner'
 import { TenantMismatch } from '#/components/tenant-mismatch'
 import { serverFields, validateForm } from '#/forms/validate-form'
@@ -13,13 +14,14 @@ import { Value } from '@sinclair/typebox/value'
 import { DisputeState as DisputeStateSchema } from '#/api/schemas.gen'
 import { listDisputes, type DisputeState } from '#/server/disputes-list'
 
-type Search = { state?: DisputeState; cursor?: string }
+type Search = { state?: DisputeState; cursor?: string; overdue?: boolean }
 
 // The workbench: open a dispute, find one, and the tenant's newest disputes with a state filter and paging.
 export const Route = createFileRoute('/$tenant/')({
   validateSearch: (s: Record<string, unknown>): Search => ({
     ...(isState(s.state) ? { state: s.state } : {}),
     ...(typeof s.cursor === 'string' ? { cursor: s.cursor } : {}),
+    ...(s.overdue === true || s.overdue === 'true' ? { overdue: true } : {}),
   }),
   loaderDeps: ({ search }) => search,
   loader: ({ deps }) => listDisputes({ data: deps }),
@@ -38,7 +40,9 @@ const button =
 function Workbench() {
   const { tenant } = Route.useParams()
   const page = Route.useLoaderData()
-  const { state, cursor } = Route.useSearch()
+  const { state, cursor, overdue } = Route.useSearch()
+  // The list's own filters, minus the cursor: what the paging and reset links carry along.
+  const filters = { ...(state ? { state } : {}), ...(overdue ? { overdue: true } : {}) }
   const { viewer } = useRouteContext({ from: '__root__' })
   const navigate = useNavigate()
   const [failure, setFailure] = useState<Failure | null>(null)
@@ -71,9 +75,17 @@ function Workbench() {
             className="flex items-center gap-2 text-sm"
             onSubmit={(e) => {
               e.preventDefault()
-              const raw = new FormData(e.currentTarget).get('state')
+              const form = new FormData(e.currentTarget)
+              const raw = form.get('state')
               const next = isState(raw) ? raw : undefined
-              void navigate({ to: '/$tenant', params: { tenant }, search: next ? { state: next } : {} })
+              void navigate({
+                to: '/$tenant',
+                params: { tenant },
+                search: {
+                  ...(next ? { state: next } : {}),
+                  ...(form.get('overdue') ? { overdue: true } : {}),
+                },
+              })
             }}
           >
             <label htmlFor="state-filter" className="text-neutral-600">
@@ -92,6 +104,10 @@ function Workbench() {
                 </option>
               ))}
             </select>
+            <label className="flex items-center gap-1 text-neutral-600">
+              <input type="checkbox" name="overdue" defaultChecked={overdue ?? false} />
+              overdue only
+            </label>
             <button
               type="submit"
               className="rounded-md border border-neutral-300 bg-white px-2 py-1 hover:bg-neutral-100"
@@ -115,6 +131,7 @@ function Workbench() {
                   <th className="py-1 pr-4 font-normal">State</th>
                   <th className="py-1 pr-4 font-normal">Regime</th>
                   <th className="py-1 pr-4 font-normal">Amount</th>
+                  <th className="py-1 pr-4 font-normal">Next clock</th>
                   <th className="py-1 font-normal">Opened</th>
                 </tr>
               </thead>
@@ -135,6 +152,16 @@ function Workbench() {
                     <td className="py-1 pr-4">
                       {d.disputedAmount} {d.currency}
                     </td>
+                    <td className="py-1 pr-4">
+                      {d.nextDeadline ? (
+                        <span className="flex items-center gap-2">
+                          <DeadlineBadge status={d.nextDeadline.status} />
+                          <span className="text-neutral-600">{remaining(d.nextDeadline.dueAt)}</span>
+                        </span>
+                      ) : (
+                        <span className="text-neutral-400">none</span>
+                      )}
+                    </td>
                     <td className="py-1 text-neutral-500">{d.openedAt.slice(0, 16).replace('T', ' ')}</td>
                   </tr>
                 ))}
@@ -142,7 +169,7 @@ function Workbench() {
             </table>
             <div className="mt-3 flex gap-3 text-sm">
               {cursor && (
-                <Link to="/$tenant" params={{ tenant }} search={state ? { state } : {}} className="underline">
+                <Link to="/$tenant" params={{ tenant }} search={filters} className="underline">
                   Newest
                 </Link>
               )}
@@ -150,7 +177,7 @@ function Workbench() {
                 <Link
                   to="/$tenant"
                   params={{ tenant }}
-                  search={{ ...(state ? { state } : {}), cursor: page.value.nextCursor }}
+                  search={{ ...filters, cursor: page.value.nextCursor }}
                   className="underline"
                 >
                   Older
@@ -159,7 +186,10 @@ function Workbench() {
             </div>
           </>
         ) : (
-          <p className="text-sm text-neutral-600">No disputes{state ? ` in ${state}` : ''} yet.</p>
+          <p className="text-sm text-neutral-600">
+            No {overdue ? 'overdue ' : ''}disputes{state ? ` in ${state}` : ''}
+            {overdue ? '.' : ' yet.'}
+          </p>
         )}
       </section>
 

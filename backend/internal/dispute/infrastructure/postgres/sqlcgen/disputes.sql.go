@@ -32,6 +32,35 @@ func (q *Queries) BumpTenantRateWindow(ctx context.Context, arg BumpTenantRateWi
 	return count, err
 }
 
+const countDeadlinesOverdue = `-- name: CountDeadlinesOverdue :many
+SELECT tenant_id, regime, kind, n FROM deadlines_overdue
+`
+
+func (q *Queries) CountDeadlinesOverdue(ctx context.Context) ([]DeadlinesOverdue, error) {
+	rows, err := q.db.Query(ctx, countDeadlinesOverdue)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DeadlinesOverdue{}
+	for rows.Next() {
+		var i DeadlinesOverdue
+		if err := rows.Scan(
+			&i.TenantID,
+			&i.Regime,
+			&i.Kind,
+			&i.N,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const countDisputesByState = `-- name: CountDisputesByState :many
 SELECT tenant_id, regime, state, n FROM disputes_by_state
 `
@@ -282,6 +311,24 @@ func (q *Queries) GetTenantByTenantKeyHash(ctx context.Context, keyHash []byte) 
 	return i, err
 }
 
+const getTenantCalendar = `-- name: GetTenantCalendar :one
+SELECT COALESCE(settings->>'timezone', '')::text AS timezone,
+       COALESCE(ARRAY(SELECT jsonb_array_elements_text(settings->'holidays')), '{}')::text[] AS holidays
+FROM tenants WHERE id = current_tenant_id()
+`
+
+type GetTenantCalendarRow struct {
+	Timezone string
+	Holidays []string
+}
+
+func (q *Queries) GetTenantCalendar(ctx context.Context) (GetTenantCalendarRow, error) {
+	row := q.db.QueryRow(ctx, getTenantCalendar)
+	var i GetTenantCalendarRow
+	err := row.Scan(&i.Timezone, &i.Holidays)
+	return i, err
+}
+
 const getTenantKeyForTenant = `-- name: GetTenantKeyForTenant :one
 SELECT id, prefix, label, created_at, last_used_at, expires_at, revoked_at FROM tenant_keys WHERE id = $1 AND tenant_id = $2
 `
@@ -391,6 +438,32 @@ func (q *Queries) InsertAccount(ctx context.Context, arg InsertAccountParams) er
 		arg.TenantID,
 		arg.HolderName,
 		arg.Currency,
+	)
+	return err
+}
+
+const insertDeadline = `-- name: InsertDeadline :exec
+INSERT INTO dispute_deadlines (dispute_id, kind, cycle, started_at, due_at, basis)
+VALUES ($1, $2, $3, $4, $5, $6)
+`
+
+type InsertDeadlineParams struct {
+	DisputeID uuid.UUID
+	Kind      string
+	Cycle     int32
+	StartedAt time.Time
+	DueAt     time.Time
+	Basis     string
+}
+
+func (q *Queries) InsertDeadline(ctx context.Context, arg InsertDeadlineParams) error {
+	_, err := q.db.Exec(ctx, insertDeadline,
+		arg.DisputeID,
+		arg.Kind,
+		arg.Cycle,
+		arg.StartedAt,
+		arg.DueAt,
+		arg.Basis,
 	)
 	return err
 }
@@ -546,6 +619,53 @@ func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionPa
 	return err
 }
 
+const listDeadlines = `-- name: ListDeadlines :many
+SELECT dispute_id, kind, cycle, started_at, due_at, met_at, voided_at, basis
+FROM dispute_deadlines
+WHERE dispute_id = $1
+ORDER BY cycle, started_at, kind
+`
+
+type ListDeadlinesRow struct {
+	DisputeID uuid.UUID
+	Kind      string
+	Cycle     int32
+	StartedAt time.Time
+	DueAt     time.Time
+	MetAt     pgtype.Timestamptz
+	VoidedAt  pgtype.Timestamptz
+	Basis     string
+}
+
+func (q *Queries) ListDeadlines(ctx context.Context, disputeID uuid.UUID) ([]ListDeadlinesRow, error) {
+	rows, err := q.db.Query(ctx, listDeadlines, disputeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDeadlinesRow{}
+	for rows.Next() {
+		var i ListDeadlinesRow
+		if err := rows.Scan(
+			&i.DisputeID,
+			&i.Kind,
+			&i.Cycle,
+			&i.StartedAt,
+			&i.DueAt,
+			&i.MetAt,
+			&i.VoidedAt,
+			&i.Basis,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDisputeEvents = `-- name: ListDisputeEvents :many
 SELECT id, dispute_id, seq, event, from_state, to_state, actor, payload, idempotency_key, trace_id, occurred_at
 FROM dispute_events
@@ -603,13 +723,18 @@ const listDisputes = `-- name: ListDisputes :many
 SELECT id, regime, state, transaction_id, disputed_amount, currency, opened_at, updated_at
 FROM disputes
 WHERE ($1::text IS NULL OR state = $1::text)
-  AND ($2::timestamptz IS NULL OR (opened_at, id) < ($2::timestamptz, $3::uuid))
+  AND (NOT $2::boolean OR EXISTS (
+        SELECT 1 FROM dispute_deadlines dl
+        WHERE dl.dispute_id = disputes.id AND dl.met_at IS NULL AND dl.voided_at IS NULL AND dl.due_at < $3::timestamptz))
+  AND ($4::timestamptz IS NULL OR (opened_at, id) < ($4::timestamptz, $5::uuid))
 ORDER BY opened_at DESC, id DESC
-LIMIT $4
+LIMIT $6
 `
 
 type ListDisputesParams struct {
 	State          *string
+	Overdue        bool
+	Now            time.Time
 	BeforeOpenedAt pgtype.Timestamptz
 	BeforeID       pgtype.UUID
 	PageSize       int32
@@ -630,6 +755,8 @@ type ListDisputesRow struct {
 func (q *Queries) ListDisputes(ctx context.Context, arg ListDisputesParams) ([]ListDisputesRow, error) {
 	rows, err := q.db.Query(ctx, listDisputes,
 		arg.State,
+		arg.Overdue,
+		arg.Now,
 		arg.BeforeOpenedAt,
 		arg.BeforeID,
 		arg.PageSize,
@@ -823,6 +950,54 @@ func (q *Queries) ListTenantsForDiscovery(ctx context.Context) ([]ListTenantsFor
 	return items, nil
 }
 
+const nextDeadlines = `-- name: NextDeadlines :many
+SELECT DISTINCT ON (dispute_id) dispute_id, kind, cycle, started_at, due_at, met_at, voided_at, basis
+FROM dispute_deadlines
+WHERE dispute_id = ANY($1::uuid[]) AND met_at IS NULL AND voided_at IS NULL
+ORDER BY dispute_id, due_at
+`
+
+type NextDeadlinesRow struct {
+	DisputeID uuid.UUID
+	Kind      string
+	Cycle     int32
+	StartedAt time.Time
+	DueAt     time.Time
+	MetAt     pgtype.Timestamptz
+	VoidedAt  pgtype.Timestamptz
+	Basis     string
+}
+
+// The earliest open clock for each dispute in the set; a dispute with none has no row.
+func (q *Queries) NextDeadlines(ctx context.Context, disputeIds []uuid.UUID) ([]NextDeadlinesRow, error) {
+	rows, err := q.db.Query(ctx, nextDeadlines, disputeIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []NextDeadlinesRow{}
+	for rows.Next() {
+		var i NextDeadlinesRow
+		if err := rows.Scan(
+			&i.DisputeID,
+			&i.Kind,
+			&i.Cycle,
+			&i.StartedAt,
+			&i.DueAt,
+			&i.MetAt,
+			&i.VoidedAt,
+			&i.Basis,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const purgeIdempotencyKeys = `-- name: PurgeIdempotencyKeys :one
 SELECT purge_idempotency_keys($1)::bigint AS n
 `
@@ -915,6 +1090,27 @@ func (q *Queries) RevokeTenantKeyForTenant(ctx context.Context, arg RevokeTenant
 	return result.RowsAffected(), nil
 }
 
+const setTenantCalendar = `-- name: SetTenantCalendar :execrows
+UPDATE tenants
+SET settings = settings || jsonb_build_object('timezone', $1::text, 'holidays', to_jsonb($2::text[]))
+WHERE id = $3
+`
+
+type SetTenantCalendarParams struct {
+	Timezone string
+	Holidays []string
+	ID       uuid.UUID
+}
+
+// The business-day calendar the regulatory clocks use (docs/adr/0013); other settings keys are left alone.
+func (q *Queries) SetTenantCalendar(ctx context.Context, arg SetTenantCalendarParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setTenantCalendar, arg.Timezone, arg.Holidays, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const setTenantDisabled = `-- name: SetTenantDisabled :execrows
 UPDATE tenants SET disabled_at = CASE WHEN $1::boolean THEN COALESCE(disabled_at, now()) ELSE NULL END WHERE id = $2
 `
@@ -943,6 +1139,35 @@ type SetTenantEmailDomainsParams struct {
 
 func (q *Queries) SetTenantEmailDomains(ctx context.Context, arg SetTenantEmailDomainsParams) (int64, error) {
 	result, err := q.db.Exec(ctx, setTenantEmailDomains, arg.ID, arg.EmailDomains)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const settleDeadline = `-- name: SettleDeadline :execrows
+UPDATE dispute_deadlines
+SET met_at = CASE WHEN $1::boolean THEN $2::timestamptz ELSE met_at END,
+    voided_at = CASE WHEN $1::boolean THEN voided_at ELSE $2::timestamptz END
+WHERE dispute_id = $3 AND kind = $4 AND cycle = $5 AND met_at IS NULL AND voided_at IS NULL
+`
+
+type SettleDeadlineParams struct {
+	Met       bool
+	At        time.Time
+	DisputeID uuid.UUID
+	Kind      string
+	Cycle     int32
+}
+
+func (q *Queries) SettleDeadline(ctx context.Context, arg SettleDeadlineParams) (int64, error) {
+	result, err := q.db.Exec(ctx, settleDeadline,
+		arg.Met,
+		arg.At,
+		arg.DisputeID,
+		arg.Kind,
+		arg.Cycle,
+	)
 	if err != nil {
 		return 0, err
 	}

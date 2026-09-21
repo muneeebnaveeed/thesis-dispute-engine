@@ -140,6 +140,46 @@ SELECT id, prefix, label, created_at, last_used_at, expires_at, revoked_at FROM 
 SELECT id, regime, state, transaction_id, disputed_amount, currency, opened_at, updated_at
 FROM disputes
 WHERE (sqlc.narg(state)::text IS NULL OR state = sqlc.narg(state)::text)
+  AND (NOT sqlc.arg(overdue)::boolean OR EXISTS (
+        SELECT 1 FROM dispute_deadlines dl
+        WHERE dl.dispute_id = disputes.id AND dl.met_at IS NULL AND dl.voided_at IS NULL AND dl.due_at < sqlc.arg(now)::timestamptz))
   AND (sqlc.narg(before_opened_at)::timestamptz IS NULL OR (opened_at, id) < (sqlc.narg(before_opened_at)::timestamptz, sqlc.narg(before_id)::uuid))
 ORDER BY opened_at DESC, id DESC
 LIMIT sqlc.arg(page_size);
+
+-- name: InsertDeadline :exec
+INSERT INTO dispute_deadlines (dispute_id, kind, cycle, started_at, due_at, basis)
+VALUES ($1, $2, $3, $4, $5, $6);
+
+-- name: ListDeadlines :many
+SELECT dispute_id, kind, cycle, started_at, due_at, met_at, voided_at, basis
+FROM dispute_deadlines
+WHERE dispute_id = $1
+ORDER BY cycle, started_at, kind;
+
+-- name: SettleDeadline :execrows
+UPDATE dispute_deadlines
+SET met_at = CASE WHEN sqlc.arg(met)::boolean THEN sqlc.arg(at)::timestamptz ELSE met_at END,
+    voided_at = CASE WHEN sqlc.arg(met)::boolean THEN voided_at ELSE sqlc.arg(at)::timestamptz END
+WHERE dispute_id = sqlc.arg(dispute_id) AND kind = sqlc.arg(kind) AND cycle = sqlc.arg(cycle) AND met_at IS NULL AND voided_at IS NULL;
+
+-- name: NextDeadlines :many
+-- The earliest open clock for each dispute in the set; a dispute with none has no row.
+SELECT DISTINCT ON (dispute_id) dispute_id, kind, cycle, started_at, due_at, met_at, voided_at, basis
+FROM dispute_deadlines
+WHERE dispute_id = ANY(sqlc.arg(dispute_ids)::uuid[]) AND met_at IS NULL AND voided_at IS NULL
+ORDER BY dispute_id, due_at;
+
+-- name: CountDeadlinesOverdue :many
+SELECT tenant_id, regime, kind, n FROM deadlines_overdue;
+
+-- name: GetTenantCalendar :one
+SELECT COALESCE(settings->>'timezone', '')::text AS timezone,
+       COALESCE(ARRAY(SELECT jsonb_array_elements_text(settings->'holidays')), '{}')::text[] AS holidays
+FROM tenants WHERE id = current_tenant_id();
+
+-- name: SetTenantCalendar :execrows
+-- The business-day calendar the regulatory clocks use (docs/adr/0013); other settings keys are left alone.
+UPDATE tenants
+SET settings = settings || jsonb_build_object('timezone', sqlc.arg(timezone)::text, 'holidays', to_jsonb(sqlc.arg(holidays)::text[]))
+WHERE id = sqlc.arg(id);

@@ -86,13 +86,24 @@ type Tx interface {
 	PutIdempotent(ctx context.Context, scope, key string, r StoredResponse) error
 	// ListDisputes returns up to limit records newest first, after the cursor when one is given.
 	ListDisputes(ctx context.Context, q ListQuery) ([]DisputeRecord, error)
+	// TenantCalendar is the current tenant's business-day calendar from its settings; defaults when unset.
+	TenantCalendar(ctx context.Context) (domain.Calendar, error)
+	InsertDeadlines(ctx context.Context, disputeID uuid.UUID, ds []domain.Deadline) error
+	ListDeadlines(ctx context.Context, disputeID uuid.UUID) ([]domain.Deadline, error)
+	// SettleDeadline closes an open clock as met or void at the given time; a clock already settled is left alone.
+	SettleDeadline(ctx context.Context, disputeID uuid.UUID, kind domain.DeadlineKind, cycle int, met bool, at time.Time) error
+	// NextDeadlines returns, per dispute that has one, the open clock that runs out first.
+	NextDeadlines(ctx context.Context, disputeIDs []uuid.UUID) (map[uuid.UUID]domain.Deadline, error)
 }
 
-// ListQuery is a page request; After is exclusive and comes from the previous page's last record.
+// ListQuery is a page request; After is exclusive and comes from the previous page's last record. Overdue keeps
+// only disputes with an open clock past due at Now.
 type ListQuery struct {
-	State *domain.State
-	After *Cursor
-	Limit int
+	State   *domain.State
+	After   *Cursor
+	Limit   int
+	Overdue bool
+	Now     time.Time
 }
 
 // Cursor is the keyset position (opened_at, id) of the last record on a page.
@@ -109,11 +120,21 @@ type StateCount struct {
 	N        int64
 }
 
+// OverdueCount is how many open clocks of one kind are past due under one regime.
+type OverdueCount struct {
+	TenantID uuid.UUID
+	Regime   domain.Regime
+	Kind     domain.DeadlineKind
+	N        int64
+}
+
 // Store runs fn inside one transaction; a returned error rolls it back.
 type Store interface {
 	WithTx(ctx context.Context, fn func(Tx) error) error
 	// CountByState feeds the disputes-by-state gauge; it runs outside any transaction.
 	CountByState(ctx context.Context) ([]StateCount, error)
+	// CountOverdue feeds the overdue-deadlines gauge; it runs outside any transaction.
+	CountOverdue(ctx context.Context) ([]OverdueCount, error)
 	// PurgeIdempotencyKeys deletes stored responses older than before and reports how many went; when another
 	// replica holds the sweep it returns 0 and no error.
 	PurgeIdempotencyKeys(ctx context.Context, before time.Time) (int64, error)

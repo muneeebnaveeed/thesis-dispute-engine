@@ -370,6 +370,9 @@ func (h *Handler) ListDisputes(ctx context.Context, req oapi.ListDisputesRequest
 		st := domain.State(*req.Params.State)
 		q.State = &st
 	}
+	if req.Params.Overdue != nil {
+		q.Overdue = *req.Params.Overdue
+	}
 	if req.Params.Cursor != nil && *req.Params.Cursor != "" {
 		c, err := decodeCursor(*req.Params.Cursor)
 		if err != nil {
@@ -384,8 +387,13 @@ func (h *Handler) ListDisputes(ctx context.Context, req oapi.ListDisputesRequest
 	}
 	out := oapi.DisputePage{Items: make([]oapi.DisputeSummary, 0, len(page.Items))}
 	for _, d := range page.Items {
-		out.Items = append(out.Items, oapi.DisputeSummary{Id: d.ID, Regime: oapi.Regime(d.Regime), State: oapi.DisputeState(d.State),
-			TransactionId: d.TransactionID, DisputedAmount: d.DisputedAmount.StringFixed(4), Currency: d.Currency, OpenedAt: d.OpenedAt, UpdatedAt: d.UpdatedAt})
+		item := oapi.DisputeSummary{Id: d.ID, Regime: oapi.Regime(d.Regime), State: oapi.DisputeState(d.State),
+			TransactionId: d.TransactionID, DisputedAmount: d.DisputedAmount.StringFixed(4), Currency: d.Currency, OpenedAt: d.OpenedAt, UpdatedAt: d.UpdatedAt}
+		if d.NextDeadline != nil {
+			nd := toDeadline(*d.NextDeadline)
+			item.NextDeadline = &nd
+		}
+		out.Items = append(out.Items, item)
 	}
 	if page.Next != nil {
 		c := encodeCursor(*page.Next)
@@ -552,10 +560,19 @@ func toAPI(v application.DisputeView) oapi.Dispute {
 	for _, e := range v.AllowedEvents {
 		allowed = append(allowed, oapi.DisputeEvent(e))
 	}
+	deadlines := make([]oapi.Deadline, 0, len(v.Deadlines))
+	for _, d := range v.Deadlines {
+		deadlines = append(deadlines, toDeadline(d))
+	}
 	return oapi.Dispute{
 		Id: v.ID, Regime: oapi.Regime(v.Regime), State: oapi.DisputeState(v.State), Appeals: v.Appeals,
 		Version: v.Version, TransactionId: v.TransactionID, AccountId: v.AccountID,
 		DisputedAmount: v.DisputedAmount.StringFixed(4), Currency: v.Currency, OpenedAt: v.OpenedAt, UpdatedAt: v.UpdatedAt,
-		AllowedEvents: allowed, Events: events,
+		AllowedEvents: allowed, Events: events, Deadlines: deadlines,
 	}
+}
+
+func toDeadline(d application.DeadlineView) oapi.Deadline {
+	return oapi.Deadline{Kind: oapi.DeadlineKind(d.Kind), Cycle: d.Cycle, StartedAt: d.StartedAt, DueAt: d.DueAt, MetAt: d.MetAt,
+		Status: oapi.DeadlineStatus(d.Status), Basis: d.Basis}
 }

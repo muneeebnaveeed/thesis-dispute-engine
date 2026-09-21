@@ -59,7 +59,8 @@ failure as a ticket.
 ## Tenants
 
 ```sh
-go run ./cmd/tenant upsert --slug otp --name "OTP Bank" --domains otpbank.hu        # row, issuer, email domains
+go run ./cmd/tenant upsert --slug otp --name "OTP Bank" --domains otpbank.hu \
+    --timezone Europe/Budapest --holidays 2026-10-23,2026-11-01     # row, issuer, email domains, clock calendar
 go run ./cmd/tenant disable --slug otp   # every key and analyst token stops resolving on the next request; data kept
 go run ./cmd/tenant enable  --slug otp
 go run ./cmd/tenant list
@@ -70,10 +71,15 @@ go run ./cmd/tenant list
 ## Onboarding a tenant
 
 ```sh
-scripts/tenant onboard --slug otp --name "OTP Bank" --domains otpbank.hu
+scripts/tenant onboard --slug otp --name "OTP Bank" --domains otpbank.hu --timezone Europe/Budapest \
+    --holidays 2026-01-01,2026-03-15,2026-04-03,2026-04-06,2026-05-01,2026-05-25,2026-08-20,2026-10-23,2026-11-01,2026-12-25,2026-12-26
 ```
 
-In order: the tenant row (id, slug, issuer, email domains), the realm rendered from the template and created
+The time zone and holidays are the calendar the regulatory clocks count business days in (docs/adr/0013);
+a tenant without them gets UTC and weekends only, so give every tenant its own at onboarding and re-run
+`cmd/tenant upsert` when the next year's holidays are published.
+
+In order: the tenant row (id, slug, issuer, email domains, calendar), the realm rendered from the template and created
 in Keycloak (brute-force detection, login events, back-channel logout and the frontend client come with it),
 and two tenant keys labelled primary and standby, printed once. The summary gives the front door,
 `$APP_URL/<slug>`, which is all an analyst ever needs. Deliver the keys over the customer's secret channel.

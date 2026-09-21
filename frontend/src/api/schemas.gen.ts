@@ -59,6 +59,50 @@ const _CreateTenantKeyRequest: Same<CreateTenantKeyRequest, components['schemas'
   true
 void _CreateTenantKeyRequest
 
+export const DeadlineKind = Type.Union([
+  Type.Literal('REFUND'),
+  Type.Literal('ACKNOWLEDGE'),
+  Type.Literal('RESOLUTION'),
+])
+export type DeadlineKind = Static<typeof DeadlineKind>
+const _DeadlineKind: Same<DeadlineKind, components['schemas']['DeadlineKind']> = true
+void _DeadlineKind
+
+export const DeadlineStatus = Type.Union(
+  [
+    Type.Literal('RUNNING'),
+    Type.Literal('MET'),
+    Type.Literal('LATE'),
+    Type.Literal('BREACHED'),
+    Type.Literal('VOID'),
+  ],
+  {
+    description:
+      'RUNNING and BREACHED are open; MET and LATE are satisfied (before or after due); VOID no longer applies.',
+  },
+)
+export type DeadlineStatus = Static<typeof DeadlineStatus>
+const _DeadlineStatus: Same<DeadlineStatus, components['schemas']['DeadlineStatus']> = true
+void _DeadlineStatus
+
+export const Deadline = Type.Object({
+  kind: DeadlineKind,
+  cycle: Type.Integer({
+    description: '0 for the clocks started at opening; the appeal number for a restarted clock.',
+  }),
+  startedAt: Type.String({ format: 'date-time' }),
+  dueAt: Type.String({
+    description: "End of the last permitted day in the tenant's calendar.",
+    format: 'date-time',
+  }),
+  metAt: Type.Optional(Type.String({ format: 'date-time' })),
+  status: DeadlineStatus,
+  basis: Type.String({ description: 'The regulatory provision the clock comes from.' }),
+})
+export type Deadline = Static<typeof Deadline>
+const _Deadline: Same<Deadline, components['schemas']['Deadline']> = true
+void _Deadline
+
 export const Regime = Type.Union([
   Type.Literal('EU_SEPA_DIRECT_DEBIT'),
   Type.Literal('EU_PSD2_CARD'),
@@ -118,6 +162,10 @@ export const Dispute = Type.Object({
   updatedAt: Type.String({ format: 'date-time' }),
   allowedEvents: Type.Array(DisputeEvent),
   events: Type.Array(LoggedEvent),
+  deadlines: Type.Array(Deadline, {
+    description:
+      'Every regulatory clock the regime started for this dispute, opening clocks first, then per appeal.',
+  }),
 })
 export type Dispute = Static<typeof Dispute>
 const _Dispute: Same<Dispute, components['schemas']['Dispute']> = true
@@ -132,6 +180,7 @@ export const DisputeSummary = Type.Object({
   currency: Type.String({ minLength: 3, maxLength: 3 }),
   openedAt: Type.String({ format: 'date-time' }),
   updatedAt: Type.String({ format: 'date-time' }),
+  nextDeadline: Type.Optional(Deadline),
 })
 export type DisputeSummary = Static<typeof DisputeSummary>
 const _DisputeSummary: Same<DisputeSummary, components['schemas']['DisputeSummary']> = true

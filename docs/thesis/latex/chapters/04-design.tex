@@ -3,3 +3,79 @@
 
 % Budget and sources: docs/thesis/outline.md. Every claim about behaviour points at a test, a figure or a number in data/.
 
+
+% Sections are written as the decisions land (docs/adr); order follows the outline, so earlier sections are
+% filled in later. This one distils ADR 0002 (the SLA columns) and ADR 0013.
+\section{The regime-parameterised state machine}
+\label{sec:design-state-machine}
+% To write: ADR 0002. Kept as a stub so the cross-references from later sections resolve.
+
+\section{Regulatory clocks}
+\label{sec:design-clocks}
+
+A dispute is not only a sequence of states; it is a sequence of states that must be reached by
+particular dates. The dates are where the regimes differ most visibly. PSD2 requires the payer to
+be refunded ``immediately, and in any event no later than by the end of the following business
+day'' \cite[art.~73(1)]{psd2} and a final reply to a complaint within fifteen business days
+\cite[art.~101(2)]{psd2}; for an authorised direct debit the refund or a justification is due
+within ten business days of the request \cite[art.~77(1)]{psd2}. Regulation~E requires provisional
+credit within ten business days and a completed investigation within forty-five days
+\cite[\S~1005.11(c)]{rege}; Regulation~Z requires a written acknowledgement within thirty days and
+a resolution within two billing cycles, at most ninety days \cite[\S~1026.13(c)]{regz}. Two of the
+four count business days, which depend on the jurisdiction's holidays; the others count calendar
+days. An engine that treats deadlines as documentation leaves the analyst to compute them, and
+leaves the institution unable to answer the auditor's first question, namely how often it met
+them.
+
+The design carries each deadline as a \emph{clock} on the regime's rules (table~\ref{fig:clocks}):
+a kind, a count, a unit and the citation. There are three kinds, and each is defined by the states
+that satisfy it rather than by the regime, in the same spirit as the gates of the state machine
+(section~\ref{sec:design-state-machine}): the refund clock is met by entering any credit state,
+the acknowledgement clock by opening the investigation, the resolution clock by closing. A clock
+that can no longer be met, such as the refund clock of a dispute closed without a credit, is
+voided rather than breached. An appeal restarts the resolution clock and numbers the new one by the
+appeal, so a dispute's history keeps every clock it ever had.
+
+\begin{figure}[htbp]
+\centering
+\small
+\begin{tabular}{llrll}
+\toprule
+Regime & Clock & Count & Unit & Basis \\
+\midrule
+\code{EU\_PSD2\_CARD} & refund & 1 & business days & PSD2 art.~73(1) \\
+ & resolution & 15 & business days & PSD2 art.~101(2) \\
+\code{EU\_SEPA\_DIRECT\_DEBIT} & refund & 10 & business days & PSD2 art.~77(1) \\
+ & resolution & 15 & business days & PSD2 art.~101(2) \\
+\code{US\_REG\_E} & refund & 10 & business days & 12 CFR 1005.11(c)(1) \\
+ & resolution & 45 & calendar days & 12 CFR 1005.11(c)(2) \\
+\code{US\_REG\_Z} & acknowledge & 30 & calendar days & 12 CFR 1026.13(c)(1) \\
+ & resolution & 90 & calendar days & 12 CFR 1026.13(c)(2) \\
+\bottomrule
+\end{tabular}
+\caption{The clocks each regime starts when a dispute opens (\code{domain/regime.go}). Extensions the law
+permits for complex cases are not modelled; see section~\ref{sec:limitations}.}
+\label{fig:clocks}
+\end{figure}
+
+Two decisions follow from treating a due date as something the institution has told the customer.
+First, the due time is computed once, when the dispute opens, and stored as a row alongside the
+dispute under the same row-level security as everything else the tenant owns; a later change to a
+rule or to a holiday calendar cannot silently move a deadline that was already communicated, and a
+dispute opened before the feature existed has no clocks rather than an invented breach. Second,
+the calendar is tenant data, not code: a tenant's settings name its time zone and public holidays,
+entered at onboarding, and the due time is the last instant of the $n$th permitted day in that
+zone. A complaint received on a Friday evening in Budapest is due by the end of Monday, Budapest
+time, or Tuesday if Monday is a national holiday; the same complaint received at the same instant
+by a bank in New York, where it is still Friday afternoon, is also due Monday but four hours and
+two time zones later. The unit tests in \code{domain/deadline\_test.go} fix these cases.
+
+Status is never stored. A clock is \emph{running}, \emph{met}, \emph{late} (satisfied after its
+due time), \emph{breached} (open and past due) or \emph{void}, and the answer is a comparison of
+three timestamps with the current time at the moment someone asks. Nothing therefore has to run
+at midnight to notice a breach; the workbench's ``overdue only'' filter, the API's
+\code{overdue} parameter and the \code{dispute.deadlines\_overdue} gauge all ask the same question
+of the same rows, and a histogram of the slack at the moment each clock is satisfied
+(\code{dispute.deadline\_slack}) turns compliance from a report into a distribution. The one place
+the derivation shows is idempotent replay: a repeated request returns the response as first
+stored, so its statuses are as of the first request, which is what a replay promises anyway.

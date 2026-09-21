@@ -373,6 +373,8 @@ export type components = {
       openedAt: string
       /** Format: date-time */
       updatedAt: string
+      /** @description The open regulatory clock that runs out first; absent once every clock is settled. */
+      nextDeadline?: components['schemas']['Deadline']
     }
     DisputePage: {
       items: components['schemas']['DisputeSummary'][]
@@ -403,6 +405,32 @@ export type components = {
       updatedAt: string
       allowedEvents: components['schemas']['DisputeEvent'][]
       events: components['schemas']['LoggedEvent'][]
+      /** @description Every regulatory clock the regime started for this dispute, opening clocks first, then per appeal. */
+      deadlines: components['schemas']['Deadline'][]
+    }
+    /** @enum {string} */
+    DeadlineKind: 'REFUND' | 'ACKNOWLEDGE' | 'RESOLUTION'
+    /**
+     * @description RUNNING and BREACHED are open; MET and LATE are satisfied (before or after due); VOID no longer applies.
+     * @enum {string}
+     */
+    DeadlineStatus: 'RUNNING' | 'MET' | 'LATE' | 'BREACHED' | 'VOID'
+    Deadline: {
+      kind: components['schemas']['DeadlineKind']
+      /** @description 0 for the clocks started at opening; the appeal number for a restarted clock. */
+      cycle: number
+      /** Format: date-time */
+      startedAt: string
+      /**
+       * Format: date-time
+       * @description End of the last permitted day in the tenant's calendar.
+       */
+      dueAt: string
+      /** Format: date-time */
+      metAt?: string
+      status: components['schemas']['DeadlineStatus']
+      /** @description The regulatory provision the clock comes from. */
+      basis: string
     }
   }
   responses: {
@@ -529,6 +557,8 @@ export interface operations {
         limit?: number
         /** @description Opaque; from the previous page's nextCursor. */
         cursor?: string
+        /** @description Only disputes with at least one regulatory clock past its due time and still open. */
+        overdue?: boolean
       }
       header?: never
       path?: never
