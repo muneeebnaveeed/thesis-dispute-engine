@@ -25,18 +25,46 @@ export type DisputeEvent = Static<typeof DisputeEvent>
 const _DisputeEvent: Same<DisputeEvent, components['schemas']['DisputeEvent']> = true
 void _DisputeEvent
 
+export const SuspenseSettlement = Type.Union([Type.Literal('RECOVERED'), Type.Literal('WRITTEN_OFF')])
+export type SuspenseSettlement = Static<typeof SuspenseSettlement>
+const _SuspenseSettlement: Same<SuspenseSettlement, components['schemas']['SuspenseSettlement']> = true
+void _SuspenseSettlement
+
 export const ApplyEventRequest = Type.Object({
   event: DisputeEvent,
   actor: Type.Optional(Type.String({ default: 'system' })),
   payload: Type.Optional(
-    Type.Record(Type.String(), Type.Unknown(), {
-      description: 'Event-specific facts, stored verbatim on the log entry.',
-    }),
+    Type.Object(
+      {
+        liability: Type.Optional(Type.String({ example: '50.00' })),
+        settlement: Type.Optional(SuspenseSettlement),
+      },
+      {
+        description:
+          "Event-specific facts, stored verbatim on the log entry. Two are read by the ledger: on ISSUE_REFUND, `liability` is the amount the customer bears (a decimal string, capped by the regime, refused with invalid-liability); on CLOSE, `settlement` says how an outstanding advance clears (RECOVERED or WRITTEN_OFF; the regime's default when absent; refused with invalid-settlement).",
+      },
+    ),
   ),
 })
 export type ApplyEventRequest = Static<typeof ApplyEventRequest>
 const _ApplyEventRequest: Same<ApplyEventRequest, components['schemas']['ApplyEventRequest']> = true
 void _ApplyEventRequest
+
+export const Balances = Type.Object(
+  {
+    customer: Type.String(),
+    suspense: Type.String(),
+    recovery: Type.String(),
+    loss: Type.String(),
+  },
+  {
+    description:
+      "Running totals per account; customer from the customer's side (positive means credited), the rest from the bank's.",
+  },
+)
+export type Balances = Static<typeof Balances>
+const _Balances: Same<Balances, components['schemas']['Balances']> = true
+void _Balances
 
 export const CreateDisputeRequest = Type.Object({
   transactionId: Type.String({ format: 'uuid' }),
@@ -148,6 +176,49 @@ export type LoggedEvent = Static<typeof LoggedEvent>
 const _LoggedEvent: Same<LoggedEvent, components['schemas']['LoggedEvent']> = true
 void _LoggedEvent
 
+export const PostingKind = Type.Union([
+  Type.Literal('PROVISIONAL_CREDIT'),
+  Type.Literal('FAST_REFUND'),
+  Type.Literal('NQA_REFUND'),
+  Type.Literal('PROVISIONAL_CREDIT_REVERSAL'),
+  Type.Literal('RECOVERY'),
+  Type.Literal('WRITE_OFF'),
+])
+export type PostingKind = Static<typeof PostingKind>
+const _PostingKind: Same<PostingKind, components['schemas']['PostingKind']> = true
+void _PostingKind
+
+export const LedgerAccount = Type.Union(
+  [Type.Literal('CUSTOMER'), Type.Literal('SUSPENSE'), Type.Literal('RECOVERY'), Type.Literal('LOSS')],
+  {
+    description:
+      "CUSTOMER is the disputing customer's account; SUSPENSE holds what the bank advanced; RECOVERY and LOSS clear it.",
+  },
+)
+export type LedgerAccount = Static<typeof LedgerAccount>
+const _LedgerAccount: Same<LedgerAccount, components['schemas']['LedgerAccount']> = true
+void _LedgerAccount
+
+export const LedgerEntry = Type.Object(
+  {
+    seq: Type.Integer({ description: 'The event that caused it.' }),
+    kind: PostingKind,
+    debit: LedgerAccount,
+    credit: LedgerAccount,
+    amount: Type.String({ description: 'Decimal as a string; never a float.' }),
+    currency: Type.String({ minLength: 3, maxLength: 3 }),
+    reference: Type.String({ description: 'Unique per posting; what the banking core is told.' }),
+    postedAt: Type.String({ format: 'date-time' }),
+  },
+  {
+    description:
+      'One double-entry movement the engine instructed; amount leaves the credit account and lands in the debit account.',
+  },
+)
+export type LedgerEntry = Static<typeof LedgerEntry>
+const _LedgerEntry: Same<LedgerEntry, components['schemas']['LedgerEntry']> = true
+void _LedgerEntry
+
 export const Dispute = Type.Object({
   id: Type.String({ format: 'uuid' }),
   regime: Regime,
@@ -166,6 +237,10 @@ export const Dispute = Type.Object({
     description:
       'Every regulatory clock the regime started for this dispute, opening clocks first, then per appeal.',
   }),
+  ledger: Type.Array(LedgerEntry, {
+    description: 'Every movement the engine instructed on this dispute, in posting order.',
+  }),
+  balances: Balances,
 })
 export type Dispute = Static<typeof Dispute>
 const _Dispute: Same<Dispute, components['schemas']['Dispute']> = true
@@ -204,6 +279,8 @@ export const ErrorCode = Type.Union(
     Type.Literal('not-found'),
     Type.Literal('invalid-transition'),
     Type.Literal('appeals-exhausted'),
+    Type.Literal('invalid-liability'),
+    Type.Literal('invalid-settlement'),
     Type.Literal('concurrent-update'),
     Type.Literal('idempotency-key-reuse'),
     Type.Literal('no-regime'),

@@ -79,3 +79,15 @@ test('non-problem failures are classified too', () => {
   expect(classify({ error: undefined })).toBeNull()
   expect(describe(localValidation({ label: 'required' })).hint).toMatch(/highlighted/)
 })
+
+test('ledger refusals point at the fact in the payload', () => {
+  const f = fromProblem({
+    ...base,
+    status: 422,
+    code: 'invalid-liability',
+    title: 'the customer liability is not allowed under this regime',
+    errors: [{ field: 'body.payload.liability', message: 'exceeds the 50.00 EUR cap under EU_PSD2_CARD' }],
+  })
+  const fields = f.kind === 'validation' ? f.fields : {}
+  expect(fields.liability).toMatch(/cap/)
+})

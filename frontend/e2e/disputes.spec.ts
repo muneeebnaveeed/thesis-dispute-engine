@@ -114,3 +114,34 @@ test('the regime clocks appear at opening, settle with the transition that satis
   await expect(page).toHaveURL(/overdue=true/)
   await expect(row).toHaveCount(0)
 })
+
+test('a refund with a customer liability posts the difference, an over-cap liability is refused under the field, and closing clears suspense', async ({
+  page,
+}) => {
+  const id = await openDisputeViaApi(page.request, 'otp')
+  await page.goto(`/otp/disputes/${id}`)
+  await page.getByRole('button', { name: 'OPEN_INVESTIGATION' }).click()
+  const liability = page.getByLabel(/Customer liability/)
+  await expect(liability).toBeVisible()
+
+  await liability.fill('50.01') // PSD2 art. 74 caps the customer's share at 50
+  await page.getByRole('button', { name: 'ISSUE_REFUND' }).click()
+  await expect(liability).toHaveAttribute('aria-invalid', 'true')
+  await expect(page.locator('#liability-error')).toContainText(/cap/)
+  await expect(page.getByText(/No money has moved/)).toBeVisible()
+
+  await liability.fill('50')
+  await page.getByRole('button', { name: 'ISSUE_REFUND' }).click()
+  const postings = page.getByRole('table', { name: 'Postings' })
+  await expect(postings).toContainText('Refund to the customer')
+  await expect(postings).toContainText('SUSPENSE')
+  const advanced = page.getByText('Advanced, not yet cleared').locator('xpath=following-sibling::dd')
+  await expect(advanced).not.toHaveText(/^0\.0000/)
+
+  // Closing asks how the advance clears; the bank writes it off here and suspense returns to zero.
+  const settle = page.getByLabel('Outstanding advance on close')
+  await settle.selectOption('WRITTEN_OFF')
+  await page.getByRole('button', { name: 'CLOSE' }).click()
+  await expect(postings).toContainText('Written off')
+  await expect(advanced).toHaveText(/^0\.0000/)
+})

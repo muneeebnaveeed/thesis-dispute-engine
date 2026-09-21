@@ -14,6 +14,7 @@ source (exists in the repo, needs exporting), todo. Code listings count as figur
 | 4.7 | 4 | Two credential kinds resolving to one tenant context | `docs/authentication.md` | todo (diagram) |
 | 4.8 | 4 | Analyst sign-in sequence: front door, realm, callback, sealed session, token hand-out | ADR 0011 | todo (sequence diagram) |
 | 4.9 | 4 | Regulatory clocks per regime (table) | `backend/internal/dispute/domain/regime.go`, ADR 0013 | done (`latex/chapters/04-design.tex`) |
+| 4.10 | 4 | Ledger postings caused by entering a state (table) | `backend/internal/dispute/domain/ledger.go`, ADR 0014 | done (`latex/chapters/04-design.tex`) |
 | 5.1 | 5 | Contract to code: what is generated on each side | `Makefile generate`, `frontend/scripts/generate-api.ts` | todo (diagram) |
 | 5.2 | 5 | TypeBox schema paired with its generated type (listing) | `frontend/src/api/schemas.gen.ts` | source |
 | 5.3 | 5 | A dispute traced end to end: HTTP span, use case, statements | Tempo screenshot | source (capture from `make otel-up`) |

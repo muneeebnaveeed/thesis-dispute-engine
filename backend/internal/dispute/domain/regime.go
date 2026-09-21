@@ -42,6 +42,9 @@ type Rules struct {
 	LiabilityCapMinor  int64
 	Currency           string
 	MaxAppeals         int
+	// CloseSettlement clears whatever the bank still has in suspense when a dispute closes without an
+	// adjudication: a SEPA refund is recovered from the creditor under the scheme rules; the rest is absorbed.
+	CloseSettlement SuspenseSettlement
 }
 
 // HasProvisionalCredit reports whether a reversible credit precedes the outcome.
@@ -65,6 +68,7 @@ var rules = map[Regime]Rules{
 		LiabilityCapMinor:  0,
 		Currency:           "EUR",
 		MaxAppeals:         defaultAppeals,
+		CloseSettlement:    SettleRecovered,
 	},
 	RegimeEUPSD2Card: {
 		Regime: RegimeEUPSD2Card,
@@ -78,6 +82,7 @@ var rules = map[Regime]Rules{
 		LiabilityCapMinor:  50_00,
 		Currency:           "EUR",
 		MaxAppeals:         defaultAppeals,
+		CloseSettlement:    SettleWrittenOff,
 	},
 	RegimeUSRegE: {
 		Regime: RegimeUSRegE,
@@ -91,6 +96,7 @@ var rules = map[Regime]Rules{
 		LiabilityCapMinor:  50_00,
 		Currency:           "USD",
 		MaxAppeals:         defaultAppeals,
+		CloseSettlement:    SettleWrittenOff,
 	},
 	RegimeUSRegZ: {
 		Regime: RegimeUSRegZ,
@@ -104,6 +110,7 @@ var rules = map[Regime]Rules{
 		LiabilityCapMinor:  0,
 		Currency:           "USD",
 		MaxAppeals:         defaultAppeals,
+		CloseSettlement:    SettleWrittenOff,
 	},
 }
 

@@ -71,6 +71,19 @@ func (s *Store) CountOverdue(ctx context.Context) ([]application.OverdueCount, e
 	return out, nil
 }
 
+// SuspenseBalances implements application.Store.
+func (s *Store) SuspenseBalances(ctx context.Context) ([]application.SuspenseBalance, error) {
+	rows, err := sqlcgen.New(s.pool).SuspenseByRegime(ctx)
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	out := make([]application.SuspenseBalance, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, application.SuspenseBalance{TenantID: r.TenantID, Regime: domain.Regime(r.Regime), Currency: r.Currency, Balance: r.Balance})
+	}
+	return out, nil
+}
+
 // PurgeLockID is the advisory lock the idempotency sweep takes; arbitrary but fixed, distinct from the migration lock.
 const PurgeLockID = 72040002
 
@@ -298,4 +311,33 @@ func deadlineOf(kind string, cycle int32, started, due time.Time, met, voided pg
 		d.VoidedAt = &t
 	}
 	return d
+}
+
+func (t *txn) AppendLedger(ctx context.Context, disputeID uuid.UUID, entries []application.LedgerEntry) error {
+	for _, e := range entries {
+		if err := t.q.InsertLedgerEntry(ctx, sqlcgen.InsertLedgerEntryParams{
+			DisputeID: disputeID, Seq: int32Of(e.Seq), Kind: string(e.Posting.Kind),
+			DebitAccount: string(e.Posting.Debit), CreditAccount: string(e.Posting.Credit),
+			Amount: e.Posting.Amount, Currency: e.Posting.Currency, Reference: e.Reference, PostedAt: e.PostedAt,
+		}); err != nil {
+			return mapErr(err)
+		}
+	}
+	return nil
+}
+
+func (t *txn) ListLedger(ctx context.Context, disputeID uuid.UUID) ([]application.LedgerEntry, error) {
+	rows, err := t.q.ListLedgerEntries(ctx, disputeID)
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	out := make([]application.LedgerEntry, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, application.LedgerEntry{
+			Seq: int(r.Seq), Reference: r.Reference, PostedAt: r.PostedAt,
+			Posting: domain.Posting{Kind: domain.PostingKind(r.Kind), Debit: domain.Account(r.DebitAccount),
+				Credit: domain.Account(r.CreditAccount), Amount: r.Amount, Currency: r.Currency},
+		})
+	}
+	return out, nil
 }

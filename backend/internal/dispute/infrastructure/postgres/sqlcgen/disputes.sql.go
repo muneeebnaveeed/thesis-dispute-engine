@@ -563,6 +563,38 @@ func (q *Queries) InsertIdempotencyKey(ctx context.Context, arg InsertIdempotenc
 	return err
 }
 
+const insertLedgerEntry = `-- name: InsertLedgerEntry :exec
+INSERT INTO ledger_entries (dispute_id, seq, kind, debit_account, credit_account, amount, currency, reference, posted_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+`
+
+type InsertLedgerEntryParams struct {
+	DisputeID     uuid.UUID
+	Seq           int32
+	Kind          string
+	DebitAccount  string
+	CreditAccount string
+	Amount        decimal.Decimal
+	Currency      string
+	Reference     string
+	PostedAt      time.Time
+}
+
+func (q *Queries) InsertLedgerEntry(ctx context.Context, arg InsertLedgerEntryParams) error {
+	_, err := q.db.Exec(ctx, insertLedgerEntry,
+		arg.DisputeID,
+		arg.Seq,
+		arg.Kind,
+		arg.DebitAccount,
+		arg.CreditAccount,
+		arg.Amount,
+		arg.Currency,
+		arg.Reference,
+		arg.PostedAt,
+	)
+	return err
+}
+
 const insertTenantKey = `-- name: InsertTenantKey :exec
 INSERT INTO tenant_keys (id, tenant_id, key_hash, prefix, label, expires_at) VALUES ($1, $2, $3, $4, $5, $6)
 `
@@ -777,6 +809,57 @@ func (q *Queries) ListDisputes(ctx context.Context, arg ListDisputesParams) ([]L
 			&i.Currency,
 			&i.OpenedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLedgerEntries = `-- name: ListLedgerEntries :many
+SELECT id, dispute_id, seq, kind, debit_account, credit_account, amount, currency, reference, posted_at
+FROM ledger_entries
+WHERE dispute_id = $1
+ORDER BY id
+`
+
+type ListLedgerEntriesRow struct {
+	ID            int64
+	DisputeID     uuid.UUID
+	Seq           int32
+	Kind          string
+	DebitAccount  string
+	CreditAccount string
+	Amount        decimal.Decimal
+	Currency      string
+	Reference     string
+	PostedAt      time.Time
+}
+
+func (q *Queries) ListLedgerEntries(ctx context.Context, disputeID uuid.UUID) ([]ListLedgerEntriesRow, error) {
+	rows, err := q.db.Query(ctx, listLedgerEntries, disputeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLedgerEntriesRow{}
+	for rows.Next() {
+		var i ListLedgerEntriesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.DisputeID,
+			&i.Seq,
+			&i.Kind,
+			&i.DebitAccount,
+			&i.CreditAccount,
+			&i.Amount,
+			&i.Currency,
+			&i.Reference,
+			&i.PostedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1172,6 +1255,42 @@ func (q *Queries) SettleDeadline(ctx context.Context, arg SettleDeadlineParams) 
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const suspenseByRegime = `-- name: SuspenseByRegime :many
+SELECT tenant_id, regime, currency, balance::numeric AS balance FROM suspense_by_regime
+`
+
+type SuspenseByRegimeRow struct {
+	TenantID uuid.UUID
+	Regime   string
+	Currency string
+	Balance  decimal.Decimal
+}
+
+func (q *Queries) SuspenseByRegime(ctx context.Context) ([]SuspenseByRegimeRow, error) {
+	rows, err := q.db.Query(ctx, suspenseByRegime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SuspenseByRegimeRow{}
+	for rows.Next() {
+		var i SuspenseByRegimeRow
+		if err := rows.Scan(
+			&i.TenantID,
+			&i.Regime,
+			&i.Currency,
+			&i.Balance,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const touchTenantKey = `-- name: TouchTenantKey :exec

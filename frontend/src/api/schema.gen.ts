@@ -208,6 +208,8 @@ export type components = {
       | 'not-found'
       | 'invalid-transition'
       | 'appeals-exhausted'
+      | 'invalid-liability'
+      | 'invalid-settlement'
       | 'concurrent-update'
       | 'idempotency-key-reuse'
       | 'no-regime'
@@ -340,10 +342,51 @@ export type components = {
       event: components['schemas']['DisputeEvent']
       /** @default system */
       actor?: string
-      /** @description Event-specific facts, stored verbatim on the log entry. */
+      /** @description Event-specific facts, stored verbatim on the log entry. Two are read by the ledger: on ISSUE_REFUND, `liability` is the amount the customer bears (a decimal string, capped by the regime, refused with invalid-liability); on CLOSE, `settlement` says how an outstanding advance clears (RECOVERED or WRITTEN_OFF; the regime's default when absent; refused with invalid-settlement). */
       payload?: {
+        /** @example 50.00 */
+        liability?: string
+        settlement?: components['schemas']['SuspenseSettlement']
+      } & {
         [key: string]: unknown
       }
+    }
+    /** @enum {string} */
+    SuspenseSettlement: 'RECOVERED' | 'WRITTEN_OFF'
+    /**
+     * @description CUSTOMER is the disputing customer's account; SUSPENSE holds what the bank advanced; RECOVERY and LOSS clear it.
+     * @enum {string}
+     */
+    LedgerAccount: 'CUSTOMER' | 'SUSPENSE' | 'RECOVERY' | 'LOSS'
+    /** @enum {string} */
+    PostingKind:
+      | 'PROVISIONAL_CREDIT'
+      | 'FAST_REFUND'
+      | 'NQA_REFUND'
+      | 'PROVISIONAL_CREDIT_REVERSAL'
+      | 'RECOVERY'
+      | 'WRITE_OFF'
+    /** @description One double-entry movement the engine instructed; amount leaves the credit account and lands in the debit account. */
+    LedgerEntry: {
+      /** @description The event that caused it. */
+      seq: number
+      kind: components['schemas']['PostingKind']
+      debit: components['schemas']['LedgerAccount']
+      credit: components['schemas']['LedgerAccount']
+      /** @description Decimal as a string; never a float. */
+      amount: string
+      currency: string
+      /** @description Unique per posting; what the banking core is told. */
+      reference: string
+      /** Format: date-time */
+      postedAt: string
+    }
+    /** @description Running totals per account; customer from the customer's side (positive means credited), the rest from the bank's. */
+    Balances: {
+      customer: string
+      suspense: string
+      recovery: string
+      loss: string
     }
     LoggedEvent: {
       seq: number
@@ -407,6 +450,9 @@ export type components = {
       events: components['schemas']['LoggedEvent'][]
       /** @description Every regulatory clock the regime started for this dispute, opening clocks first, then per appeal. */
       deadlines: components['schemas']['Deadline'][]
+      /** @description Every movement the engine instructed on this dispute, in posting order. */
+      ledger: components['schemas']['LedgerEntry'][]
+      balances: components['schemas']['Balances']
     }
     /** @enum {string} */
     DeadlineKind: 'REFUND' | 'ACKNOWLEDGE' | 'RESOLUTION'

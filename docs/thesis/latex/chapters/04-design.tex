@@ -79,3 +79,70 @@ of the same rows, and a histogram of the slack at the moment each clock is satis
 (\code{dispute.deadline\_slack}) turns compliance from a report into a distribution. The one place
 the derivation shows is idempotent replay: a repeated request returns the response as first
 stored, so its statuses are as of the first request, which is what a replay promises anyway.
+
+\section{The banking core adapter}
+\label{sec:design-core}
+% To write: ADR 0015. Stub so the ledger section's reference resolves.
+
+% Distils ADR 0014.
+\section{The ledger}
+\label{sec:design-ledger}
+
+Three of the four regimes move the customer's money before anyone knows who was right. Under
+Regulation~E the bank posts a provisional credit it may later take back; under PSD2 it refunds at
+once and absorbs the loss unless a chargeback recovers it; under SEPA Core it refunds and the
+scheme recovers the amount from the creditor's bank. The original design (appendix, wiki extract)
+imagined a provisional-credit engine and a final-credit engine as separate components. Both
+disappear into one small ledger once the question is put correctly: not ``what kind of credit is
+this?'' but ``where is the money now?''
+
+The ledger has four accounts from the issuer's point of view (figure~\ref{fig:ledger}): the
+customer's account, a suspense account holding what the bank has advanced and not yet cleared, and
+recovery and loss, which clear it. Every movement is a double-entry posting, and every posting is
+caused by a transition: entering a credit state debits suspense and credits the customer; a
+reversal does the opposite; a won chargeback recovers; a lost chargeback writes off, unless the
+regime has provisional credit, in which case the reversal that follows takes the advance back from
+the customer instead; and closing settles whatever remains, recovered or written off, by the
+analyst's word or the regime's default. As with the state machine and the clocks, nothing here
+tests the regime's name: the postings follow from the state entered and two properties of the
+rules.
+
+\begin{figure}[htbp]
+\centering
+\small
+\begin{tabular}{llll}
+\toprule
+State entered & Posting & Debit & Credit \\
+\midrule
+any credit state & credit (disputed less liability) & suspense & customer \\
+\code{PROVISIONAL\_CREDIT\_REVERSED} & reversal (outstanding) & customer & suspense \\
+\code{CHARGEBACK\_WON} & recovery (outstanding) & recovery & suspense \\
+\code{CHARGEBACK\_LOST}, no provisional credit & write-off (outstanding) & loss & suspense \\
+\code{CLOSED}, outstanding & settlement, recovered or written off & recovery or loss & suspense \\
+\bottomrule
+\end{tabular}
+\caption{Postings caused by entering a state (\code{domain/ledger.go}). ``Outstanding'' is the dispute's suspense
+balance before the transition; a posting of zero is not written.}
+\label{fig:ledger}
+\end{figure}
+
+The property that matters is that suspense is zero when a dispute closes: whatever the bank
+advanced was taken back, recovered or written off, and nothing is left in limbo. It is not
+enforced by a check at close. It holds by construction, and the test suite proves it the way the
+state machine's dead-end freedom is proved (section~\ref{sec:design-state-machine}): a test
+enumerates every path from \code{INITIATED} to \code{CLOSED} under every regime, forty-three at
+the time of writing, replays each through the posting rules with each settlement choice, and
+asserts a zero balance and a customer who never ends up net debited
+(\code{TestSuspenseBalancesOnEveryPath}). A regime or state added later that breaks the invariant
+fails the build rather than a reconciliation months on.
+
+The amount credited is the disputed amount less a liability the analyst may assign to the
+customer, which the regime caps: fifty euro for a lost or stolen instrument under PSD2 art.~74,
+fifty dollars under Regulation~E \S~1005.6(b), none under SEPA Core or Regulation~Z. The liability
+travels in the refund event's payload, as does the settlement choice on close; both are validated
+against the regime before the transition is written, and a refusal is a 422 problem naming the
+field, after which the dispute is exactly as it was: no event, no posting. Postings themselves are
+rows under the same row-level security as the dispute, append-only at the database like the event
+log, each keyed to the event that caused it and carrying a reference unique within the tenant.
+That reference is the idempotency key the banking core adapter (section~\ref{sec:design-core})
+uses, so an instruction repeated after a timeout cannot move money twice.

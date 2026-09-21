@@ -564,11 +564,18 @@ func toAPI(v application.DisputeView) oapi.Dispute {
 	for _, d := range v.Deadlines {
 		deadlines = append(deadlines, toDeadline(d))
 	}
+	ledger := make([]oapi.LedgerEntry, 0, len(v.Ledger))
+	for _, l := range v.Ledger {
+		ledger = append(ledger, oapi.LedgerEntry{Seq: l.Seq, Kind: oapi.PostingKind(l.Kind), Debit: oapi.LedgerAccount(l.Debit),
+			Credit: oapi.LedgerAccount(l.Credit), Amount: l.Amount.StringFixed(4), Currency: l.Currency, Reference: l.Reference, PostedAt: l.PostedAt})
+	}
 	return oapi.Dispute{
 		Id: v.ID, Regime: oapi.Regime(v.Regime), State: oapi.DisputeState(v.State), Appeals: v.Appeals,
 		Version: v.Version, TransactionId: v.TransactionID, AccountId: v.AccountID,
 		DisputedAmount: v.DisputedAmount.StringFixed(4), Currency: v.Currency, OpenedAt: v.OpenedAt, UpdatedAt: v.UpdatedAt,
-		AllowedEvents: allowed, Events: events, Deadlines: deadlines,
+		AllowedEvents: allowed, Events: events, Deadlines: deadlines, Ledger: ledger,
+		Balances: oapi.Balances{Customer: v.Balances.Customer.StringFixed(4), Suspense: v.Balances.Suspense.StringFixed(4),
+			Recovery: v.Balances.Recovery.StringFixed(4), Loss: v.Balances.Loss.StringFixed(4)},
 	}
 }
 
