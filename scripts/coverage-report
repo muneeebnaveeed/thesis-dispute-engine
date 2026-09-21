@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# Render a Go coverage profile as markdown: total, per-package table, and the delta against a
+# baseline profile when one is given. Generated code (sqlcgen, oapi) and test-only helpers (apptest,
+# pgtest) are excluded from every number.
+#
+#   scripts/coverage-report <coverage.out> [baseline.out]
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+
+[[ $# -ge 1 && -f $1 ]] || die "usage: coverage-report <coverage.out> [baseline.out]"
+profile=$1
+baseline=${2:-}
+module=$(awk '/^module /{print $2}' "$(repo_root)/backend/go.mod")
+
+# Prints "<package>\t<covered>\t<total>" per package plus a TOTAL row, statements weighted.
+stats() {
+  awk -v gen='/sqlcgen/|/oapi/|/apptest/|/pgtest/' -v mod="$module/" '
+    /^mode:/ { next }
+    $0 ~ gen { next }
+    {
+      split($1, a, ":"); pkg = a[1]; sub(/\/[^\/]*$/, "", pkg); sub(mod, "", pkg)
+      if (!($1 in stmts)) { stmts[$1] = $2; pkgof[$1] = pkg }
+      if ($3 > 0) hit[$1] = 1
+    }
+    END {
+      for (k in stmts) {
+        p = pkgof[k]; tot[p] += stmts[k]; all += stmts[k]
+        if (k in hit) { cov[p] += stmts[k]; allc += stmts[k] }
+      }
+      for (p in tot) printf "%s\t%d\t%d\n", p, cov[p], tot[p]
+      printf "TOTAL\t%d\t%d\n", allc, all
+    }' "$1" | sort
+}
+
+cur=$(mktemp); trap 'rm -f "$cur" "${base:-}"' EXIT
+stats "$profile" > "$cur"
+base=""
+if [[ -n $baseline && -f $baseline ]]; then
+  base=$(mktemp); stats "$baseline" > "$base"
+fi
+
+awk -F'\t' -v have_base="${base:+1}" '
+  function pct(c, t) { return t ? 100 * c / t : 0 }
+  function fmt_delta(d) { return sprintf("%s%.1f", d > 0 ? "+" : "", d) }
+  FNR == NR && have_base { bc[$1] = $2; bt[$1] = $3; next }
+  { pk[++n] = $1; cc[$1] = $2; ct[$1] = $3 }
+  END {
+    tp = pct(cc["TOTAL"], ct["TOTAL"])
+    head = sprintf("### Coverage: %.1f%%", tp)
+    if (have_base) {
+      if ("TOTAL" in bt) head = head " (" fmt_delta(tp - pct(bc["TOTAL"], bt["TOTAL"])) " vs main)"
+      else head = head " (no baseline yet)"
+    }
+    print head; print ""
+    print "Statements; generated code and test helpers excluded."; print ""
+    if (have_base) { print "| Package | Coverage | Delta |"; print "| --- | ---: | ---: |" }
+    else { print "| Package | Coverage |"; print "| --- | ---: |" }
+    for (i = 1; i <= n; i++) {
+      p = pk[i]; if (p == "TOTAL") continue
+      row = sprintf("| `%s` | %.1f%% |", p, pct(cc[p], ct[p]))
+      if (have_base) row = row " " ((p in bt) ? fmt_delta(pct(cc[p], ct[p]) - pct(bc[p], bt[p])) : "new") " |"
+      print row
+    }
+  }' ${base:+"$base"} "$cur"

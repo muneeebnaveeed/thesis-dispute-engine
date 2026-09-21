@@ -5,7 +5,7 @@ SHELL := /bin/bash
 BACKEND := backend
 GO      := cd $(BACKEND) && go
 
-.PHONY: help hooks run dev build test test-race test-integration lint vet fmt fmt-fix tidy vuln versions generate generate-check db-up db-down db-logs db-seed up down docker-dev otel-up otel-down otel-reset image pr ci-logs pr-comments stack ci
+.PHONY: help hooks run dev build test test-race test-integration cover lint vet fmt fmt-fix tidy vuln versions generate generate-check db-up db-down db-logs db-seed up down docker-dev otel-up otel-down otel-reset image pr ci-logs pr-comments stack ci
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -33,6 +33,11 @@ test-race: ## Unit tests with the race detector (what CI runs; needs a C compile
 TEST_DB_URL ?= postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable
 test-integration: ## Tests that need PostgreSQL (make db-up first); each test gets its own schema
 	cd $(BACKEND) && DISPUTE_TEST_DATABASE_URL="$(TEST_DB_URL)" go test -count=1 ./...
+
+cover: ## Coverage table as CI reports it (uses PostgreSQL if make db-up is running); coverage.html for line detail
+	cd $(BACKEND) && DISPUTE_TEST_DATABASE_URL="$(TEST_DB_URL)" go test -count=1 -coverprofile=coverage.out -covermode=atomic ./... > /dev/null
+	cd $(BACKEND) && go tool cover -html=coverage.out -o coverage.html
+	scripts/coverage-report $(BACKEND)/coverage.out
 
 generate: ## Regenerate sqlc queries and the OpenAPI server from docs/api/openapi.yaml
 	cd $(BACKEND) && sqlc generate && go generate ./...
