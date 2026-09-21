@@ -7,20 +7,14 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-func registerRoutes(mux *http.ServeMux) {
-	route(mux, "GET /healthz", handleHealthz)
-}
-
-// route names the span after the pattern; ServeMux only sets r.Pattern after matching, so this cannot be outer middleware.
-func route(mux *http.ServeMux, pattern string, h http.HandlerFunc) {
-	mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
-		span := trace.SpanFromContext(r.Context())
-		span.SetName(pattern)
-		span.SetAttributes(semconv.HTTPRoute(pattern))
-		h(w, r)
+// NameSpanByRoute renames the server span to the matched pattern; ServeMux only sets r.Pattern after matching, so this must wrap the route handler, not the mux.
+func NameSpanByRoute(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Pattern != "" {
+			span := trace.SpanFromContext(r.Context())
+			span.SetName(r.Pattern)
+			span.SetAttributes(semconv.HTTPRoute(r.Pattern))
+		}
+		next.ServeHTTP(w, r)
 	})
-}
-
-func handleHealthz(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

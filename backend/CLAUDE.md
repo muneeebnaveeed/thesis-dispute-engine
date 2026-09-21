@@ -19,8 +19,14 @@ its `domain` or storage.
 
 ## Conventions
 
-- **HTTP:** standard library only (docs/adr/0001). Register routes through `route()` in
-  `platform/httpserver/routes.go` so spans get the pattern name; respond via `writeJSON`.
+- **HTTP:** standard library only (docs/adr/0001) behind the generated strict server
+  (docs/adr/0006). Implement `oapi.StrictServerInterface` in `ports/http`; `Mount` wires
+  validation and `httpserver.NameSpanByRoute`. Never register routes by hand.
+- **Errors:** sentinels are `errs.New(...)` values in the package that owns the rule; wrap with
+  `errs.Wrap`; infrastructure maps driver errors onto application sentinels in `mapErr`.
+- **Persistence:** sqlc queries in `infrastructure/postgres/queries/*.sql`, `make generate`,
+  never hand-written SQL in Go. Money is `decimal.Decimal`. Every write path goes through
+  `application.Store.WithTx`; the event log is append-only (docs/adr/0004).
 - **Regime first (docs/adr/0002):** gate on `Rules` properties (`HasProvisionalCredit()`),
   never on `if regime == X` outside the rules table. A new regime is a new row plus an entry in
   the reachability test.
@@ -30,6 +36,8 @@ its `domain` or storage.
   `trace_id`, `span_id`, `route`.
 - **Telemetry:** `otel.Tracer("<import path>")` in the package doing the work; bounded span
   names, variable parts as attributes. Never add exporters in code.
-- **Tests:** table-driven, `testing` only. Postgres-backed tests use a real database.
+- **Tests:** table-driven, `testing` only. Fast tests use `application/apptest.MemStore`;
+  Postgres-backed tests use `platform/postgres/pgtest.Pool` (fresh schema per test, skipped
+  without `DISPUTE_TEST_DATABASE_URL`).
 - **Style:** Google/Uber Go style; `.golangci.yml` is the enforced subset. `gofmt` +
   `goimports` with local prefix `github.com/muneeebnaveeed/`.

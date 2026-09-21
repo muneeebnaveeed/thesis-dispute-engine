@@ -3,7 +3,6 @@ package httpserver
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -18,11 +17,8 @@ type Server struct {
 	logger *slog.Logger
 }
 
-// New builds the routed, middleware-wrapped server.
-func New(addr string, logger *slog.Logger) *Server {
-	mux := http.NewServeMux()
-	registerRoutes(mux)
-
+// New builds the middleware-wrapped server around a mux the caller has populated.
+func New(addr string, logger *slog.Logger, mux *http.ServeMux) *Server {
 	// Unmatched requests keep a method-only span name so arbitrary URLs cannot explode cardinality.
 	handler := otelhttp.NewHandler(
 		Chain(mux,
@@ -64,12 +60,4 @@ func (s *Server) ListenAndServe() error {
 // Shutdown drains in-flight requests within ctx's deadline.
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.http.Shutdown(ctx)
-}
-
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(v); err != nil {
-		slog.Default().Error("encode response", "err", err)
-	}
 }

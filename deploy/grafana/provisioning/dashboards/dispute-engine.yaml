@@ -1,0 +1,11 @@
+apiVersion: 1
+providers:
+  - name: dispute-engine
+    folder: Dispute Engine
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /otel-lgtm/dispute-engine-dashboards
+      foldersFromFilesStructure: false

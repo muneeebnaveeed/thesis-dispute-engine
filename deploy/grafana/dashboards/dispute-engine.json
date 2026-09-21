@@ -1,0 +1,267 @@
+{
+  "uid": "dispute-engine",
+  "title": "Dispute Engine",
+  "tags": [
+    "dispute-engine"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Requests / s by route",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{service_name=\"dispute-engine\"}[1m]))",
+          "legendFormat": "{{http_route}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Latency p50 / p95 / p99",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "p50",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=\"dispute-engine\"}[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "p95",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=\"dispute-engine\"}[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "p99",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=\"dispute-engine\"}[5m])))",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Error rate (4xx / 5xx share)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "4xx",
+          "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=\"dispute-engine\", http_response_status_code=~\"4..\"}[5m])) / sum(rate(http_server_request_duration_seconds_count{service_name=\"dispute-engine\"}[5m]))",
+          "legendFormat": "4xx"
+        },
+        {
+          "refId": "5xx",
+          "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=\"dispute-engine\", http_response_status_code=~\"5..\"}[5m])) / sum(rate(http_server_request_duration_seconds_count{service_name=\"dispute-engine\"}[5m]))",
+          "legendFormat": "5xx"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Dispute transitions / min by regime and event",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (regime, event) (rate(dispute_transitions_total{service_name=\"dispute-engine\"}[5m])) * 60",
+          "legendFormat": "{{regime}} {{event}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Time in state before leaving (p95, seconds)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, state) (rate(dispute_time_in_state_seconds_bucket{service_name=\"dispute-engine\"}[15m])))",
+          "legendFormat": "{{state}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Idempotent replays / min",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 6,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(dispute_idempotent_replays_total{service_name=\"dispute-engine\"}[5m])) * 60"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Transitions total (1h)",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 16,
+        "w": 6,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(dispute_transitions_total{service_name=\"dispute-engine\"}[1h]))"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Logs (click trace_id to open the trace)",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service_name=\"dispute-engine\"} | json | line_format \"{{.severity_text}} {{.body}}\""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      }
+    },
+    {
+      "id": 9,
+      "title": "Recent traces",
+      "type": "table",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "traceqlSearch",
+          "filters": [
+            {
+              "id": "svc",
+              "scope": "resource",
+              "tag": "service.name",
+              "operator": "=",
+              "value": [
+                "dispute-engine"
+              ]
+            }
+          ],
+          "limit": 20
+        }
+      ]
+    }
+  ]
+}
