@@ -1,0 +1,20 @@
+# Live reload for `make dev`. Everything air writes stays under tmp/ (gitignored).
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/api ./cmd/api"
+  bin = "./tmp/api"
+  log = "tmp/build-errors.log"
+  include_ext = ["go", "sql", "toml"]
+  exclude_dir = ["tmp", "bin"]
+  exclude_regex = ["_test\\.go$"]
+  delay = 300
+  kill_delay = "2s"
+  send_interrupt = true
+
+[log]
+  time = false
+
+[misc]
+  clean_on_exit = true

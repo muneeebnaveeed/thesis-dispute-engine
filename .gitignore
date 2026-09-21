@@ -1,0 +1,35 @@
+# Go
+backend/bin/
+backend/tmp/
+build-errors.log
+*.test
+*.out
+coverage.*
+
+# Node (frontend/, Phase 4)
+node_modules/
+frontend/dist/
+frontend/.output/
+frontend/.vinxi/
+
+# Thesis build output (docs/thesis/)
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+
+# Local
+.env
+.env.*
+!.env.example
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
