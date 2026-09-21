@@ -79,10 +79,31 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_USERS_ALLOW_SIGN_UP: "false"
+      # Retention: a week of local data, then the volume stops growing.
+      PROMETHEUS_EXTRA_ARGS: "--storage.tsdb.retention.time=${LGTM_RETENTION:-168h}"
+      LGTM_RETENTION: ${LGTM_RETENTION:-168h}
+      TEMPO_EXTRA_ARGS: "-config.expand-env=true"
+      LOKI_EXTRA_ARGS: "-compactor.retention-enabled=true -compactor.delete-request-store=filesystem -compactor.working-directory=/data/loki/compactor -store.retention=${LGTM_RETENTION:-168h}"
+      # With host networking the collector would otherwise listen on every interface; keep OTLP on loopback.
+      OTELCOL_EXTRA_ARGS: "--set=receivers.otlp.protocols.grpc.endpoint=127.0.0.1:4317 --set=receivers.otlp.protocols.http.endpoint=127.0.0.1:4318"
     volumes:
       - lgtm:/data
+      - ./lgtm/tempo-config.yaml:/otel-lgtm/tempo-config.yaml:ro
       - ./grafana/provisioning/dashboards/dispute-engine.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/dispute-engine.yaml:ro
+      - ./grafana/provisioning/alerting/dispute-engine.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/dispute-engine.yaml:ro
       - ./grafana/dashboards:/otel-lgtm/dispute-engine-dashboards:ro
+
+  # Synthetic traffic so the dashboards are populated during a demo; needs `make db-seed` (otel-up runs it).
+  probe:
+    image: curlimages/curl:8.16.0
+    network_mode: host
+    profiles: [otel]
+    depends_on: [api]
+    volumes:
+      - ./probe.sh:/probe.sh:ro
+    entrypoint: ["sh", "/probe.sh"]
+    environment:
+      INTERVAL: ${PROBE_INTERVAL:-60}
 
 volumes:
   pgdata:

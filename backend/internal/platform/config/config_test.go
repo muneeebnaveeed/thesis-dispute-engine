@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log/slog"
 	"testing"
 	"time"
 )
@@ -31,6 +32,18 @@ func TestLoadOverrides(t *testing.T) {
 	}
 	if cfg.ShutdownTimeout != 3*time.Second {
 		t.Errorf("ShutdownTimeout = %v, want 3s", cfg.ShutdownTimeout)
+	}
+}
+
+func TestLoadLogLevel(t *testing.T) {
+	t.Setenv("DISPUTE_LOG_LEVEL", "debug")
+	cfg, err := Load()
+	if err != nil || cfg.LogLevel != slog.LevelDebug {
+		t.Errorf("LogLevel = %v, err = %v", cfg.LogLevel, err)
+	}
+	t.Setenv("DISPUTE_LOG_LEVEL", "loud")
+	if _, err := Load(); err == nil {
+		t.Error("bad level accepted")
 	}
 }
 

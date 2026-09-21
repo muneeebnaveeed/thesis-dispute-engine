@@ -24,7 +24,8 @@ How to work in this repo. What the system does is in `README.md` and `docs/adr/`
 - `make run`: API natively on :8090. `make dev`: same with live reload (air).
 - `make db-up`: PostgreSQL in Docker. `make up`: Postgres + the API image. `make docker-dev`:
   Postgres + the API in a Go toolchain container with live reload. `make otel-up`: plus Grafana LGTM
-  (Grafana at http://localhost:3001, admin/admin; traces in Tempo, metrics in Mimir, logs in Loki).
+  (Grafana at http://localhost:3001, admin/admin; traces in Tempo, metrics in Mimir, logs in Loki)
+  plus a synthetic probe. Cheat sheet: `docs/observability.md`.
 - `make image`: build `backend/Dockerfile` locally.
 
 Toolchain is pinned in `mise.toml` (Go, golangci-lint, air, sqlc); `go.mod` carries
@@ -41,7 +42,7 @@ backend/internal/<context>/ports/http    HTTP handlers implementing the generate
 backend/internal/platform/{config,httpserver,telemetry,postgres,errs}  shared kernel, no domain knowledge
 backend/migrations                       SQL, forward-only, embedded; applied at startup and by cmd/seed
 docs/api/openapi.yaml                    the API contract; everything HTTP is generated from it
-deploy/                                  compose.yml (host networking, see below), otel.env
+deploy/                                  compose.yml (host networking, see below), otel.env, probe.sh, grafana/ and lgtm/ provisioning
 docs/adr, docs/thesis                    decisions; the design document
 ```
 

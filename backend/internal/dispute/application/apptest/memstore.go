@@ -54,6 +54,21 @@ func (m *MemStore) WithTx(_ context.Context, fn func(application.Tx) error) erro
 	return nil
 }
 
+// CountByState implements application.Store.
+func (m *MemStore) CountByState(_ context.Context) ([]application.StateCount, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	counts := map[[2]string]int64{}
+	for _, d := range m.Disputes {
+		counts[[2]string{string(d.Regime), string(d.State)}]++
+	}
+	out := make([]application.StateCount, 0, len(counts))
+	for k, n := range counts {
+		out = append(out, application.StateCount{Regime: domain.Regime(k[0]), State: domain.State(k[1]), N: n})
+	}
+	return out, nil
+}
+
 type snapshotT struct {
 	disputes   map[uuid.UUID]application.DisputeRecord
 	events     map[uuid.UUID][]application.EventRecord

@@ -1,0 +1,55 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: dispute-engine
+    folder: Dispute Engine
+    interval: 1m
+    rules:
+      - uid: dispute-engine-5xx-share
+        title: 5xx share above 1 percent
+        condition: C
+        for: 5m
+        labels: { service: dispute-engine, severity: page }
+        annotations:
+          summary: More than 1 percent of requests failed server-side for 5 minutes.
+          runbook: docs/observability.md
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum(rate(http_server_request_duration_seconds_count{service_name="dispute-engine", http_response_status_code=~"5.."}[5m])) / sum(rate(http_server_request_duration_seconds_count{service_name="dispute-engine"}[5m]))
+              instant: true
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0.01] }
+      - uid: dispute-engine-p99-latency
+        title: p99 latency above 1 second
+        condition: C
+        for: 5m
+        labels: { service: dispute-engine, severity: warn }
+        annotations:
+          summary: p99 request latency has been above 1s for 5 minutes.
+          runbook: docs/observability.md
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name="dispute-engine"}[5m])))
+              instant: true
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [1] }
