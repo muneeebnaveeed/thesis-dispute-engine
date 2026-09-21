@@ -24,8 +24,12 @@ standard `OTEL_*` environment variables (`contrib/exporters/autoexport`), never 
   routing table.
 - `slog` records fan out to stdout and, through the `otelslog` bridge, to the OTLP log
   exporter with trace context attached; request logs also carry `trace_id` and `span_id`.
+- `otelpgx` traces every statement as a child span named after the sqlc query; values are never
+  recorded. Log records pass through a redaction handler before any sink.
 - Local viewing is Grafana LGTM (Tempo, Mimir, Loki) via `make otel-up`; production points the
-  same variables at whatever backend is in use.
+  same variables at whatever backend is in use. The local stack keeps a week of data, binds OTLP
+  to loopback, provisions the dashboard and two alert rules from the repo, and runs a synthetic
+  probe so panels are never empty. `docs/observability.md` is the operator cheat sheet.
 
 ## Consequences
 
