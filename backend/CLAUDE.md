@@ -30,6 +30,13 @@ its `domain` or storage.
   `dispute_api`, a member of the `dispute_app` group role whose grants live in the migration
   that creates each table; `migrations/roles_test.go` fails on a table without them. Only
   `cmd/migrate` and `cmd/seed` use the owner URL (`DISPUTE_MIGRATE_DATABASE_URL`).
+- **Tenancy (docs/adr/0008):** the tenant travels in the context (`tenant.IDFrom`); `WithTx` binds
+  it to the transaction and row-level security does the filtering, so queries never add
+  `tenant_id` predicates by hand. Anything that must read or write across tenants goes through an
+  owner-defined view or `SECURITY DEFINER` function in a migration, never through table grants.
+  Tests: `apptest.Ctx()` for unit tests, `pgtest.AppPool` for anything that must prove isolation.
+  A backfill over `dispute_events` disables the append-only trigger inside the migration and
+  re-enables it; `migrations/populated_test.go` proves migrations run over existing rows.
 - **Regime first (docs/adr/0002):** gate on `Rules` properties (`HasProvisionalCredit()`),
   never on `if regime == X` outside the rules table. A new regime is a new row plus an entry in
   the reachability test.
