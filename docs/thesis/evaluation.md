@@ -32,6 +32,14 @@ make eval               # correctness suites, then a load run, then Prometheus q
 
 Runs are committed; the thesis cites the directory name.
 
+| Run | What the API did per transition | Create p99 | Event p99 | Read p99 |
+| --- | --- | --- | --- | --- |
+| `2026-09-21_2304` | state row, event log | 25 ms | 5 ms | 5 ms |
+| `2026-09-22_0126` | plus clocks, ledger, simulated core call, notices, risk assessment | 25 ms | 14 ms | 5 ms |
+
+Server-side percentiles from Prometheus at 7.6 requests/s on the laptop; the second run shows the
+cost of the six domain components landing in the same transaction.
+
 ## Limitations to state
 
 Single machine, synthetic traffic, one Postgres, no network between browser and API beyond
