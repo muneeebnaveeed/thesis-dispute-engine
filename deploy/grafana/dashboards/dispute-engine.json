@@ -56,17 +56,20 @@
         {
           "refId": "p50",
           "expr": "histogram_quantile(0.50, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=\"dispute-engine\"}[5m])))",
-          "legendFormat": "p50"
+          "legendFormat": "p50",
+          "exemplar": true
         },
         {
           "refId": "p95",
           "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=\"dispute-engine\"}[5m])))",
-          "legendFormat": "p95"
+          "legendFormat": "p95",
+          "exemplar": true
         },
         {
           "refId": "p99",
           "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=\"dispute-engine\"}[5m])))",
-          "legendFormat": "p99"
+          "legendFormat": "p99",
+          "exemplar": true
         }
       ],
       "fieldConfig": {
@@ -172,7 +175,7 @@
       "gridPos": {
         "x": 12,
         "y": 16,
-        "w": 6,
+        "w": 4,
         "h": 8
       },
       "targets": [
@@ -191,9 +194,9 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "x": 18,
+        "x": 16,
         "y": 16,
-        "w": 6,
+        "w": 4,
         "h": 8
       },
       "targets": [
@@ -260,6 +263,60 @@
             }
           ],
           "limit": 20
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Disputes by state (live)",
+      "type": "bargauge",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 16,
+        "w": 4,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (state) (dispute_by_state{service_name=\"dispute-engine\"})",
+          "legendFormat": "{{state}}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 11,
+      "title": "Problem responses / min by code",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 43,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (code) (rate(http_server_problems_total{service_name=\"dispute-engine\"}[5m])) * 60",
+          "legendFormat": "{{code}}"
         }
       ]
     }
