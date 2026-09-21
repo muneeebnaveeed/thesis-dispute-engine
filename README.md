@@ -25,6 +25,7 @@ make db-up            # PostgreSQL on localhost:5432
 make run              # API on http://localhost:8090  ->  curl localhost:8090/healthz
 make dev              # same, with live reload
 make ci               # what CI runs
+make help             # every target, including PR and stack tooling
 ```
 
 `make up` runs the API from its container image alongside Postgres; `make docker-dev` runs
