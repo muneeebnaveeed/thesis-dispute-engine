@@ -1,0 +1,131 @@
+{
+  "internal/dispute/application": {
+    "failed": 0,
+    "passed": 7,
+    "tests": [
+      "TestCreateDerivesRegimeAndLogsOpened",
+      "TestCreateRejectsUnknownTransactionAndRegimelessRail",
+      "TestApplyAdvancesVersionAndLog",
+      "TestApplyRejectsInvalidTransitionWithoutWriting",
+      "TestIdempotentReplayAndMismatch",
+      "TestApplyRollsBackWhenTheLogRejectsTheEvent",
+      "TestMemStoreScopesByTenant"
+    ]
+  },
+  "internal/dispute/domain": {
+    "failed": 0,
+    "passed": 8,
+    "tests": [
+      "TestRegimeFor",
+      "TestHappyPaths",
+      "TestRegimeGates",
+      "TestAppeals",
+      "TestAllowedMatchesApply",
+      "TestReachableStates",
+      "TestEveryReachableStateCanReachClosed",
+      "TestRulesAreConsistent"
+    ]
+  },
+  "internal/dispute/infrastructure/postgres": {
+    "failed": 0,
+    "passed": 1,
+    "tests": [
+      "TestMapErr"
+    ]
+  },
+  "internal/dispute/ports/http": {
+    "failed": 0,
+    "passed": 11,
+    "tests": [
+      "TestErrorCodesMatchContract",
+      "TestRetryableCodes",
+      "TestReadyz",
+      "TestCreateApplyGetRoundTrip",
+      "TestInvalidTransitionIs409WithAllowedEvents",
+      "TestContractViolationsAre400",
+      "TestIdempotencyKeyReplayAndReuse",
+      "TestUnknownDisputeIs404AndSpecIsServed",
+      "TestAuthenticationFollowsTheSpec",
+      "TestInternalSessionsRequireTheServiceKey",
+      "TestInternalBulkSessionDeleteAndTenantDirectory"
+    ]
+  },
+  "internal/platform/auth": {
+    "failed": 0,
+    "passed": 4,
+    "tests": [
+      "TestBearer",
+      "TestFailureLimiter",
+      "TestOIDCVerify",
+      "TestBearerAcceptsBothCredentialKinds"
+    ]
+  },
+  "internal/platform/config": {
+    "failed": 0,
+    "passed": 4,
+    "tests": [
+      "TestLoadDefaults",
+      "TestLoadOverrides",
+      "TestLoadLogLevel",
+      "TestLoadRejectsBadTimeout"
+    ]
+  },
+  "internal/platform/errs": {
+    "failed": 0,
+    "passed": 3,
+    "tests": [
+      "TestClassificationSurvivesWrapping",
+      "TestUnclassifiedIsInternalWithNoUserMessage",
+      "TestRetryable"
+    ]
+  },
+  "internal/platform/httpserver": {
+    "failed": 0,
+    "passed": 9,
+    "tests": [
+      "TestCORS",
+      "TestInternalOnly",
+      "TestRoutedRequestCarriesRequestID",
+      "TestWrongMethodIs405",
+      "TestPanicBecomes500",
+      "TestChainOrder",
+      "TestSpanIsNamedByRoute",
+      "TestProblemFromClassifiesAndHidesInternals",
+      "TestRequestLogCarriesRouteAndAnnotationsThroughClonedRequests"
+    ]
+  },
+  "internal/platform/postgres": {
+    "failed": 0,
+    "passed": 2,
+    "tests": [
+      "TestSpanName",
+      "TestLoadOrdersAndRejectsDuplicates"
+    ]
+  },
+  "internal/platform/ratelimit": {
+    "failed": 0,
+    "passed": 1,
+    "tests": [
+      "TestMiddleware"
+    ]
+  },
+  "internal/platform/telemetry": {
+    "failed": 0,
+    "passed": 5,
+    "tests": [
+      "TestRedactDropsSensitiveKeysAtAnyDepth",
+      "TestSetupWithoutEnvInstallsProvidersAndExportsNothing",
+      "TestSetupHonoursConsoleExporterEnv",
+      "TestSpanIDs",
+      "TestHandlerFansOutAndKeepsBaseBehaviour"
+    ]
+  },
+  "internal/platform/tenant": {
+    "failed": 0,
+    "passed": 2,
+    "tests": [
+      "TestIDFrom",
+      "TestStatic"
+    ]
+  }
+}

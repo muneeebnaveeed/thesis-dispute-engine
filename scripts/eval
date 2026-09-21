@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Thesis evaluation run: correctness suites, a paced load run, Prometheus read-back; all into docs/thesis/data/<date>/.
+# Needs the otel profile up (make otel-up) so Prometheus has the API's metrics.
+set -euo pipefail
+source "$(dirname "$0")/lib/common.sh"
+root=$(repo_root)
+rps=${EVAL_RPS:-1.5}
+seconds=${EVAL_SECONDS:-120}
+key=${EVAL_KEY:-tk_dev_tenant_a}
+api=${DISPUTE_API_URL:-http://localhost:8090}
+prom=${PROMETHEUS_URL:-http://localhost:9090}
+out="$root/docs/thesis/data/$(date +%Y-%m-%d_%H%M)"
+mkdir -p "$out"
+
+curl -fsS "$api/readyz" >/dev/null || die "API not ready at $api (make otel-up)"
+curl -fsS "$prom/-/ready" >/dev/null || die "Prometheus not ready at $prom (make otel-up)"
+
+info "correctness suites"
+(cd "$root/backend" && go test -count=1 -json ./internal/dispute/... ./internal/platform/... 2>/dev/null) \
+  | python3 -c '
+import sys, json, collections
+per = collections.defaultdict(lambda: {"passed": 0, "failed": 0, "tests": []})
+for line in sys.stdin:
+    try: e = json.loads(line)
+    except ValueError: continue
+    if e.get("Test") and e.get("Action") in ("pass", "fail") and "/" not in e["Test"]:
+        p = per[e["Package"].split("/backend/")[-1]]
+        p["passed" if e["Action"] == "pass" else "failed"] += 1
+        p["tests"].append(e["Test"])
+json.dump(per, open(sys.argv[1], "w"), indent=2, sort_keys=True)
+print("  " + ", ".join("%s: %d passed, %d failed" % (k, v["passed"], v["failed"]) for k, v in sorted(per.items())))
+' "$out/correctness.json"
+
+info "load run: $rps iterations/s (about 5 requests each) for ${seconds}s; the tenant budget is 600 requests/min, raise DISPUTE_RATE_PER_MINUTE on the API to go faster"
+(cd "$root/backend" && go run ./cmd/eval --api "$api" --key "$key" --prometheus "$prom" --rps "$rps" --seconds "$seconds" --out "$out/load.json")
+
+info "environment"
+{
+  echo "date: $(date -u +%FT%TZ)"
+  echo "commit: $(git -C "$root" rev-parse --short HEAD)"
+  echo "go: $(cd "$root/backend" && go version | awk '{print $3}')"
+  echo "postgres: $(docker compose -f "$root/deploy/compose.yml" exec -T postgres psql -U dispute -d dispute -Atc 'show server_version' 2>/dev/null || echo unknown)"
+  echo "cpu: $(nproc) cores, $(lscpu 2>/dev/null | sed -n 's/^Model name:\s*//p' | head -1)"
+  echo "memory: $(free -g 2>/dev/null | awk '/^Mem:/{print $2 " GB"}')"
+} > "$out/environment.txt"
+info "wrote $out"
+ls "$out"
