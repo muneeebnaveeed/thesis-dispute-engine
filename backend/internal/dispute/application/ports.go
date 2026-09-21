@@ -64,6 +64,34 @@ type TransactionRecord struct {
 	Amount          decimal.Decimal
 	Currency        string
 	AccountCurrency string
+	Merchant        string
+	OccurredAt      time.Time
+}
+
+// AccountRecord is the customer as the notices need them.
+type AccountRecord struct {
+	ID            uuid.UUID
+	Holder        string
+	Currency      string
+	Email         string
+	PostalAddress string
+}
+
+// NoticeRecord is one communication owed or sent; Document is the composed notice as JSON (notice.Document).
+type NoticeRecord struct {
+	ID        int64
+	TenantID  uuid.UUID
+	DisputeID uuid.UUID
+	Seq       int
+	Kind      domain.NoticeKind
+	Channel   domain.Channel
+	Recipient string
+	Subject   string
+	Document  []byte
+	CreatedAt time.Time
+	SentAt    *time.Time
+	Attempts  int
+	LastError *string
 }
 
 // StoredResponse is a prior answer kept for idempotent replay.
@@ -105,6 +133,12 @@ type Tx interface {
 	AnswerQuestionnaire(ctx context.Context, disputeID uuid.UUID, answers map[string]string, at time.Time) error
 	// GetQuestionnaire returns ErrNotFound when none was sent.
 	GetQuestionnaire(ctx context.Context, disputeID uuid.UUID) (Questionnaire, error)
+	GetAccount(ctx context.Context, id uuid.UUID) (AccountRecord, error)
+	TenantName(ctx context.Context) (string, error)
+	// InsertNotice stores one composed notice; letters are complete at once (SentAt set), emails wait for the dispatcher.
+	InsertNotice(ctx context.Context, n NoticeRecord) (int64, error)
+	ListNotices(ctx context.Context, disputeID uuid.UUID) ([]NoticeRecord, error)
+	GetNotice(ctx context.Context, disputeID uuid.UUID, id int64) (NoticeRecord, error)
 }
 
 // Questionnaire is what was asked of the customer and, once received, what they answered.
@@ -175,6 +209,11 @@ type Store interface {
 	CountOverdue(ctx context.Context) ([]OverdueCount, error)
 	// SuspenseBalances feeds the suspense gauge; it runs outside any transaction.
 	SuspenseBalances(ctx context.Context) ([]SuspenseBalance, error)
+	// ClaimNotices takes up to batch unsent emails across tenants for one delivery attempt each; a claimed notice
+	// is not offered again until its backoff passes, so a crash mid-send retries rather than repeats at once.
+	ClaimNotices(ctx context.Context, batch int) ([]NoticeRecord, error)
+	// FinishNotice records the outcome of an attempt: sent when failure is empty, otherwise the error for the next try.
+	FinishNotice(ctx context.Context, id int64, failure string) error
 	// PurgeIdempotencyKeys deletes stored responses older than before and reports how many went; when another
 	// replica holds the sweep it returns 0 and no error.
 	PurgeIdempotencyKeys(ctx context.Context, before time.Time) (int64, error)

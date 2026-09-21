@@ -216,3 +216,45 @@ customer said. The second consumer is the contradiction check the domain runs ov
 a customer who recognises the merchant, held the card, and shared it with nobody is claiming an
 unauthorised payment that the answers do not support. These are sentences an analyst can act on,
 and in section~\ref{sec:design-fraud} they become one of the signals a risk score is built from.
+
+\section{Multi-tenancy with row-level security}
+\label{sec:design-tenancy}
+% To write: ADR 0008. Stub so the communications section's reference resolves.
+
+% Distils ADR 0017.
+\section{Communications}
+\label{sec:design-communications}
+
+A dispute is a conversation with the customer as much as a sequence of states, and the regimes
+say when the bank must speak: Regulation~Z wants a written acknowledgement within thirty days
+\cite[\S~1026.13(c)(1)]{regz}; Regulation~E wants the customer told of a provisional credit
+\cite[\S~1005.11(c)(2)(iv)]{rege}, told the date and amount of a reversal before it happens
+\cite[\S~1005.11(d)(2)]{rege}, and told the outcome with the right to see the documents relied on
+\cite[\S~1005.11(d)(1)]{rege}. What the bank owes is therefore domain knowledge, and the engine
+keeps it where it keeps the rest: a function from the state entered to the notices it triggers,
+and a second from the regime's rules to the channels, email always and a printable letter as well
+where the regime's notices must be in writing. As with the clocks and the ledger, the gate is a
+property of the rules, never a regime's name.
+
+The design question is again \emph{when}. Sending is a side effect that can fail, and a transition
+must not be undone because a mail relay was down; but a notice that is owed must not be lost
+because the process died between the commit and the send. The engine composes the notice inside
+the transition, from facts it already holds (the account, the original transaction, the running
+clocks, the ledger, the questionnaire), as structured paragraphs with the provision each one
+satisfies, and stores it as a row in the same transaction. A letter is thereby complete the moment
+it exists; the workbench lays it out on a printable page from the paragraphs, so no markup is ever
+trusted. An email is an entry in an outbox: a dispatcher claims unsent rows across tenants through
+owner-defined functions, the same device the purge uses to cross tenant boundaries
+(section~\ref{sec:design-tenancy}), renders text and HTML from the same paragraphs, hands them to
+the relay, and records the outcome. A nudge after every commit keeps latency low; a timer keeps
+nothing lost; a backoff that grows per attempt and row locks that skip what another replica holds
+let several instances share the work. The trade is the usual one for an outbox: delivery is
+at-least-once, so a relay that accepted a message but failed to say so may receive it twice,
+whereas a letter, being a row, cannot be duplicated.
+
+Two smaller consequences follow. The acknowledgement clock of section~\ref{sec:design-clocks} is
+met by the acknowledgement notice, not by any state, because the acknowledgement is what the
+regulation asks for. And the customer's file becomes complete and auditable from the dispute alone:
+every paragraph ever sent, to which address, by which channel, and whether it went. The browser
+suite closes the loop by opening a dispute and finding the acknowledgement in the development mail
+relay, and by opening a Regulation~E dispute and printing its letter.

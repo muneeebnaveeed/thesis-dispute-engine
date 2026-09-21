@@ -24,7 +24,7 @@ test('an analyst opens a dispute and drives it through allowed transitions from 
   })
   await page.getByRole('button', { name: 'OPEN_INVESTIGATION' }).click()
   await expect(state).toHaveText('INVESTIGATING')
-  await expect(page.getByRole('row')).toHaveCount(3) // header + OPENED + OPEN_INVESTIGATION
+  await expect(page.getByRole('table', { name: 'Event log' }).getByRole('row')).toHaveCount(3) // header + OPENED + OPEN_INVESTIGATION
   expect(direct.length).toBeGreaterThan(0)
   expect(direct[0]).toMatch(/^Bearer ey/)
   expect(direct[0]).not.toContain('tk_')
@@ -223,4 +223,48 @@ test('the questionnaire follows the reason, incomplete answers are refused under
       .first(),
   ).toHaveText('QUESTIONNAIRE_RECEIVED')
   await expect(page.getByRole('list', { name: 'Inconsistencies' })).toContainText(/recognises the merchant/)
+})
+
+test('every step writes to the customer: the acknowledgement email lands in the relay and a Reg E letter is ready to print', async ({
+  page,
+  request,
+}) => {
+  const id = await openDisputeViaApi(request, 'otp')
+  await page.goto(`/otp/disputes/${id}`)
+  const comms = page.getByRole('table', { name: 'Communications' })
+  const ack = comms.getByRole('row').filter({ hasText: 'Acknowledgement' })
+  await expect(ack).toContainText('anna.kovacs@example.com')
+  await expect(ack).toContainText(/sent/, { timeout: 20_000 })
+
+  // Mailpit holds what the relay received; the mail names the dispute.
+  await expect
+    .poll(
+      async () => {
+        const res = await request.get('http://localhost:8025/api/v1/search', {
+          params: { query: `to:anna.kovacs@example.com ${id}` },
+        })
+        const body = (await res.json()) as { messages_count?: number }
+        return body.messages_count ?? 0
+      },
+      { timeout: 20_000 },
+    )
+    .toBeGreaterThan(0)
+
+  // Reg E requires written notices: a letter accompanies the email and opens on its own printable page.
+  const usd = await request.post(`${api}/disputes`, {
+    headers: { Authorization: `Bearer ${tenants.otp.key}`, 'Idempotency-Key': crypto.randomUUID() },
+    data: { transactionId: '00000000-0000-8000-8000-000000000201', actor: 'e2e' },
+  })
+  const { id: regE } = (await usd.json()) as { id: string }
+  await page.goto(`/otp/disputes/${regE}`)
+  const letter = page
+    .getByRole('table', { name: 'Communications' })
+    .getByRole('row')
+    .filter({ hasText: 'LETTER' })
+  await expect(letter).toContainText('ready to print')
+  await letter.getByRole('link', { name: 'Open letter' }).click()
+  await expect(page).toHaveURL(new RegExp(`/otp/disputes/${regE}/notices/\\d+$`))
+  await expect(page.getByRole('heading', { name: 'We have received your dispute' })).toBeVisible()
+  await expect(page.getByText('Dear Jordan Lee,')).toBeVisible()
+  await expect(page.getByText(regE)).toBeVisible()
 })

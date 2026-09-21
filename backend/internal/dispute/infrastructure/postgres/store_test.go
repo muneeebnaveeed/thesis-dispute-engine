@@ -35,7 +35,8 @@ func seedFor(t *testing.T, pool *pgxpool.Pool, tenantID uuid.UUID, rail domain.R
 		t.Fatal(err)
 	}
 	account := uuid.New()
-	if err := q.InsertAccount(ctx, sqlcgen.InsertAccountParams{ID: account, TenantID: tenantID, HolderName: "Test Holder", Currency: currency}); err != nil {
+	email, address := "holder@example.com", "1 Test Street"
+	if err := q.InsertAccount(ctx, sqlcgen.InsertAccountParams{ID: account, TenantID: tenantID, HolderName: "Test Holder", Currency: currency, Email: &email, PostalAddress: &address}); err != nil {
 		t.Fatal(err)
 	}
 	txn := uuid.New()

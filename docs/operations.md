@@ -75,6 +75,11 @@ scripts/tenant onboard --slug otp --name "OTP Bank" --domains otpbank.hu --timez
     --holidays 2026-01-01,2026-03-15,2026-04-03,2026-04-06,2026-05-01,2026-05-25,2026-08-20,2026-10-23,2026-11-01,2026-12-25,2026-12-26
 ```
 
+Customer notices go out through `DISPUTE_SMTP_ADDR` (a relay taking unauthenticated SMTP; Mailpit at
+`localhost:1025` in compose, inbox on http://localhost:8025) from `DISPUTE_MAIL_FROM`; leave the address empty
+to log instead of sending. Letters need no relay: they are ready to print from the workbench. Recipients come
+from the account's email and postal address (docs/adr/0017).
+
 `--core` names the tenant's banking core as JSON (docs/adr/0015): `{"kind":"mock"}` for the simulator, with
 optional `declineAbove`, `insufficientFundsAccounts`, `latencyMs` and `outage` to shape its behaviour; omit it for
 book entries only. `DISPUTE_CORE_TIMEOUT` (default 5s) bounds each call.

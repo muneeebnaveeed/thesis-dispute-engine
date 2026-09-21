@@ -45,6 +45,9 @@ type Rules struct {
 	// CloseSettlement clears whatever the bank still has in suspense when a dispute closes without an
 	// adjudication: a SEPA refund is recovered from the creditor under the scheme rules; the rest is absorbed.
 	CloseSettlement SuspenseSettlement
+	// WrittenNotices: the regime requires notices in writing (12 CFR 1005.11(d), 1026.13(c)), so a letter
+	// accompanies the email.
+	WrittenNotices bool
 }
 
 // HasProvisionalCredit reports whether a reversible credit precedes the outcome.
@@ -97,6 +100,7 @@ var rules = map[Regime]Rules{
 		Currency:           "USD",
 		MaxAppeals:         defaultAppeals,
 		CloseSettlement:    SettleWrittenOff,
+		WrittenNotices:     true,
 	},
 	RegimeUSRegZ: {
 		Regime: RegimeUSRegZ,
@@ -111,6 +115,7 @@ var rules = map[Regime]Rules{
 		Currency:           "USD",
 		MaxAppeals:         defaultAppeals,
 		CloseSettlement:    SettleWrittenOff,
+		WrittenNotices:     true,
 	},
 }
 

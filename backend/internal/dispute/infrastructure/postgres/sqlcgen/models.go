@@ -13,11 +13,13 @@ import (
 )
 
 type Account struct {
-	ID         uuid.UUID
-	HolderName string
-	Currency   string
-	OpenedAt   time.Time
-	TenantID   uuid.UUID
+	ID            uuid.UUID
+	HolderName    string
+	Currency      string
+	OpenedAt      time.Time
+	TenantID      uuid.UUID
+	Email         *string
+	PostalAddress *string
 }
 
 type DeadlinesOverdue struct {
@@ -102,6 +104,23 @@ type LedgerEntry struct {
 	CoreRrn          *string
 	CoreResponseCode *string
 	CoreLatencyMs    *int32
+}
+
+type Notice struct {
+	ID            int64
+	TenantID      uuid.UUID
+	DisputeID     uuid.UUID
+	Seq           int32
+	Kind          string
+	Channel       string
+	Recipient     string
+	Subject       string
+	Document      []byte
+	CreatedAt     time.Time
+	SentAt        pgtype.Timestamptz
+	Attempts      int32
+	NextAttemptAt time.Time
+	LastError     *string
 }
 
 type Questionnaire struct {

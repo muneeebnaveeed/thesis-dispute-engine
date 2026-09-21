@@ -365,6 +365,25 @@ func (h *Handler) GetDispute(ctx context.Context, req oapi.GetDisputeRequestObje
 	return oapi.GetDispute200JSONResponse(toAPI(view)), nil
 }
 
+// GetNotice returns one composed communication of a dispute.
+func (h *Handler) GetNotice(ctx context.Context, req oapi.GetNoticeRequestObject) (oapi.GetNoticeResponseObject, error) {
+	rec, doc, err := h.svc.GetNotice(ctx, req.DisputeId, req.NoticeId)
+	if err != nil {
+		if errors.Is(err, application.ErrNotFound) {
+			p := h.problem(ctx, fmt.Sprintf("/disputes/%s/notices/%d", req.DisputeId, req.NoticeId), err, uuid.Nil)
+			return oapi.GetNotice404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: oapi.NotFoundApplicationProblemPlusJSONResponse(p)}, nil
+		}
+		return nil, err
+	}
+	out := oapi.NoticeDocument{Id: rec.ID, Kind: oapi.NoticeKind(rec.Kind), Channel: oapi.Channel(rec.Channel), Recipient: rec.Recipient,
+		Bank: doc.Bank, Date: rec.CreatedAt, Subject: doc.Subject, Greeting: doc.Greeting, Paragraphs: doc.Paragraphs, Closing: doc.Closing, SentAt: rec.SentAt}
+	if doc.Basis != "" {
+		basis := doc.Basis
+		out.Basis = &basis
+	}
+	return oapi.GetNotice200JSONResponse(out), nil
+}
+
 // ListDisputes pages the tenant's disputes. The cursor is base64 of "<RFC3339Nano opened_at>|<id>"; opaque to clients.
 func (h *Handler) ListDisputes(ctx context.Context, req oapi.ListDisputesRequestObject) (oapi.ListDisputesResponseObject, error) {
 	q := application.ListQuery{Limit: 25}
@@ -585,6 +604,11 @@ func toAPI(v application.DisputeView) oapi.Dispute {
 		AllowedEvents: allowed, Events: events, Deadlines: deadlines, Ledger: ledger,
 		Balances: oapi.Balances{Customer: v.Balances.Customer.StringFixed(4), Suspense: v.Balances.Suspense.StringFixed(4),
 			Recovery: v.Balances.Recovery.StringFixed(4), Loss: v.Balances.Loss.StringFixed(4)},
+	}
+	out.Notices = make([]oapi.Notice, 0, len(v.Notices))
+	for _, n := range v.Notices {
+		out.Notices = append(out.Notices, oapi.Notice{Id: n.ID, Seq: n.Seq, Kind: oapi.NoticeKind(n.Kind), Channel: oapi.Channel(n.Channel),
+			Recipient: n.Recipient, Subject: n.Subject, CreatedAt: n.CreatedAt, SentAt: n.SentAt, Error: n.Error})
 	}
 	if q := v.Questionnaire; q != nil {
 		questions := make([]oapi.Question, 0, len(q.Questions))

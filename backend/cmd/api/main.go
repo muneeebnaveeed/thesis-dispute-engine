@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/mail"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/mockcore"
 	disputepg "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres"
 	disputehttp "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/ports/http"
@@ -75,10 +76,18 @@ func run(cfg config.Config, logger *slog.Logger) error {
 	store := disputepg.NewStore(pool)
 	// Tenants choose their core by kind in tenants.settings.core; only the simulated one exists in this build.
 	cores := application.CoreRouter{Adapters: map[string]application.BankingCore{mockcore.Kind: mockcore.New(logger)}}
-	svc, err := application.NewService(store, nil, application.WithCore(cores), application.WithCoreTimeout(cfg.CoreTimeout))
+	// Customer notices: composed in the transition, delivered by the dispatcher from the outbox.
+	var mailer application.Mailer = mail.Log{Log: logger}
+	if cfg.SMTPAddr != "" {
+		mailer = mail.SMTP{Addr: cfg.SMTPAddr, From: cfg.MailFrom}
+	}
+	dispatcher := application.NewDispatcher(store, mailer, application.RenderMail, logger)
+	svc, err := application.NewService(store, nil, application.WithCore(cores), application.WithCoreTimeout(cfg.CoreTimeout),
+		application.WithAfterCommit(dispatcher.Kick))
 	if err != nil {
 		return err
 	}
+	go dispatcher.Run(ctx)
 	go application.RunIdempotencyPurge(ctx, store, cfg.IdempotencyTTL, logger)
 
 	mux := http.NewServeMux()

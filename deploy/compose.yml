@@ -64,6 +64,9 @@ services:
       DISPUTE_SERVICE_KEY: ${DISPUTE_SERVICE_KEY:-dev-service-key}
       DISPUTE_RATE_PER_MINUTE: ${DISPUTE_RATE_PER_MINUTE:-600}
       DISPUTE_INTERNAL_CIDRS: ${DISPUTE_INTERNAL_CIDRS:-127.0.0.0/8,::1/128}
+      # Customer notices go to Mailpit (SMTP 1025, inbox on http://localhost:8025); empty logs instead of sending.
+      DISPUTE_SMTP_ADDR: ${DISPUTE_SMTP_ADDR:-localhost:1025}
+      DISPUTE_MAIL_FROM: ${DISPUTE_MAIL_FROM:-disputes@dispute-engine.local}
       # deploy/otel.env fills these under the otel profile; empty means instrumented, nothing exported.
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-dispute-engine}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
@@ -112,6 +115,15 @@ services:
       DISPUTE_DATABASE_URL: postgres://dispute_api:dispute_api@localhost:5432/dispute?sslmode=disable
 
   # Identity for analysts: one realm per tenant, imported from deploy/keycloak/import on start. UI on 8180.
+  # Catches every notice email in development and CI; the inbox is at http://localhost:8025, the API at /api/v1.
+  mailpit:
+    image: axllent/mailpit:v1.29
+    network_mode: host
+    profiles: [app, otel, auth]
+    environment:
+      MP_SMTP_BIND_ADDR: 127.0.0.1:1025
+      MP_UI_BIND_ADDR: 127.0.0.1:8025
+
   keycloak:
     image: quay.io/keycloak/keycloak:26.7.4
     network_mode: host

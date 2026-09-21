@@ -50,6 +50,56 @@ func (q *Queries) BumpTenantRateWindow(ctx context.Context, arg BumpTenantRateWi
 	return count, err
 }
 
+const claimNotices = `-- name: ClaimNotices :many
+SELECT id, tenant_id, dispute_id, seq, kind, channel, recipient, subject, document, created_at, attempts FROM claim_notices($1)
+`
+
+type ClaimNoticesRow struct {
+	ID        int64
+	TenantID  uuid.UUID
+	DisputeID uuid.UUID
+	Seq       int32
+	Kind      string
+	Channel   string
+	Recipient string
+	Subject   string
+	Document  []byte
+	CreatedAt time.Time
+	Attempts  int32
+}
+
+func (q *Queries) ClaimNotices(ctx context.Context, batch int32) ([]ClaimNoticesRow, error) {
+	rows, err := q.db.Query(ctx, claimNotices, batch)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ClaimNoticesRow{}
+	for rows.Next() {
+		var i ClaimNoticesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.DisputeID,
+			&i.Seq,
+			&i.Kind,
+			&i.Channel,
+			&i.Recipient,
+			&i.Subject,
+			&i.Document,
+			&i.CreatedAt,
+			&i.Attempts,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const countDeadlinesOverdue = `-- name: CountDeadlinesOverdue :many
 SELECT tenant_id, regime, kind, n FROM deadlines_overdue
 `
@@ -220,6 +270,45 @@ func (q *Queries) FindTenantKeysByPrefix(ctx context.Context, prefix string) ([]
 	return items, nil
 }
 
+const finishNotice = `-- name: FinishNotice :exec
+SELECT finish_notice($1, $2::text)
+`
+
+type FinishNoticeParams struct {
+	NoticeID int64
+	Failure  *string
+}
+
+func (q *Queries) FinishNotice(ctx context.Context, arg FinishNoticeParams) error {
+	_, err := q.db.Exec(ctx, finishNotice, arg.NoticeID, arg.Failure)
+	return err
+}
+
+const getAccount = `-- name: GetAccount :one
+SELECT id, holder_name, currency, email, postal_address FROM accounts WHERE id = $1
+`
+
+type GetAccountRow struct {
+	ID            uuid.UUID
+	HolderName    string
+	Currency      string
+	Email         *string
+	PostalAddress *string
+}
+
+func (q *Queries) GetAccount(ctx context.Context, id uuid.UUID) (GetAccountRow, error) {
+	row := q.db.QueryRow(ctx, getAccount, id)
+	var i GetAccountRow
+	err := row.Scan(
+		&i.ID,
+		&i.HolderName,
+		&i.Currency,
+		&i.Email,
+		&i.PostalAddress,
+	)
+	return i, err
+}
+
 const getDispute = `-- name: GetDispute :one
 SELECT id, tenant_id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at, reason
 FROM disputes
@@ -293,6 +382,51 @@ func (q *Queries) GetIdempotencyKey(ctx context.Context, arg GetIdempotencyKeyPa
 		&i.StatusCode,
 		&i.Response,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getNotice = `-- name: GetNotice :one
+SELECT id, dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at, attempts, last_error
+FROM notices WHERE id = $1 AND dispute_id = $2
+`
+
+type GetNoticeParams struct {
+	ID        int64
+	DisputeID uuid.UUID
+}
+
+type GetNoticeRow struct {
+	ID        int64
+	DisputeID uuid.UUID
+	Seq       int32
+	Kind      string
+	Channel   string
+	Recipient string
+	Subject   string
+	Document  []byte
+	CreatedAt time.Time
+	SentAt    pgtype.Timestamptz
+	Attempts  int32
+	LastError *string
+}
+
+func (q *Queries) GetNotice(ctx context.Context, arg GetNoticeParams) (GetNoticeRow, error) {
+	row := q.db.QueryRow(ctx, getNotice, arg.ID, arg.DisputeID)
+	var i GetNoticeRow
+	err := row.Scan(
+		&i.ID,
+		&i.DisputeID,
+		&i.Seq,
+		&i.Kind,
+		&i.Channel,
+		&i.Recipient,
+		&i.Subject,
+		&i.Document,
+		&i.CreatedAt,
+		&i.SentAt,
+		&i.Attempts,
+		&i.LastError,
 	)
 	return i, err
 }
@@ -427,6 +561,17 @@ func (q *Queries) GetTenantKeyForTenant(ctx context.Context, arg GetTenantKeyFor
 	return i, err
 }
 
+const getTenantName = `-- name: GetTenantName :one
+SELECT name FROM tenants WHERE id = current_tenant_id()
+`
+
+func (q *Queries) GetTenantName(ctx context.Context) (string, error) {
+	row := q.db.QueryRow(ctx, getTenantName)
+	var name string
+	err := row.Scan(&name)
+	return name, err
+}
+
 const getTransaction = `-- name: GetTransaction :one
 SELECT t.id, t.account_id, t.rail, t.amount, t.currency, t.merchant, t.occurred_at, a.currency AS account_currency
 FROM transactions t
@@ -485,15 +630,17 @@ func (q *Queries) GetWebSession(ctx context.Context, id uuid.UUID) (GetWebSessio
 }
 
 const insertAccount = `-- name: InsertAccount :exec
-INSERT INTO accounts (id, tenant_id, holder_name, currency) VALUES ($1, $2, $3, $4)
-ON CONFLICT (id) DO NOTHING
+INSERT INTO accounts (id, tenant_id, holder_name, currency, email, postal_address) VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, postal_address = EXCLUDED.postal_address
 `
 
 type InsertAccountParams struct {
-	ID         uuid.UUID
-	TenantID   uuid.UUID
-	HolderName string
-	Currency   string
+	ID            uuid.UUID
+	TenantID      uuid.UUID
+	HolderName    string
+	Currency      string
+	Email         *string
+	PostalAddress *string
 }
 
 func (q *Queries) InsertAccount(ctx context.Context, arg InsertAccountParams) error {
@@ -502,6 +649,8 @@ func (q *Queries) InsertAccount(ctx context.Context, arg InsertAccountParams) er
 		arg.TenantID,
 		arg.HolderName,
 		arg.Currency,
+		arg.Email,
+		arg.PostalAddress,
 	)
 	return err
 }
@@ -666,6 +815,41 @@ func (q *Queries) InsertLedgerEntry(ctx context.Context, arg InsertLedgerEntryPa
 		arg.CoreLatencyMs,
 	)
 	return err
+}
+
+const insertNotice = `-- name: InsertNotice :one
+INSERT INTO notices (dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id
+`
+
+type InsertNoticeParams struct {
+	DisputeID uuid.UUID
+	Seq       int32
+	Kind      string
+	Channel   string
+	Recipient string
+	Subject   string
+	Document  []byte
+	CreatedAt time.Time
+	SentAt    pgtype.Timestamptz
+}
+
+func (q *Queries) InsertNotice(ctx context.Context, arg InsertNoticeParams) (int64, error) {
+	row := q.db.QueryRow(ctx, insertNotice,
+		arg.DisputeID,
+		arg.Seq,
+		arg.Kind,
+		arg.Channel,
+		arg.Recipient,
+		arg.Subject,
+		arg.Document,
+		arg.CreatedAt,
+		arg.SentAt,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const insertTenantKey = `-- name: InsertTenantKey :exec
@@ -942,6 +1126,59 @@ func (q *Queries) ListLedgerEntries(ctx context.Context, disputeID uuid.UUID) ([
 			&i.CoreRrn,
 			&i.CoreResponseCode,
 			&i.CoreLatencyMs,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listNotices = `-- name: ListNotices :many
+SELECT id, dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at, attempts, last_error
+FROM notices WHERE dispute_id = $1 ORDER BY id
+`
+
+type ListNoticesRow struct {
+	ID        int64
+	DisputeID uuid.UUID
+	Seq       int32
+	Kind      string
+	Channel   string
+	Recipient string
+	Subject   string
+	Document  []byte
+	CreatedAt time.Time
+	SentAt    pgtype.Timestamptz
+	Attempts  int32
+	LastError *string
+}
+
+func (q *Queries) ListNotices(ctx context.Context, disputeID uuid.UUID) ([]ListNoticesRow, error) {
+	rows, err := q.db.Query(ctx, listNotices, disputeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListNoticesRow{}
+	for rows.Next() {
+		var i ListNoticesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.DisputeID,
+			&i.Seq,
+			&i.Kind,
+			&i.Channel,
+			&i.Recipient,
+			&i.Subject,
+			&i.Document,
+			&i.CreatedAt,
+			&i.SentAt,
+			&i.Attempts,
+			&i.LastError,
 		); err != nil {
 			return nil, err
 		}

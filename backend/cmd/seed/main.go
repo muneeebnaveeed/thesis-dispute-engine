@@ -120,12 +120,15 @@ func run() error {
 			return err
 		}
 	}
-	for _, a := range []struct{ id, tenant, holder, currency string }{
-		{accountEUR, tenantA, "Kovács Anna", "EUR"},
-		{accountUSD, tenantA, "Jordan Lee", "USD"},
-		{accountB, tenantB, "Nagy Péter", "EUR"},
+	// Addresses are where notices go: example.com mailboxes land in Mailpit in development.
+	for _, a := range []struct{ id, tenant, holder, currency, email, address string }{
+		{accountEUR, tenantA, "Kovács Anna", "EUR", "anna.kovacs@example.com", "Kovács Anna, Andrássy út 12, 1061 Budapest, Hungary"},
+		{accountUSD, tenantA, "Jordan Lee", "USD", "jordan.lee@example.com", "Jordan Lee, 350 Fifth Avenue, New York, NY 10118, USA"},
+		{accountB, tenantB, "Nagy Péter", "EUR", "peter.nagy@example.com", "Nagy Péter, Fő utca 3, 9021 Győr, Hungary"},
 	} {
-		if err := q.InsertAccount(ctx, sqlcgen.InsertAccountParams{ID: uuid.MustParse(a.id), TenantID: uuid.MustParse(a.tenant), HolderName: a.holder, Currency: a.currency}); err != nil {
+		email, address := a.email, a.address
+		if err := q.InsertAccount(ctx, sqlcgen.InsertAccountParams{ID: uuid.MustParse(a.id), TenantID: uuid.MustParse(a.tenant), HolderName: a.holder, Currency: a.currency,
+			Email: &email, PostalAddress: &address}); err != nil {
 			return err
 		}
 	}

@@ -131,7 +131,8 @@ func TestSettle(t *testing.T) {
 		{DeadlineRefund, StateFinalCreditIssued, Met},
 		{DeadlineRefund, StateClosed, Void},
 		{DeadlineRefund, StateInvestigating, Untouched},
-		{DeadlineAcknowledge, StateInvestigating, Met},
+		{DeadlineAcknowledge, StateInvestigating, Untouched},
+		{DeadlineAcknowledge, StateClosed, Void},
 		{DeadlineResolution, StateChargebackWon, Untouched},
 		{DeadlineResolution, StateClosed, Met},
 	}
