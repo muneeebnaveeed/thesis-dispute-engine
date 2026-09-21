@@ -51,6 +51,9 @@ func TestAppRolePrivileges(t *testing.T) {
 		"truncate":       `TRUNCATE disputes`,
 		"ddl":            `CREATE TABLE smuggled (id int)`,
 		"migrations":     `INSERT INTO schema_migrations (version, name, checksum) VALUES (999, 'x', 'y')`,
+		"key label":      `UPDATE tenant_keys SET label = 'x'`,
+		"key revoke":     `UPDATE tenant_keys SET revoked_at = now()`,
+		"key insert":     `INSERT INTO tenant_keys (id, tenant_id, key_hash, prefix, label) VALUES (gen_random_uuid(), gen_random_uuid(), '\x00', 'p', 'l')`,
 	}
 	for name, stmt := range denied {
 		_, err := app.Exec(ctx, stmt)
@@ -64,6 +67,7 @@ func TestAppRolePrivileges(t *testing.T) {
 		`SELECT count(*) FROM disputes`,
 		`SELECT count(*) FROM disputes_by_state`,
 		`SELECT purge_idempotency_keys(now() - interval '1 year')`,
+		`UPDATE tenant_keys SET last_used_at = now()`,
 	}
 	for _, stmt := range allowed {
 		if _, err := app.Exec(ctx, stmt); err != nil {

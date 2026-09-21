@@ -58,13 +58,23 @@ SELECT purge_idempotency_keys($1)::bigint AS n;
 SELECT tenant_id, regime, state, n FROM disputes_by_state;
 
 -- name: InsertTenantKey :exec
-INSERT INTO tenant_keys (id, tenant_id, key_hash, label) VALUES ($1, $2, $3, $4);
+INSERT INTO tenant_keys (id, tenant_id, key_hash, prefix, label, expires_at) VALUES ($1, $2, $3, $4, $5, $6);
 
 -- name: GetTenantByTenantKeyHash :one
-SELECT tenant_id FROM tenant_keys WHERE key_hash = $1 AND revoked_at IS NULL;
+SELECT id, tenant_id FROM tenant_keys
+WHERE key_hash = $1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now());
+
+-- name: TouchTenantKey :exec
+UPDATE tenant_keys SET last_used_at = now() WHERE id = $1;
 
 -- name: RevokeTenantKey :execrows
 UPDATE tenant_keys SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL;
 
+-- name: FindTenantKeysByPrefix :many
+SELECT id, tenant_id, label, revoked_at FROM tenant_keys WHERE prefix = $1;
+
+-- name: FindTenantKeyByHash :one
+SELECT id, tenant_id, label, revoked_at FROM tenant_keys WHERE key_hash = $1;
+
 -- name: ListTenantKeys :many
-SELECT id, tenant_id, label, created_at, revoked_at FROM tenant_keys ORDER BY created_at;
+SELECT id, tenant_id, prefix, label, created_at, last_used_at, expires_at, revoked_at FROM tenant_keys ORDER BY created_at;

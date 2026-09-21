@@ -46,6 +46,7 @@ backend/migrations                       SQL, forward-only, embedded; applied by
 docs/api/openapi.yaml                    the API contract; everything HTTP is generated from it
 deploy/                                  compose.yml (host networking, see below), otel.env, probe.sh, grafana/ and lgtm/ provisioning
 docs/adr, docs/thesis                    decisions; the design document
+docs/operations.md, docs/observability.md  operator runbooks: tenant keys; where telemetry lives
 ```
 
 Bounded contexts so far: `dispute` (all four layers). Create a layer only when a context
