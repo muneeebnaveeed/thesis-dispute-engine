@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shopspring/decimal"
 )
 
@@ -71,6 +72,15 @@ type Tenant struct {
 	Name      string
 	Settings  []byte
 	CreatedAt time.Time
+}
+
+type TenantKey struct {
+	ID        uuid.UUID
+	TenantID  uuid.UUID
+	KeyHash   []byte
+	Label     string
+	CreatedAt time.Time
+	RevokedAt pgtype.Timestamptz
 }
 
 type Transaction struct {

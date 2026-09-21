@@ -18,6 +18,7 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/ports/http/oapi"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/auth"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/httpserver"
 )
@@ -64,7 +65,16 @@ func Mount(mux *http.ServeMux, svc *application.Service, ready Readiness) error 
 		Middlewares: []oapi.MiddlewareFunc{
 			httpserver.NameSpanByRoute,
 			nethttpmiddleware.OapiRequestValidatorWithOptions(spec, &nethttpmiddleware.Options{
+				// Called only for operations the spec secures; auth.Bearer has already resolved the key by then.
+				Options: openapi3filter.Options{AuthenticationFunc: func(ctx context.Context, _ *openapi3filter.AuthenticationInput) error {
+					return auth.Required(ctx)
+				}},
 				ErrorHandlerWithOpts: func(_ context.Context, err error, w http.ResponseWriter, r *http.Request, _ nethttpmiddleware.ErrorHandlerOpts) {
+					var sec *openapi3filter.SecurityRequirementsError
+					if errors.As(err, &sec) {
+						fail(w, r, auth.ErrUnauthenticated)
+						return
+					}
 					fail(w, r, contractViolation(err))
 				},
 			}),

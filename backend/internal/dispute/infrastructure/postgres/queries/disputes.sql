@@ -56,3 +56,15 @@ SELECT purge_idempotency_keys($1)::bigint AS n;
 
 -- name: CountDisputesByState :many
 SELECT tenant_id, regime, state, n FROM disputes_by_state;
+
+-- name: InsertTenantKey :exec
+INSERT INTO tenant_keys (id, tenant_id, key_hash, label) VALUES ($1, $2, $3, $4);
+
+-- name: GetTenantByTenantKeyHash :one
+SELECT tenant_id FROM tenant_keys WHERE key_hash = $1 AND revoked_at IS NULL;
+
+-- name: RevokeTenantKey :execrows
+UPDATE tenant_keys SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL;
+
+-- name: ListTenantKeys :many
+SELECT id, tenant_id, label, created_at, revoked_at FROM tenant_keys ORDER BY created_at;

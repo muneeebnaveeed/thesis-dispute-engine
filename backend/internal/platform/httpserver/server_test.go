@@ -115,3 +115,25 @@ func TestProblemFromClassifiesAndHidesInternals(t *testing.T) {
 		t.Errorf("unavailable problem = %+v", p)
 	}
 }
+
+// Inner middleware clones the request; the log line must still carry the matched route and any annotations.
+func TestRequestLogCarriesRouteAndAnnotationsThroughClonedRequests(t *testing.T) {
+	var buf strings.Builder
+	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	mux := http.NewServeMux()
+	mux.Handle("GET /ping", NameSpanByRoute(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		Annotate(r.Context(), "tenant", "t-1")
+		w.WriteHeader(http.StatusNoContent)
+	})))
+	clone := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { next.ServeHTTP(w, r.WithContext(r.Context())) })
+	}
+	srv := New(":0", logger, mux, clone)
+	srv.Handler().ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/ping", nil))
+	line := buf.String()
+	for _, want := range []string{`"route":"GET /ping"`, `"tenant":"t-1"`, `"status":204`} {
+		if !strings.Contains(line, want) {
+			t.Errorf("log line missing %s: %s", want, line)
+		}
+	}
+}

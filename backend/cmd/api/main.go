@@ -13,11 +13,11 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
 	disputepg "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres"
 	disputehttp "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/ports/http"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/auth"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/config"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/httpserver"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/postgres"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/telemetry"
-	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/migrations"
 )
 
@@ -80,7 +80,7 @@ func run(cfg config.Config, logger *slog.Logger) error {
 	if err := disputehttp.Mount(mux, svc, pool.Ping); err != nil {
 		return err
 	}
-	srv := httpserver.New(cfg.Addr, logger, mux, tenant.Static(cfg.TenantID))
+	srv := httpserver.New(cfg.Addr, logger, mux, auth.Bearer(disputepg.NewKeyStore(pool)))
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()
