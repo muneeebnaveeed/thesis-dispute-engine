@@ -25,7 +25,7 @@ value carried by every dispute from creation, not a separate machine.
 
 EU regimes are first-class and the implementation focus. US regimes exist as
 configuration and test fixtures to demonstrate that the model generalises and to
-support the comparative-regulation discussion in the thesis.
+support a comparative discussion of regulation.
 
 Regime-gated states (a regime enables a subset):
 

@@ -1,35 +1,35 @@
 # backend
 
 Go module `github.com/muneeebnaveeed/thesis-dispute-engine/backend`. Run `make` targets from
-the repo root; `go` commands from here. Root `CLAUDE.md` has the project context, commands,
-layout, and the machine's sharp edges (host networking, port 8090, no cgo locally).
+the repo root and `go` commands from here. Root `CLAUDE.md` has commands, layout, and the
+machine's sharp edges.
+
+## Layers (per bounded context under `internal/`)
+
+- `domain`: types, invariants, state machines. Imports nothing from other layers or from
+  `platform`. Table-driven tests here are the specification.
+- `application`: use cases. Depends on `domain` and on port interfaces it declares itself.
+- `infrastructure`: implementations of those ports (Postgres via sqlc, external systems).
+- `ports/http`: handlers and DTOs; translate HTTP to application calls, nothing more.
+- `platform/*`: shared kernel (config, HTTP server, telemetry). No domain knowledge.
+
+Dependencies point inward: `ports` and `infrastructure` -> `application` -> `domain`. A
+second context that needs another's data goes through that context's `application`, never
+its `domain` or storage.
 
 ## Conventions
 
-
-- **HTTP:** standard library only (ADR 0001). Register routes through `route()` in
-  `routes.go` so the OTel span gets the pattern name. Handlers return JSON via `writeJSON`.
-- **Regime first (ADR 0002):** anything that depends on jurisdiction reads it from the
-  dispute's `Regime`; gate on regime *properties* (`HasProvisionalCredit()`), never on
-  `if regime == X` outside the regime table itself.
+- **HTTP:** standard library only (docs/adr/0001). Register routes through `route()` in
+  `platform/httpserver/routes.go` so spans get the pattern name; respond via `writeJSON`.
+- **Regime first (docs/adr/0002):** gate on `Rules` properties (`HasProvisionalCredit()`),
+  never on `if regime == X` outside the rules table. A new regime is a new row plus an entry in
+  the reachability test.
 - **Money:** `NUMERIC` in Postgres, `shopspring/decimal` in Go, never floats.
-- **Errors:** wrap with `fmt.Errorf("pkg: what: %w", err)`; sentinel errors are exported vars.
-- **Logging:** `log/slog`, JSON in prod. Request logs already carry `request_id`, `trace_id`,
-  `span_id`, `route`; add key/value pairs, never format strings.
-- **Telemetry:** instrument with `otel.Tracer("<package>")` / `otel.Meter(...)`; span names
-  are bounded (route patterns, operation names), attributes carry the variable parts. Do
-  not add exporters in code; the environment decides where telemetry goes.
-- **Tests:** table-driven, `testing` only for now; Postgres-backed tests use a real
-  database (dockertest or compose), no mocks of the storage layer.
-- **Style:** Google/Uber Go style; golangci-lint v2 config in `.golangci.yml` is the
-  enforced subset. `gofmt` + `goimports` with local-prefix `github.com/muneeebnaveeed/...`.
-
-## Packages
-
-- `internal/dispute` is pure: regimes, states, transitions, no I/O. Extend the regime table
-  in `regime.go` and the transition table in `state.go`; every new arm must gate on a `Rules`
-  property. Add the regime to the reachability test so the state set it can visit is pinned.
-- `internal/httpserver` owns routing and middleware only; handlers call into domain and
-  storage packages, never the other way round.
-- `internal/telemetry` is wiring; instrument in the package doing the work with
-  `otel.Tracer("<import path>")`.
+- **Errors:** `fmt.Errorf("pkg: what: %w", err)`; sentinel errors are exported vars.
+- **Logging:** `log/slog`, key/value pairs only. Request logs already carry `request_id`,
+  `trace_id`, `span_id`, `route`.
+- **Telemetry:** `otel.Tracer("<import path>")` in the package doing the work; bounded span
+  names, variable parts as attributes. Never add exporters in code.
+- **Tests:** table-driven, `testing` only. Postgres-backed tests use a real database.
+- **Style:** Google/Uber Go style; `.golangci.yml` is the enforced subset. `gofmt` +
+  `goimports` with local prefix `github.com/muneeebnaveeed/`.

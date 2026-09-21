@@ -8,7 +8,7 @@ Observability is easy to add on day one and painful to retrofit: once handlers, 
 calls and background jobs exist without context propagation, threading a trace through them
 is a cross-cutting rewrite. The engine's interesting behaviour (a dispute crossing state
 boundaries, SLA deadlines firing, ledger postings) is exactly what traces and metrics make
-legible, both for debugging and for the thesis's evaluation chapter.
+legible, both for debugging and for evaluating the system's behaviour.
 
 ## Decision
 
@@ -29,7 +29,7 @@ standard `OTEL_*` environment variables (`contrib/exporters/autoexport`), never 
 ## Consequences
 
 - Easier: any OTLP backend, zero code change; every future package gets a tracer with one
-  line; the evaluation chapter can show real traces of a dispute lifecycle.
+  line; real traces of a dispute lifecycle are available for evaluation.
 - Harder: a dependency footprint (otel SDK, exporters) in an otherwise lean module; contributors
   must keep span names bounded and put variable parts in attributes. Metrics have no local
   sink yet (Jaeger is traces-only); add a collector or Prometheus when a metric matters.

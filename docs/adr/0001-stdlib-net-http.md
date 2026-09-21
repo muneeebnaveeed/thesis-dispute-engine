@@ -7,9 +7,8 @@
 An earlier proposal draft named Chi as the HTTP router. Go 1.22 added method and
 path-pattern matching to `net/http.ServeMux` (`"GET /disputes/{id}"`), which covers
 every routing need this service has: a few dozen JSON endpoints, no dynamic route
-registration, no per-route middleware trees. The thesis's Go-foundations week is built
-around understanding `net/http` directly, and the write-up benefits from showing the
-mechanism rather than a dependency.
+registration, no per-route middleware trees. Showing the mechanism rather than a dependency also
+makes the HTTP layer easier to explain.
 
 ## Decision
 
