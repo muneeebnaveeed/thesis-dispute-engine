@@ -21,6 +21,7 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/auth"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/httpserver"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/websession"
 )
 
 // Readiness reports dependency health; a non-nil error makes /readyz answer 503.
@@ -28,9 +29,23 @@ type Readiness func(ctx context.Context) error
 
 // Handler implements the generated strict server.
 type Handler struct {
-	svc   *application.Service
-	ready Readiness
+	svc      *application.Service
+	ready    Readiness
+	sessions SessionStore
 }
+
+// SessionStore is the opaque blob store behind /internal/sessions; nil disables those routes with a 404.
+type SessionStore interface {
+	Put(ctx context.Context, id uuid.UUID, b websession.Blob) error
+	Get(ctx context.Context, id uuid.UUID) (websession.Blob, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+}
+
+// Option configures Mount.
+type Option func(*Handler)
+
+// WithSessions enables the internal session endpoints.
+func WithSessions(s SessionStore) Option { return func(h *Handler) { h.sessions = s } }
 
 var _ oapi.StrictServerInterface = (*Handler)(nil)
 
@@ -46,7 +61,7 @@ var registerFormats = sync.OnceFunc(func() {
 })
 
 // Mount registers every spec route on mux, with spec validation and route-named spans.
-func Mount(mux *http.ServeMux, svc *application.Service, ready Readiness) error {
+func Mount(mux *http.ServeMux, svc *application.Service, ready Readiness, opts ...Option) error {
 	registerFormats()
 	spec, err := oapi.GetSpec()
 	if err != nil {
@@ -54,6 +69,9 @@ func Mount(mux *http.ServeMux, svc *application.Service, ready Readiness) error 
 	}
 	spec.Servers = nil
 	h := &Handler{svc: svc, ready: ready}
+	for _, o := range opts {
+		o(h)
+	}
 	strict := oapi.NewStrictHandlerWithOptions(h, nil, oapi.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			fail(w, r, detailed(errMalformed, err))
@@ -66,8 +84,8 @@ func Mount(mux *http.ServeMux, svc *application.Service, ready Readiness) error 
 			httpserver.NameSpanByRoute,
 			nethttpmiddleware.OapiRequestValidatorWithOptions(spec, &nethttpmiddleware.Options{
 				// Called only for operations the spec secures; auth.Bearer has already resolved the key by then.
-				Options: openapi3filter.Options{AuthenticationFunc: func(ctx context.Context, _ *openapi3filter.AuthenticationInput) error {
-					return auth.Required(ctx)
+				Options: openapi3filter.Options{AuthenticationFunc: func(ctx context.Context, in *openapi3filter.AuthenticationInput) error {
+					return auth.Required(ctx, in.SecuritySchemeName)
 				}},
 				ErrorHandlerWithOpts: func(_ context.Context, err error, w http.ResponseWriter, r *http.Request, _ nethttpmiddleware.ErrorHandlerOpts) {
 					var sec *openapi3filter.SecurityRequirementsError
@@ -90,6 +108,50 @@ func Mount(mux *http.ServeMux, svc *application.Service, ready Readiness) error 
 		_, _ = w.Write(specJSON)
 	})
 	return nil
+}
+
+// PutSession stores the frontend server's opaque session blob.
+func (h *Handler) PutSession(ctx context.Context, req oapi.PutSessionRequestObject) (oapi.PutSessionResponseObject, error) {
+	if h.sessions == nil {
+		return nil, application.ErrNotFound
+	}
+	var tenantID *uuid.UUID
+	if req.Body.TenantId != nil {
+		t := *req.Body.TenantId
+		tenantID = &t
+	}
+	if err := h.sessions.Put(ctx, req.SessionId, websession.Blob{TenantID: tenantID, Ciphertext: req.Body.Ciphertext, ExpiresAt: req.Body.ExpiresAt}); err != nil {
+		return nil, err
+	}
+	return oapi.PutSession204Response{}, nil
+}
+
+// GetSession returns a live blob.
+func (h *Handler) GetSession(ctx context.Context, req oapi.GetSessionRequestObject) (oapi.GetSessionResponseObject, error) {
+	if h.sessions == nil {
+		return nil, application.ErrNotFound
+	}
+	b, err := h.sessions.Get(ctx, req.SessionId)
+	if err != nil {
+		return nil, err
+	}
+	out := oapi.GetSession200JSONResponse{Ciphertext: b.Ciphertext, ExpiresAt: b.ExpiresAt}
+	if b.TenantID != nil {
+		t := *b.TenantID
+		out.TenantId = &t
+	}
+	return out, nil
+}
+
+// DeleteSession removes a session.
+func (h *Handler) DeleteSession(ctx context.Context, req oapi.DeleteSessionRequestObject) (oapi.DeleteSessionResponseObject, error) {
+	if h.sessions == nil {
+		return nil, application.ErrNotFound
+	}
+	if err := h.sessions.Delete(ctx, req.SessionId); err != nil {
+		return nil, err
+	}
+	return oapi.DeleteSession204Response{}, nil
 }
 
 // GetHealthz is liveness only.

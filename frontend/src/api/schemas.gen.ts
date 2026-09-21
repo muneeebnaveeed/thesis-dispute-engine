@@ -183,3 +183,22 @@ export const Problem = Type.Object(
 export type Problem = Static<typeof Problem>
 const _Problem: Same<Problem, components['schemas']['Problem']> = true
 void _Problem
+
+export const SessionBlob = Type.Object(
+  {
+    tenantId: Type.Optional(
+      Type.String({
+        description: 'Set once the session belongs to a signed-in analyst; informational.',
+        format: 'uuid',
+      }),
+    ),
+    ciphertext: Type.String({ format: 'byte', maxLength: 16384 }),
+    expiresAt: Type.String({ format: 'date-time' }),
+  },
+  {
+    description: 'Ciphertext the frontend server produced; the API stores it without being able to read it.',
+  },
+)
+export type SessionBlob = Static<typeof SessionBlob>
+const _SessionBlob: Same<SessionBlob, components['schemas']['SessionBlob']> = true
+void _SessionBlob

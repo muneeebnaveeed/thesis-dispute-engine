@@ -84,3 +84,17 @@ SELECT id, slug FROM tenants WHERE oidc_issuer = $1;
 
 -- name: ListTenants :many
 SELECT id, name, slug, oidc_issuer FROM tenants ORDER BY name;
+
+-- name: PutWebSession :exec
+INSERT INTO web_sessions (id, tenant_id, ciphertext, expires_at)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id, ciphertext = EXCLUDED.ciphertext, expires_at = EXCLUDED.expires_at, updated_at = now();
+
+-- name: GetWebSession :one
+SELECT id, tenant_id, ciphertext, expires_at FROM web_sessions WHERE id = $1 AND expires_at > now();
+
+-- name: DeleteWebSession :execrows
+DELETE FROM web_sessions WHERE id = $1;
+
+-- name: PurgeWebSessions :execrows
+DELETE FROM web_sessions WHERE expires_at < now();

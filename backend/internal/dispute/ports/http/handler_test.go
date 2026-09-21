@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -18,6 +19,7 @@ import (
 	disputehttp "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/ports/http"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/auth"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/httpserver"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/websession"
 )
 
 type api struct {
@@ -34,11 +36,12 @@ func newAPI(t *testing.T, ready disputehttp.Readiness) api {
 		t.Fatal(err)
 	}
 	mux := http.NewServeMux()
-	if err := disputehttp.Mount(mux, svc, ready); err != nil {
+	if err := disputehttp.Mount(mux, svc, ready, disputehttp.WithSessions(memSessions{})); err != nil {
 		t.Fatal(err)
 	}
 	keys := keyResolver{"key-a": apptest.TenantA, "key-b": apptest.TenantB}
-	return api{t: t, h: httpserver.RequestID(auth.Bearer(keys, nil)(mux)), store: store}
+	h := httpserver.Chain(mux, httpserver.RequestID, auth.Bearer(keys, nil), auth.ServiceKey("svc-secret"))
+	return api{t: t, h: h, store: store}
 }
 
 // keyResolver stands in for the tenant_keys table; the handler tests care about the contract, not the lookup.
@@ -231,5 +234,53 @@ func TestAuthenticationFollowsTheSpec(t *testing.T) {
 	}
 	if rec, _ := a.do(http.MethodGet, "/disputes/"+created["id"].(string), nil, map[string]string{"Authorization": "Bearer key-b"}); rec.Code != http.StatusNotFound {
 		t.Errorf("cross-tenant get: %d", rec.Code)
+	}
+}
+
+// memSessions is enough to exercise the internal routes' contract and authentication.
+type memSessions map[uuid.UUID]websession.Blob
+
+func (m memSessions) Put(_ context.Context, id uuid.UUID, b websession.Blob) error {
+	m[id] = b
+	return nil
+}
+func (m memSessions) Get(_ context.Context, id uuid.UUID) (websession.Blob, error) {
+	b, ok := m[id]
+	if !ok {
+		return websession.Blob{}, application.ErrNotFound
+	}
+	return b, nil
+}
+func (m memSessions) Delete(_ context.Context, id uuid.UUID) error { delete(m, id); return nil }
+
+func TestInternalSessionsRequireTheServiceKey(t *testing.T) {
+	a := newAPI(t, func(context.Context) error { return nil })
+	id := uuid.NewString()
+	blob := map[string]any{"ciphertext": "aGVsbG8=", "expiresAt": time.Now().Add(time.Hour).UTC().Format(time.RFC3339)}
+
+	// A tenant credential is not a service credential: the spec lists only serviceKey for these operations.
+	if rec, p := a.do(http.MethodPut, "/internal/sessions/"+id, blob, nil); rec.Code != http.StatusUnauthorized || p["code"] != "unauthenticated" {
+		t.Fatalf("tenant key on internal route: %d %v", rec.Code, p)
+	}
+	svc := map[string]string{"Authorization": "", "X-Service-Key": "svc-secret"}
+	if rec, _ := a.do(http.MethodPut, "/internal/sessions/"+id, blob, svc); rec.Code != http.StatusNoContent {
+		t.Fatalf("put: %d", rec.Code)
+	}
+	rec, got := a.do(http.MethodGet, "/internal/sessions/"+id, nil, svc)
+	if rec.Code != http.StatusOK || got["ciphertext"] != "aGVsbG8=" {
+		t.Fatalf("get: %d %v", rec.Code, got)
+	}
+	if rec, _ := a.do(http.MethodGet, "/internal/sessions/"+id, nil, map[string]string{"Authorization": "", "X-Service-Key": "wrong"}); rec.Code != http.StatusUnauthorized {
+		t.Errorf("wrong service key: %d", rec.Code)
+	}
+	if rec, _ := a.do(http.MethodDelete, "/internal/sessions/"+id, nil, svc); rec.Code != http.StatusNoContent {
+		t.Errorf("delete: %d", rec.Code)
+	}
+	if rec, _ := a.do(http.MethodGet, "/internal/sessions/"+id, nil, svc); rec.Code != http.StatusNotFound {
+		t.Errorf("after delete: %d", rec.Code)
+	}
+	// The service key opens only the internal routes; dispute routes still need a tenant.
+	if rec, _ := a.do(http.MethodGet, "/disputes/"+id, nil, svc); rec.Code != http.StatusUnauthorized {
+		t.Errorf("service key on a tenant route: %d", rec.Code)
 	}
 }

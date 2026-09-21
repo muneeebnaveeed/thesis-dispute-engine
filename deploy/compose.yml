@@ -61,6 +61,7 @@ services:
     environment:
       DISPUTE_ADDR: ":8090"
       DISPUTE_DATABASE_URL: postgres://dispute_api:dispute_api@localhost:5432/dispute?sslmode=disable
+      DISPUTE_SERVICE_KEY: ${DISPUTE_SERVICE_KEY:-dev-service-key}
       # deploy/otel.env fills these under the otel profile; empty means instrumented, nothing exported.
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-dispute-engine}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
@@ -84,8 +85,11 @@ services:
     environment:
       PORT: "3002"
       DISPUTE_API_URL: http://localhost:8090
-      # Server-side only; the browser never sees it. Replaced by analyst sign-in once Keycloak lands.
-      DISPUTE_TENANT_KEY: ${FRONTEND_TENANT_KEY:-tk_dev_tenant_a}
+      KEYCLOAK_URL: http://localhost:8180
+      APP_URL: http://localhost:3002
+      OIDC_CLIENT_SECRET: ${KEYCLOAK_FRONTEND_SECRET:-dev-frontend-secret}
+      DISPUTE_SERVICE_KEY: ${DISPUTE_SERVICE_KEY:-dev-service-key}
+      SESSION_SECRET: ${SESSION_SECRET:-ZGV2LXNlc3Npb24tc2VjcmV0LTMyLWJ5dGVzLWxvbmc=}
 
   # Toolchain container for a fully dockerised dev loop; air watches the bind mount.
   api-dev:

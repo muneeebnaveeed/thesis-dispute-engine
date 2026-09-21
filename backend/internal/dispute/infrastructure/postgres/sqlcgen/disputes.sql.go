@@ -43,6 +43,18 @@ func (q *Queries) CountDisputesByState(ctx context.Context) ([]DisputesByState, 
 	return items, nil
 }
 
+const deleteWebSession = `-- name: DeleteWebSession :execrows
+DELETE FROM web_sessions WHERE id = $1
+`
+
+func (q *Queries) DeleteWebSession(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteWebSession, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const findTenantKeyByHash = `-- name: FindTenantKeyByHash :one
 SELECT id, tenant_id, label, revoked_at FROM tenant_keys WHERE key_hash = $1
 `
@@ -240,6 +252,29 @@ func (q *Queries) GetTransaction(ctx context.Context, id uuid.UUID) (GetTransact
 		&i.Merchant,
 		&i.OccurredAt,
 		&i.AccountCurrency,
+	)
+	return i, err
+}
+
+const getWebSession = `-- name: GetWebSession :one
+SELECT id, tenant_id, ciphertext, expires_at FROM web_sessions WHERE id = $1 AND expires_at > now()
+`
+
+type GetWebSessionRow struct {
+	ID         uuid.UUID
+	TenantID   pgtype.UUID
+	Ciphertext []byte
+	ExpiresAt  time.Time
+}
+
+func (q *Queries) GetWebSession(ctx context.Context, id uuid.UUID) (GetWebSessionRow, error) {
+	row := q.db.QueryRow(ctx, getWebSession, id)
+	var i GetWebSessionRow
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Ciphertext,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
@@ -559,6 +594,41 @@ func (q *Queries) PurgeIdempotencyKeys(ctx context.Context, before time.Time) (i
 	var n int64
 	err := row.Scan(&n)
 	return n, err
+}
+
+const purgeWebSessions = `-- name: PurgeWebSessions :execrows
+DELETE FROM web_sessions WHERE expires_at < now()
+`
+
+func (q *Queries) PurgeWebSessions(ctx context.Context) (int64, error) {
+	result, err := q.db.Exec(ctx, purgeWebSessions)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const putWebSession = `-- name: PutWebSession :exec
+INSERT INTO web_sessions (id, tenant_id, ciphertext, expires_at)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id, ciphertext = EXCLUDED.ciphertext, expires_at = EXCLUDED.expires_at, updated_at = now()
+`
+
+type PutWebSessionParams struct {
+	ID         uuid.UUID
+	TenantID   pgtype.UUID
+	Ciphertext []byte
+	ExpiresAt  time.Time
+}
+
+func (q *Queries) PutWebSession(ctx context.Context, arg PutWebSessionParams) error {
+	_, err := q.db.Exec(ctx, putWebSession,
+		arg.ID,
+		arg.TenantID,
+		arg.Ciphertext,
+		arg.ExpiresAt,
+	)
+	return err
 }
 
 const revokeTenantKey = `-- name: RevokeTenantKey :execrows

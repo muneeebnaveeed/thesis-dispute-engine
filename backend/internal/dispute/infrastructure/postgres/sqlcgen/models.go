@@ -98,3 +98,12 @@ type Transaction struct {
 	OccurredAt time.Time
 	TenantID   uuid.UUID
 }
+
+type WebSession struct {
+	ID         uuid.UUID
+	TenantID   pgtype.UUID
+	Ciphertext []byte
+	ExpiresAt  time.Time
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}

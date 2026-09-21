@@ -40,6 +40,19 @@ function invalid(errors: Record<string, string>): Problem {
   }
 }
 
+/** No session: the same problem the API returns for a missing credential. */
+export function unauthenticated(): Outcome<Dispute> {
+  return failed({
+    type: 'urn:dispute-engine:error:unauthenticated',
+    title: 'Authentication required',
+    status: 401,
+    code: 'unauthenticated',
+    retryable: false,
+    requestId: 'local',
+    detail: 'Sign in to continue.',
+  })
+}
+
 export async function fetchDispute(api: Api, id: string): Promise<Outcome<Dispute>> {
   const { data, error } = await api.GET('/disputes/{disputeId}', { params: { path: { disputeId: id } } })
   return error ? failed(error) : ok(data)

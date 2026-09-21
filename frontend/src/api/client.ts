@@ -2,11 +2,11 @@ import createClient, { type Middleware } from 'openapi-fetch'
 
 import type { paths } from './schema.gen'
 
-/** Server-side only: holds the tenant key. Never import from browser code. */
-export function createApi(baseUrl: string, tenantKey: string) {
+/** A client bound to one bearer credential: an analyst access token here, a tenant key for machine callers. */
+export function createApi(baseUrl: string, bearer: string) {
   const auth: Middleware = {
     onRequest({ request }) {
-      request.headers.set('Authorization', `Bearer ${tenantKey}`)
+      request.headers.set('Authorization', `Bearer ${bearer}`)
       return request
     },
   }

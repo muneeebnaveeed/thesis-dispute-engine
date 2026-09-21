@@ -23,10 +23,16 @@ lint and format fixes. `make fe-dev` for the dev server on :3002. Inside `fronte
 - Types, the client and the TypeBox schemas are generated from the OpenAPI contract
   (`pnpm generate`, committed, diffed in CI); never hand-write request or response shapes. When
   the spec changes, regenerate here and in the backend in the same PR.
-- The browser never calls the API. Server functions in `src/server/` do, with the tenant key
-  from the server environment; keep logic in `*-core.ts` modules (testable with a fake `fetch`)
-  and the `createServerFn` wrappers thin. Return `{ value, problem }`, never throw for a
-  problem+json response.
+- Two ways to reach the API, both as the signed-in analyst: server functions in `src/server/`
+  (SSR, form posts) and `createBrowserApi` from `src/api/browser.ts` (in-page actions). Keep
+  logic in `*-core.ts` modules (testable with a fake `fetch`) and the `createServerFn` wrappers
+  thin. Return `{ value, problem }`, never throw for a problem+json response.
+- Server-only code (cookies, OIDC, the sealed store) lives in modules route files never import
+  (`session-impl.ts`); route files import only `session.ts`, whose exports are server functions.
+  Start's import protection fails the build otherwise. Never log or return tokens to the browser
+  except through `getAccessToken`.
+- Protected routes check `context.viewer` in `beforeLoad` and redirect to `/` with
+  `search: { next }`; `safeNext` decides what may be a destination.
 - Show problems through `ProblemBanner`: it renders `detail`, field errors and the retry hint
   from the contract. Never branch on `title` or `detail` text; branch on `code`.
 - Business rules (which events are allowed, field errors) arrive from the API.

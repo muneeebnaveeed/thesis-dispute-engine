@@ -31,7 +31,7 @@ func TestBearer(t *testing.T) {
 	var gotErr error
 	h := Bearer(fakeResolver{"good-key": want}, nil)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		gotTenant, _ = tenant.IDFrom(r.Context())
-		gotErr = Required(r.Context())
+		gotErr = Required(r.Context(), "bearerAuth")
 	}))
 	cases := map[string]struct {
 		header     string

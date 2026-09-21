@@ -48,6 +48,7 @@ backend/migrations                       SQL, forward-only, embedded; applied by
 frontend/                                TanStack Start app (pnpm); see frontend/README.md and frontend/CLAUDE.md
 docs/api/openapi.yaml                    the API contract; everything HTTP is generated from it
 deploy/                                  compose.yml (host networking, see below), otel.env, probe.sh, grafana/ and lgtm/ provisioning
+backend/internal/websession              opaque session store behind /internal/sessions (frontend's, ADR 0011)
 docs/adr, docs/thesis                    decisions; the design document
 docs/operations.md, docs/observability.md  operator runbooks: tenant keys; where telemetry lives
 ```
