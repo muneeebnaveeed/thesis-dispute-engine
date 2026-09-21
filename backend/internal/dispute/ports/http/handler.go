@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
@@ -22,6 +23,7 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/auth"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/httpserver"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/websession"
 )
 
@@ -34,6 +36,7 @@ type Handler struct {
 	ready    Readiness
 	sessions SessionStore
 	tenants  TenantDirectory
+	keys     KeyManager
 }
 
 // SessionStore is the opaque blob store behind /internal/sessions; nil disables those routes with a 404.
@@ -51,6 +54,16 @@ type TenantDirectory interface {
 
 // WithTenants enables the internal tenant listing.
 func WithTenants(d TenantDirectory) Option { return func(h *Handler) { h.tenants = d } }
+
+// KeyManager backs /tenant-keys, always within the caller's tenant; nil disables it with a 404.
+type KeyManager interface {
+	ListForTenant(ctx context.Context, tenantID uuid.UUID) ([]disputepg.KeyRecord, error)
+	Issue(ctx context.Context, tenantID uuid.UUID, label string, expiresAt *time.Time) (disputepg.KeyRecord, string, error)
+	Revoke(ctx context.Context, tenantID, id uuid.UUID) error
+}
+
+// WithKeys enables tenant-key self-service.
+func WithKeys(k KeyManager) Option { return func(h *Handler) { h.keys = k } }
 
 // Option configures Mount.
 type Option func(*Handler)
@@ -223,6 +236,76 @@ func (h *Handler) DeleteSession(ctx context.Context, req oapi.DeleteSessionReque
 		return nil, err
 	}
 	return oapi.DeleteSession204Response{}, nil
+}
+
+// keyView maps a record onto the contract shape.
+func keyView(r disputepg.KeyRecord, now time.Time) oapi.TenantKey {
+	return oapi.TenantKey{Id: r.ID, Prefix: r.Prefix, Label: r.Label, CreatedAt: r.CreatedAt, LastUsedAt: r.LastUsedAt,
+		ExpiresAt: r.ExpiresAt, RevokedAt: r.RevokedAt, Status: oapi.TenantKeyStatus(r.Status(now))}
+}
+
+// tenantAdmin is the guard shared by the key operations: an analyst token with the tenant-admin role, and a tenant.
+func (h *Handler) tenantAdmin(ctx context.Context) (uuid.UUID, error) {
+	if h.keys == nil {
+		return uuid.Nil, application.ErrNotFound
+	}
+	if err := auth.RequireRole(ctx, auth.RoleTenantAdmin); err != nil {
+		return uuid.Nil, err
+	}
+	id, ok := tenant.IDFrom(ctx)
+	if !ok {
+		return uuid.Nil, tenant.ErrMissing
+	}
+	return id, nil
+}
+
+// ListTenantKeys shows a tenant admin their tenant's keys.
+func (h *Handler) ListTenantKeys(ctx context.Context, _ oapi.ListTenantKeysRequestObject) (oapi.ListTenantKeysResponseObject, error) {
+	tid, err := h.tenantAdmin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	recs, err := h.keys.ListForTenant(ctx, tid)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	out := make(oapi.ListTenantKeys200JSONResponse, 0, len(recs))
+	for _, r := range recs {
+		out = append(out, keyView(r, now))
+	}
+	return out, nil
+}
+
+// CreateTenantKey issues a key and returns the secret exactly once.
+func (h *Handler) CreateTenantKey(ctx context.Context, req oapi.CreateTenantKeyRequestObject) (oapi.CreateTenantKeyResponseObject, error) {
+	tid, err := h.tenantAdmin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if req.Body.ExpiresAt != nil && !req.Body.ExpiresAt.After(time.Now()) {
+		return nil, errs.New(errs.Invalid, "contract-violation", "expiresAt must be in the future").
+			WithFields(errs.FieldError{Field: "/expiresAt", Message: "must be in the future"})
+	}
+	rec, secret, err := h.keys.Issue(ctx, tid, strings.TrimSpace(req.Body.Label), req.Body.ExpiresAt)
+	if err != nil {
+		return nil, err
+	}
+	v := keyView(rec, time.Now())
+	return oapi.CreateTenantKey201JSONResponse{Id: v.Id, Prefix: v.Prefix, Label: v.Label, CreatedAt: v.CreatedAt,
+		LastUsedAt: v.LastUsedAt, ExpiresAt: v.ExpiresAt, RevokedAt: v.RevokedAt, Status: oapi.IssuedTenantKeyStatus(v.Status), Secret: secret}, nil
+}
+
+// RevokeTenantKey ends one of the tenant's keys.
+func (h *Handler) RevokeTenantKey(ctx context.Context, req oapi.RevokeTenantKeyRequestObject) (oapi.RevokeTenantKeyResponseObject, error) {
+	tid, err := h.tenantAdmin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.keys.Revoke(ctx, tid, req.KeyId); err != nil {
+		return nil, err
+	}
+	return oapi.RevokeTenantKey204Response{}, nil
 }
 
 // GetHealthz is liveness only.

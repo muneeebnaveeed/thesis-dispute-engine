@@ -129,3 +129,9 @@ DELETE FROM web_sessions WHERE tenant_id = $1;
 
 -- name: ListTenantKeysByTenant :many
 SELECT id, prefix, label, created_at, last_used_at, expires_at, revoked_at FROM tenant_keys WHERE tenant_id = $1 ORDER BY created_at;
+
+-- name: RevokeTenantKeyForTenant :execrows
+UPDATE tenant_keys SET revoked_at = now() WHERE id = $1 AND tenant_id = $2 AND revoked_at IS NULL;
+
+-- name: GetTenantKeyForTenant :one
+SELECT id, prefix, label, created_at, last_used_at, expires_at, revoked_at FROM tenant_keys WHERE id = $1 AND tenant_id = $2;

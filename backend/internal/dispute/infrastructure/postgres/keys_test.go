@@ -75,3 +75,48 @@ func TestKeyStoreLifecycle(t *testing.T) {
 		t.Error("second use within the interval wrote last_used_at again")
 	}
 }
+
+func TestKeyStoreSelfServiceAsAPIRole(t *testing.T) {
+	owner, schema := pgtest.PoolWithSchema(t)
+	app := pgtest.AppPool(t, schema)
+	ctx := context.Background()
+	q := sqlcgen.New(owner)
+	for _, tt := range []struct {
+		id   uuid.UUID
+		slug string
+	}{{apptest.TenantA, "otp"}, {apptest.TenantB, "erste"}} {
+		if err := q.UpsertTenant(ctx, sqlcgen.UpsertTenantParams{ID: tt.id, Name: tt.slug, Slug: tt.slug}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	store := disputepg.NewKeyStore(app)
+
+	rec, secret, err := store.Issue(ctx, apptest.TenantA, "core banking", nil)
+	if err != nil || rec.Prefix != auth.Prefix(secret) || rec.Status(time.Now()) != "live" {
+		t.Fatalf("issue: %+v %q %v", rec, secret, err)
+	}
+	// The issued secret authenticates immediately, as the same role.
+	if got, err := store.TenantForKeyHash(ctx, auth.HashKey(secret)); err != nil || got != apptest.TenantA {
+		t.Fatalf("issued key resolves: %v %v", got, err)
+	}
+	list, err := store.ListForTenant(ctx, apptest.TenantA)
+	if err != nil || len(list) != 1 || list[0].ID != rec.ID {
+		t.Fatalf("list: %+v %v", list, err)
+	}
+	if other, _ := store.ListForTenant(ctx, apptest.TenantB); len(other) != 0 {
+		t.Errorf("tenant B sees A's keys: %+v", other)
+	}
+	if err := store.Revoke(ctx, apptest.TenantB, rec.ID); !errors.Is(err, application.ErrNotFound) {
+		t.Errorf("cross-tenant revoke: %v", err)
+	}
+	if err := store.Revoke(ctx, apptest.TenantA, rec.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.TenantForKeyHash(ctx, auth.HashKey(secret)); !errors.Is(err, application.ErrNotFound) {
+		t.Errorf("revoked key still resolves: %v", err)
+	}
+	// The role can revoke but not relabel: the column grant is revoked_at only.
+	if _, err := app.Exec(ctx, `UPDATE tenant_keys SET label = 'x' WHERE id = $1`, rec.ID); err == nil {
+		t.Error("API role relabelled a key")
+	}
+}

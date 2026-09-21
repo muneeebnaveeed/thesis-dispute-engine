@@ -137,6 +137,7 @@ const (
 	ErrorCodeAppealsExhausted    ErrorCode = "appeals-exhausted"
 	ErrorCodeConcurrentUpdate    ErrorCode = "concurrent-update"
 	ErrorCodeContractViolation   ErrorCode = "contract-violation"
+	ErrorCodeForbidden           ErrorCode = "forbidden"
 	ErrorCodeIdempotencyKeyReuse ErrorCode = "idempotency-key-reuse"
 	ErrorCodeInternal            ErrorCode = "internal"
 	ErrorCodeInvalidTransition   ErrorCode = "invalid-transition"
@@ -157,6 +158,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeConcurrentUpdate:
 		return true
 	case ErrorCodeContractViolation:
+		return true
+	case ErrorCodeForbidden:
 		return true
 	case ErrorCodeIdempotencyKeyReuse:
 		return true
@@ -201,6 +204,27 @@ func (e HealthStatus) Valid() bool {
 	}
 }
 
+// Defines values for IssuedTenantKeyStatus.
+const (
+	IssuedTenantKeyStatusExpired IssuedTenantKeyStatus = "expired"
+	IssuedTenantKeyStatusLive    IssuedTenantKeyStatus = "live"
+	IssuedTenantKeyStatusRevoked IssuedTenantKeyStatus = "revoked"
+)
+
+// Valid indicates whether the value is a known member of the IssuedTenantKeyStatus enum.
+func (e IssuedTenantKeyStatus) Valid() bool {
+	switch e {
+	case IssuedTenantKeyStatusExpired:
+		return true
+	case IssuedTenantKeyStatusLive:
+		return true
+	case IssuedTenantKeyStatusRevoked:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Regime.
 const (
 	EUPSD2CARD        Regime = "EU_PSD2_CARD"
@@ -225,6 +249,27 @@ func (e Regime) Valid() bool {
 	}
 }
 
+// Defines values for TenantKeyStatus.
+const (
+	TenantKeyStatusExpired TenantKeyStatus = "expired"
+	TenantKeyStatusLive    TenantKeyStatus = "live"
+	TenantKeyStatusRevoked TenantKeyStatus = "revoked"
+)
+
+// Valid indicates whether the value is a known member of the TenantKeyStatus enum.
+func (e TenantKeyStatus) Valid() bool {
+	switch e {
+	case TenantKeyStatusExpired:
+		return true
+	case TenantKeyStatusLive:
+		return true
+	case TenantKeyStatusRevoked:
+		return true
+	default:
+		return false
+	}
+}
+
 // ApplyEventRequest defines model for ApplyEventRequest.
 type ApplyEventRequest struct {
 	Actor *string      `json:"actor,omitempty"`
@@ -239,6 +284,15 @@ type CreateDisputeRequest struct {
 	// Actor Who opened it; defaults to customer.
 	Actor         *string            `json:"actor,omitempty"`
 	TransactionId openapi_types.UUID `json:"transactionId"`
+}
+
+// CreateTenantKeyRequest defines model for CreateTenantKeyRequest.
+type CreateTenantKeyRequest struct {
+	// ExpiresAt Optional; the key stops working after this.
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
+
+	// Label Which system will hold it.
+	Label string `json:"label"`
 }
 
 // Dispute defines model for Dispute.
@@ -286,6 +340,26 @@ type Health struct {
 
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
+
+// IssuedTenantKey defines model for IssuedTenantKey.
+type IssuedTenantKey struct {
+	CreatedAt  time.Time          `json:"createdAt"`
+	ExpiresAt  *time.Time         `json:"expiresAt,omitempty"`
+	Id         openapi_types.UUID `json:"id"`
+	Label      string             `json:"label"`
+	LastUsedAt *time.Time         `json:"lastUsedAt,omitempty"`
+
+	// Prefix The first characters of the key
+	Prefix    string     `json:"prefix"`
+	RevokedAt *time.Time `json:"revokedAt,omitempty"`
+
+	// Secret Shown once.
+	Secret string                `json:"secret"`
+	Status IssuedTenantKeyStatus `json:"status"`
+}
+
+// IssuedTenantKeyStatus defines model for IssuedTenantKey.Status.
+type IssuedTenantKeyStatus string
 
 // LoggedEvent defines model for LoggedEvent.
 type LoggedEvent struct {
@@ -343,6 +417,23 @@ type SessionBlob struct {
 	TenantId *openapi_types.UUID `json:"tenantId,omitempty"`
 }
 
+// TenantKey defines model for TenantKey.
+type TenantKey struct {
+	CreatedAt  time.Time          `json:"createdAt"`
+	ExpiresAt  *time.Time         `json:"expiresAt,omitempty"`
+	Id         openapi_types.UUID `json:"id"`
+	Label      string             `json:"label"`
+	LastUsedAt *time.Time         `json:"lastUsedAt,omitempty"`
+
+	// Prefix The first characters of the key
+	Prefix    string          `json:"prefix"`
+	RevokedAt *time.Time      `json:"revokedAt,omitempty"`
+	Status    TenantKeyStatus `json:"status"`
+}
+
+// TenantKeyStatus defines model for TenantKey.Status.
+type TenantKeyStatus string
+
 // TenantSummary defines model for TenantSummary.
 type TenantSummary struct {
 	// EmailDomains Work-email domains that map to this tenant at sign-in.
@@ -363,6 +454,9 @@ type IdempotencyKey = string
 
 // BadRequest RFC 9457 problem details. Every field is safe to show to a user; diagnostics stay in server logs under requestId.
 type BadRequest = Problem
+
+// Forbidden RFC 9457 problem details. Every field is safe to show to a user; diagnostics stay in server logs under requestId.
+type Forbidden = Problem
 
 // NotFound RFC 9457 problem details. Every field is safe to show to a user; diagnostics stay in server logs under requestId.
 type NotFound = Problem
@@ -404,6 +498,9 @@ type ApplyDisputeEventJSONRequestBody = ApplyEventRequest
 // PutSessionJSONRequestBody defines body for PutSession for application/json ContentType.
 type PutSessionJSONRequestBody = SessionBlob
 
+// CreateTenantKeyJSONRequestBody defines body for CreateTenantKey for application/json ContentType.
+type CreateTenantKeyJSONRequestBody = CreateTenantKeyRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// CreateDispute Open a dispute against a transaction
@@ -436,6 +533,15 @@ type ServerInterface interface {
 	// GetReadyz Readiness (database reachable)
 	// (GET /readyz)
 	GetReadyz(w http.ResponseWriter, r *http.Request)
+	// ListTenantKeys The tenant's own keys, live and revoked
+	// (GET /tenant-keys)
+	ListTenantKeys(w http.ResponseWriter, r *http.Request)
+	// CreateTenantKey Issue a key for one of the tenant's systems
+	// (POST /tenant-keys)
+	CreateTenantKey(w http.ResponseWriter, r *http.Request)
+	// RevokeTenantKey Revoke a key; takes effect on the next request
+	// (DELETE /tenant-keys/{keyId})
+	RevokeTenantKey(w http.ResponseWriter, r *http.Request, keyId openapi_types.UUID)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -743,6 +849,60 @@ func (siw *ServerInterfaceWrapper) GetReadyz(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// ListTenantKeys operation middleware
+func (siw *ServerInterfaceWrapper) ListTenantKeys(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTenantKeys(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateTenantKey operation middleware
+func (siw *ServerInterfaceWrapper) CreateTenantKey(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateTenantKey(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeTenantKey operation middleware
+func (siw *ServerInterfaceWrapper) RevokeTenantKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "keyId" -------------
+	var keyId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "keyId", r.PathValue("keyId"), &keyId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "keyId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeTenantKey(w, r, keyId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -868,6 +1028,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/disputes", wrapper.CreateDispute)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/disputes/{disputeId}", wrapper.GetDispute)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/disputes/{disputeId}/events", wrapper.ApplyDisputeEvent)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tenant-keys", wrapper.ListTenantKeys)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tenant-keys", wrapper.CreateTenantKey)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/tenant-keys/{keyId}", wrapper.RevokeTenantKey)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/internal/sessions/{sessionId}", wrapper.DeleteSession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/internal/sessions/{sessionId}", wrapper.GetSession)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/internal/sessions/{sessionId}", wrapper.PutSession)
@@ -878,6 +1041,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 }
 
 type BadRequestApplicationProblemPlusJSONResponse Problem
+
+type ForbiddenApplicationProblemPlusJSONResponse Problem
 
 type NotFoundApplicationProblemPlusJSONResponse Problem
 
@@ -1478,6 +1643,193 @@ func (response GetReadyz503JSONResponse) VisitGetReadyzResponse(w http.ResponseW
 	return err
 }
 
+type ListTenantKeysRequestObject struct {
+}
+
+type ListTenantKeysResponseObject interface {
+	VisitListTenantKeysResponse(w http.ResponseWriter) error
+}
+
+type ListTenantKeys200JSONResponse []TenantKey
+
+func (response ListTenantKeys200JSONResponse) VisitListTenantKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTenantKeys401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListTenantKeys401ApplicationProblemPlusJSONResponse) VisitListTenantKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTenantKeys403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListTenantKeys403ApplicationProblemPlusJSONResponse) VisitListTenantKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTenantKeyRequestObject struct {
+	Body *CreateTenantKeyJSONRequestBody
+}
+
+type CreateTenantKeyResponseObject interface {
+	VisitCreateTenantKeyResponse(w http.ResponseWriter) error
+}
+
+type CreateTenantKey201JSONResponse IssuedTenantKey
+
+func (response CreateTenantKey201JSONResponse) VisitCreateTenantKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTenantKey400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTenantKey400ApplicationProblemPlusJSONResponse) VisitCreateTenantKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTenantKey401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTenantKey401ApplicationProblemPlusJSONResponse) VisitCreateTenantKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTenantKey403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTenantKey403ApplicationProblemPlusJSONResponse) VisitCreateTenantKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeTenantKeyRequestObject struct {
+	KeyId openapi_types.UUID `json:"keyId"`
+}
+
+type RevokeTenantKeyResponseObject interface {
+	VisitRevokeTenantKeyResponse(w http.ResponseWriter) error
+}
+
+type RevokeTenantKey204Response struct {
+}
+
+func (response RevokeTenantKey204Response) VisitRevokeTenantKeyResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeTenantKey401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeTenantKey401ApplicationProblemPlusJSONResponse) VisitRevokeTenantKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeTenantKey403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeTenantKey403ApplicationProblemPlusJSONResponse) VisitRevokeTenantKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeTenantKey404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeTenantKey404ApplicationProblemPlusJSONResponse) VisitRevokeTenantKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// CreateDispute Open a dispute against a transaction
@@ -1510,6 +1862,15 @@ type StrictServerInterface interface {
 	// GetReadyz Readiness (database reachable)
 	// (GET /readyz)
 	GetReadyz(ctx context.Context, request GetReadyzRequestObject) (GetReadyzResponseObject, error)
+	// ListTenantKeys The tenant's own keys, live and revoked
+	// (GET /tenant-keys)
+	ListTenantKeys(ctx context.Context, request ListTenantKeysRequestObject) (ListTenantKeysResponseObject, error)
+	// CreateTenantKey Issue a key for one of the tenant's systems
+	// (POST /tenant-keys)
+	CreateTenantKey(ctx context.Context, request CreateTenantKeyRequestObject) (CreateTenantKeyResponseObject, error)
+	// RevokeTenantKey Revoke a key; takes effect on the next request
+	// (DELETE /tenant-keys/{keyId})
+	RevokeTenantKey(ctx context.Context, request RevokeTenantKeyRequestObject) (RevokeTenantKeyResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -1827,66 +2188,156 @@ func (sh *strictHandler) GetReadyz(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ListTenantKeys operation middleware
+func (sh *strictHandler) ListTenantKeys(w http.ResponseWriter, r *http.Request) {
+	var request ListTenantKeysRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListTenantKeys(ctx, request.(ListTenantKeysRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListTenantKeys")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListTenantKeysResponseObject); ok {
+		if err := validResponse.VisitListTenantKeysResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateTenantKey operation middleware
+func (sh *strictHandler) CreateTenantKey(w http.ResponseWriter, r *http.Request) {
+	var request CreateTenantKeyRequestObject
+
+	var body CreateTenantKeyJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateTenantKey(ctx, request.(CreateTenantKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateTenantKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateTenantKeyResponseObject); ok {
+		if err := validResponse.VisitCreateTenantKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeTenantKey operation middleware
+func (sh *strictHandler) RevokeTenantKey(w http.ResponseWriter, r *http.Request, keyId openapi_types.UUID) {
+	var request RevokeTenantKeyRequestObject
+
+	request.KeyId = keyId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeTenantKey(ctx, request.(RevokeTenantKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeTenantKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeTenantKeyResponseObject); ok {
+		if err := validResponse.VisitRevokeTenantKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
 // Stored as a slice of fixed-width chunks rather than one concatenated
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"g5/7b/r47vLufwMA",
+	"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",
+	"mR/5DY+OmIgIS4TSw58HvwzMec1/DQA=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

@@ -5,7 +5,7 @@ import { vi } from 'vitest'
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children }: { children: ReactNode }) => <a href="/">{children}</a>,
   useRouteContext: () => ({
-    viewer: { name: 'analyst', tenantSlug: 'otp', tenantId: 't', email: null, roles: [] },
+    viewer: { name: 'analyst', tenantSlug: 'otp', tenantId: 't', email: null, roles: ['tenant-admin'] },
   }),
   useRouter: () => ({ navigate: vi.fn<() => Promise<void>>() }),
 }))
@@ -25,4 +25,5 @@ test('renders the title, the content and who is signed in', () => {
   expect(screen.getByText(/analyst/)).toBeInTheDocument()
   expect(screen.getByText(/otp/)).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Keys' })).toBeInTheDocument()
 })

@@ -33,6 +33,7 @@ const opt = (n: Node, keys: string[]) => {
 }
 function emit(n: Node): string {
   if (typeof n.$ref === 'string') return n.$ref.replace('#/components/schemas/', '')
+  if (Array.isArray(n.allOf)) return `Type.Intersect([${(n.allOf as Node[]).map(emit).join(', ')}])`
   const meta = opt(n, [
     'description',
     'default',

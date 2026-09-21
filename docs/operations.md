@@ -5,6 +5,11 @@ Operator tasks that are not part of a request. All of them run as the schema own
 
 ## Tenant keys
 
+Tenants manage their own keys: an analyst with the `tenant-admin` realm role opens Keys in the dashboard
+(`/<slug>/keys`) to issue a key for one of their systems (secret shown once), see every key with its prefix,
+last use and status, and revoke. The commands below are the operator's path for bootstrap and support; both
+go through the same rules (a key belongs to one tenant, the API stores only its hash).
+
 A tenant key is the credential a customer's own systems present on every request
 (`Authorization: Bearer tk_...`). The server stores its SHA-256 and the first 12 characters; the
 full value exists only at the moment of creation.

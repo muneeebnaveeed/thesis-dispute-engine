@@ -282,6 +282,40 @@ func (q *Queries) GetTenantByTenantKeyHash(ctx context.Context, keyHash []byte) 
 	return i, err
 }
 
+const getTenantKeyForTenant = `-- name: GetTenantKeyForTenant :one
+SELECT id, prefix, label, created_at, last_used_at, expires_at, revoked_at FROM tenant_keys WHERE id = $1 AND tenant_id = $2
+`
+
+type GetTenantKeyForTenantParams struct {
+	ID       uuid.UUID
+	TenantID uuid.UUID
+}
+
+type GetTenantKeyForTenantRow struct {
+	ID         uuid.UUID
+	Prefix     string
+	Label      string
+	CreatedAt  time.Time
+	LastUsedAt pgtype.Timestamptz
+	ExpiresAt  pgtype.Timestamptz
+	RevokedAt  pgtype.Timestamptz
+}
+
+func (q *Queries) GetTenantKeyForTenant(ctx context.Context, arg GetTenantKeyForTenantParams) (GetTenantKeyForTenantRow, error) {
+	row := q.db.QueryRow(ctx, getTenantKeyForTenant, arg.ID, arg.TenantID)
+	var i GetTenantKeyForTenantRow
+	err := row.Scan(
+		&i.ID,
+		&i.Prefix,
+		&i.Label,
+		&i.CreatedAt,
+		&i.LastUsedAt,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+	)
+	return i, err
+}
+
 const getTransaction = `-- name: GetTransaction :one
 SELECT t.id, t.account_id, t.rail, t.amount, t.currency, t.merchant, t.occurred_at, a.currency AS account_currency
 FROM transactions t
@@ -796,6 +830,23 @@ UPDATE tenant_keys SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL
 
 func (q *Queries) RevokeTenantKey(ctx context.Context, id uuid.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, revokeTenantKey, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const revokeTenantKeyForTenant = `-- name: RevokeTenantKeyForTenant :execrows
+UPDATE tenant_keys SET revoked_at = now() WHERE id = $1 AND tenant_id = $2 AND revoked_at IS NULL
+`
+
+type RevokeTenantKeyForTenantParams struct {
+	ID       uuid.UUID
+	TenantID uuid.UUID
+}
+
+func (q *Queries) RevokeTenantKeyForTenant(ctx context.Context, arg RevokeTenantKeyForTenantParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeTenantKeyForTenant, arg.ID, arg.TenantID)
 	if err != nil {
 		return 0, err
 	}

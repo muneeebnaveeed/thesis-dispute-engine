@@ -52,8 +52,7 @@ func TestAppRolePrivileges(t *testing.T) {
 		"ddl":            `CREATE TABLE smuggled (id int)`,
 		"migrations":     `INSERT INTO schema_migrations (version, name, checksum) VALUES (999, 'x', 'y')`,
 		"key label":      `UPDATE tenant_keys SET label = 'x'`,
-		"key revoke":     `UPDATE tenant_keys SET revoked_at = now()`,
-		"key insert":     `INSERT INTO tenant_keys (id, tenant_id, key_hash, prefix, label) VALUES (gen_random_uuid(), gen_random_uuid(), '\x00', 'p', 'l')`,
+		"key unrevoke":   `UPDATE tenant_keys SET expires_at = NULL, key_hash = '\x00'`,
 	}
 	for name, stmt := range denied {
 		_, err := app.Exec(ctx, stmt)
@@ -68,6 +67,9 @@ func TestAppRolePrivileges(t *testing.T) {
 		`SELECT count(*) FROM disputes_by_state`,
 		`SELECT purge_idempotency_keys(now() - interval '1 year')`,
 		`UPDATE tenant_keys SET last_used_at = now()`,
+		// Self-service (migration 0009): the API issues keys for the tenant in context and can end them, nothing else.
+		`INSERT INTO tenant_keys (id, tenant_id, key_hash, prefix, label) VALUES (gen_random_uuid(), '00000000-0000-8000-8000-00000000a001', '\x00', 'p', 'l')`,
+		`UPDATE tenant_keys SET revoked_at = now() WHERE label = 'l'`,
 	}
 	for _, stmt := range allowed {
 		if _, err := app.Exec(ctx, stmt); err != nil {

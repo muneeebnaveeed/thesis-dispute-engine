@@ -4,8 +4,10 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/base64"
 	"net/http"
 	"slices"
 	"strings"
@@ -22,9 +24,33 @@ import (
 // ErrUnauthenticated covers a missing, malformed, unknown or revoked key; the detail never says which.
 var ErrUnauthenticated = errs.New(errs.Unauthorized, "unauthenticated", "a valid tenant key is required")
 
+// ErrForbidden is a valid credential that may not perform the operation.
+var ErrForbidden = errs.New(errs.Forbidden, "forbidden", "this operation needs an analyst with the tenant-admin role")
+
+// RoleTenantAdmin manages the tenant's keys and users.
+const RoleTenantAdmin = "tenant-admin"
+
+// RequireRole passes only analyst tokens whose realm granted the role; tenant keys and other analysts are refused.
+func RequireRole(ctx context.Context, role string) error {
+	p, ok := PrincipalFrom(ctx)
+	if !ok || !p.HasRole(role) {
+		return ErrForbidden
+	}
+	return nil
+}
+
 // Resolver maps a key hash to its tenant; application.ErrNotFound for unknown or revoked keys.
 type Resolver interface {
 	TenantForKeyHash(ctx context.Context, hash []byte) (uuid.UUID, error)
+}
+
+// NewSecret returns a 32-byte random key with a recognisable prefix so leaked keys can be grepped for.
+func NewSecret() (string, error) {
+	var b [32]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return "tk_" + base64.RawURLEncoding.EncodeToString(b[:]), nil
 }
 
 // HashKey is the only form a key is ever stored or compared in.
@@ -60,6 +86,11 @@ func (p Principal) HasRole(role string) bool { return slices.Contains(p.Roles, r
 type ctxKey struct{}
 type principalKey struct{}
 
+// WithPrincipal returns ctx carrying an analyst and their tenant; Bearer uses it, and so do tests that need one.
+func WithPrincipal(ctx context.Context, p Principal) context.Context {
+	return tenant.WithID(context.WithValue(ctx, principalKey{}, p), p.Tenant)
+}
+
 // PrincipalFrom returns the signed-in analyst, if the request carried an OIDC token rather than a tenant key.
 func PrincipalFrom(ctx context.Context) (Principal, bool) {
 	p, ok := ctx.Value(principalKey{}).(Principal)
@@ -89,7 +120,7 @@ func Bearer(keys Resolver, oidc *OIDC) httpserver.Middleware {
 					err = ErrUnauthenticated
 				} else if p, err = oidc.Verify(ctx, cred); err == nil {
 					id = p.Tenant
-					ctx = context.WithValue(ctx, principalKey{}, p)
+					ctx = WithPrincipal(ctx, p)
 					trace.SpanFromContext(ctx).SetAttributes(attribute.String("enduser.id", p.Subject))
 					httpserver.Annotate(ctx, "user", p.Subject)
 				}

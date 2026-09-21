@@ -106,6 +106,56 @@ paths:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
         "422": { $ref: "#/components/responses/Unprocessable" }
+  /tenant-keys:
+    get:
+      operationId: listTenantKeys
+      summary: The tenant's own keys, live and revoked
+      description: Analysts with the tenant-admin role only; a tenant key cannot inspect keys.
+      tags: [tenant-keys]
+      responses:
+        "200":
+          description: Keys, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TenantKey" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      operationId: createTenantKey
+      summary: Issue a key for one of the tenant's systems
+      description: The secret is in this response only; the server keeps its hash and prefix.
+      tags: [tenant-keys]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTenantKeyRequest" }
+      responses:
+        "201":
+          description: Issued.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IssuedTenantKey" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /tenant-keys/{keyId}:
+    parameters:
+      - name: keyId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      operationId: revokeTenantKey
+      summary: Revoke a key; takes effect on the next request
+      tags: [tenant-keys]
+      responses:
+        "204": { description: Revoked, or already revoked. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /internal/sessions/{sessionId}:
     parameters:
       - name: sessionId
@@ -226,6 +276,11 @@ components:
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
+    Forbidden:
+      description: The credential is valid but may not do this (an analyst without the tenant-admin role, or a tenant key on an analyst-only operation).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
     NotFound:
       description: No such resource.
       content:
@@ -250,6 +305,7 @@ components:
       description: Stable machine-readable failure identifier; branch on this, never on text.
       enum:
         - unauthenticated
+        - forbidden
         - rate-limited
         - malformed-request
         - contract-violation
@@ -292,6 +348,31 @@ components:
       properties:
         field: { type: string, example: "/transactionId" }
         message: { type: string }
+    TenantKey:
+      type: object
+      required: [id, prefix, label, createdAt, status]
+      properties:
+        id: { type: string, format: uuid }
+        prefix: { type: string, description: The first characters of the key, enough to match a value seen in a log. }
+        label: { type: string }
+        createdAt: { type: string, format: date-time }
+        lastUsedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        revokedAt: { type: string, format: date-time }
+        status: { type: string, enum: [live, expired, revoked] }
+    CreateTenantKeyRequest:
+      type: object
+      required: [label]
+      properties:
+        label: { type: string, minLength: 1, maxLength: 80, description: Which system will hold it. }
+        expiresAt: { type: string, format: date-time, description: Optional; the key stops working after this. }
+    IssuedTenantKey:
+      allOf:
+        - $ref: "#/components/schemas/TenantKey"
+        - type: object
+          required: [secret]
+          properties:
+            secret: { type: string, description: Shown once. }
     TenantSummary:
       type: object
       required: [id, slug, name, emailDomains]

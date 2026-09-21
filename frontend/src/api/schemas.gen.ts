@@ -48,6 +48,17 @@ export type CreateDisputeRequest = Static<typeof CreateDisputeRequest>
 const _CreateDisputeRequest: Same<CreateDisputeRequest, components['schemas']['CreateDisputeRequest']> = true
 void _CreateDisputeRequest
 
+export const CreateTenantKeyRequest = Type.Object({
+  label: Type.String({ description: 'Which system will hold it.', minLength: 1, maxLength: 80 }),
+  expiresAt: Type.Optional(
+    Type.String({ description: 'Optional; the key stops working after this.', format: 'date-time' }),
+  ),
+})
+export type CreateTenantKeyRequest = Static<typeof CreateTenantKeyRequest>
+const _CreateTenantKeyRequest: Same<CreateTenantKeyRequest, components['schemas']['CreateTenantKeyRequest']> =
+  true
+void _CreateTenantKeyRequest
+
 export const Regime = Type.Union([
   Type.Literal('EU_SEPA_DIRECT_DEBIT'),
   Type.Literal('EU_PSD2_CARD'),
@@ -115,6 +126,7 @@ void _Dispute
 export const ErrorCode = Type.Union(
   [
     Type.Literal('unauthenticated'),
+    Type.Literal('forbidden'),
     Type.Literal('rate-limited'),
     Type.Literal('malformed-request'),
     Type.Literal('contract-violation'),
@@ -149,6 +161,30 @@ export const Health = Type.Object({
 export type Health = Static<typeof Health>
 const _Health: Same<Health, components['schemas']['Health']> = true
 void _Health
+
+export const TenantKey = Type.Object({
+  id: Type.String({ format: 'uuid' }),
+  prefix: Type.String({ description: 'The first characters of the key' }),
+  label: Type.String(),
+  createdAt: Type.String({ format: 'date-time' }),
+  lastUsedAt: Type.Optional(Type.String({ format: 'date-time' })),
+  expiresAt: Type.Optional(Type.String({ format: 'date-time' })),
+  revokedAt: Type.Optional(Type.String({ format: 'date-time' })),
+  status: Type.Union([Type.Literal('live'), Type.Literal('expired'), Type.Literal('revoked')]),
+})
+export type TenantKey = Static<typeof TenantKey>
+const _TenantKey: Same<TenantKey, components['schemas']['TenantKey']> = true
+void _TenantKey
+
+export const IssuedTenantKey = Type.Intersect([
+  TenantKey,
+  Type.Object({
+    secret: Type.String({ description: 'Shown once.' }),
+  }),
+])
+export type IssuedTenantKey = Static<typeof IssuedTenantKey>
+const _IssuedTenantKey: Same<IssuedTenantKey, components['schemas']['IssuedTenantKey']> = true
+void _IssuedTenantKey
 
 export const Problem = Type.Object(
   {
