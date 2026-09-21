@@ -1,7 +1,11 @@
 package domain
 
 import (
+	"embed"
+	"encoding/json"
 	"fmt"
+	"io/fs"
+	"slices"
 	"sort"
 	"time"
 
@@ -52,32 +56,81 @@ var (
 	ErrInvalidAnswers = errs.New(errs.Unprocessable, "invalid-answers", "the questionnaire answers are incomplete or malformed")
 )
 
-var questionSets = map[Reason][]Question{
-	ReasonUnauthorised: {
-		{ID: "recognise_merchant", Text: "Do you recognise the merchant?", Type: AnswerYesNo, Required: true},
-		{ID: "card_in_possession", Text: "Was your card in your possession at the time?", Type: AnswerYesNo, Required: true},
-		{ID: "shared_credentials", Text: "Has anyone else had access to your card or its details?", Type: AnswerYesNo, Required: true},
-		{ID: "prior_disputes_merchant", Text: "Have you disputed a transaction with this merchant before?", Type: AnswerYesNo, Required: true},
-		{ID: "noticed_on", Text: "When did you notice the transaction?", Type: AnswerDate, Required: true},
-		{ID: "police_report", Text: "Have you reported the card lost or stolen, or filed a police report?", Type: AnswerYesNo, Required: true},
-		{ID: "details", Text: "Anything else we should know?", Type: AnswerText, Required: false},
-	},
-	ReasonNotReceived: {
-		{ID: "expected_on", Text: "When were the goods or services due?", Type: AnswerDate, Required: true},
-		{ID: "contacted_merchant", Text: "Have you contacted the merchant?", Type: AnswerYesNo, Required: true},
-		{ID: "merchant_response", Text: "What did the merchant say?", Type: AnswerText, Required: false},
-		{ID: "partial_delivery", Text: "Did you receive part of the order?", Type: AnswerYesNo, Required: true},
-	},
-	ReasonDuplicate: {
-		{ID: "original_on", Text: "When was the transaction you did authorise?", Type: AnswerDate, Required: true},
-		{ID: "same_merchant", Text: "Was it with the same merchant?", Type: AnswerYesNo, Required: true},
-		{ID: "details", Text: "Anything else we should know?", Type: AnswerText, Required: false},
-	},
-	ReasonAmountDiffers: {
-		{ID: "amount_agreed", Text: "What amount did you agree to?", Type: AnswerAmount, Required: true},
-		{ID: "receipt_available", Text: "Do you have a receipt showing that amount?", Type: AnswerYesNo, Required: true},
-		{ID: "details", Text: "Describe the difference.", Type: AnswerText, Required: true},
-	},
+//go:embed questionnaires/*.json
+var questionnaireFiles embed.FS
+
+// questionSets are loaded once from the embedded files: the questions are content a compliance team edits, and
+// the same file shape is what a per-tenant or per-language set would take later (docs/adr/0016).
+var questionSets = mustLoadQuestionSets()
+
+type questionnaireFile struct {
+	Reason    Reason     `json:"reason"`
+	Questions []Question `json:"questions"`
+}
+
+func mustLoadQuestionSets() map[Reason][]Question {
+	sets, err := LoadQuestionSets(questionnaireFiles)
+	if err != nil {
+		panic(err)
+	}
+	return sets
+}
+
+// LoadQuestionSets reads every questionnaires/*.json in fsys and checks each: a known reason, at least one
+// required question, unique ids, known answer types. Every reason must have exactly one file.
+func LoadQuestionSets(fsys fs.FS) (map[Reason][]Question, error) {
+	files, err := fs.Glob(fsys, "questionnaires/*.json")
+	if err != nil {
+		return nil, err
+	}
+	sets := make(map[Reason][]Question, len(files))
+	for _, name := range files {
+		raw, err := fs.ReadFile(fsys, name)
+		if err != nil {
+			return nil, err
+		}
+		var f questionnaireFile
+		if err := json.Unmarshal(raw, &f); err != nil {
+			return nil, fmt.Errorf("questionnaire %s: %w", name, err)
+		}
+		if err := checkQuestionSet(f); err != nil {
+			return nil, fmt.Errorf("questionnaire %s: %w", name, err)
+		}
+		if _, dup := sets[f.Reason]; dup {
+			return nil, fmt.Errorf("questionnaire %s: reason %s defined twice", name, f.Reason)
+		}
+		sets[f.Reason] = f.Questions
+	}
+	for _, r := range AllReasons() {
+		if _, ok := sets[r]; !ok {
+			return nil, fmt.Errorf("questionnaire for %s missing", r)
+		}
+	}
+	return sets, nil
+}
+
+func checkQuestionSet(f questionnaireFile) error {
+	if !slices.Contains(AllReasons(), f.Reason) {
+		return fmt.Errorf("unknown reason %q", f.Reason)
+	}
+	seen := map[string]bool{}
+	required := false
+	for _, q := range f.Questions {
+		switch {
+		case q.ID == "" || q.Text == "":
+			return fmt.Errorf("question %+v needs an id and text", q)
+		case seen[q.ID]:
+			return fmt.Errorf("question id %q repeated", q.ID)
+		case !slices.Contains([]AnswerType{AnswerYesNo, AnswerDate, AnswerText, AnswerAmount}, q.Type):
+			return fmt.Errorf("question %q: unknown type %q", q.ID, q.Type)
+		}
+		seen[q.ID] = true
+		required = required || q.Required
+	}
+	if !required {
+		return fmt.Errorf("no required question")
+	}
+	return nil
 }
 
 // ParseReason accepts a reason string, defaulting to UNAUTHORISED when empty.

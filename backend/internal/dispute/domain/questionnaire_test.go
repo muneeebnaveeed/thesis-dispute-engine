@@ -2,7 +2,9 @@ package domain
 
 import (
 	"errors"
+	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
 )
@@ -77,5 +79,36 @@ func TestInconsistencies(t *testing.T) {
 	}
 	if n := len(Inconsistencies(ReasonDuplicate, map[string]string{"same_merchant": "no"})); n != 1 {
 		t.Errorf("duplicate across merchants flagged %d", n)
+	}
+}
+
+func TestLoadQuestionSetsRefusesBadFiles(t *testing.T) {
+	good := `{"reason":"UNAUTHORISED","questions":[{"id":"a","text":"A?","type":"YES_NO","required":true}]}`
+	full := func(override map[string]string) fstest.MapFS {
+		m := fstest.MapFS{}
+		for _, r := range AllReasons() {
+			body := strings.Replace(good, "UNAUTHORISED", string(r), 1)
+			if o, ok := override[string(r)]; ok {
+				body = o
+			}
+			m["questionnaires/"+string(r)+".json"] = &fstest.MapFile{Data: []byte(body)}
+		}
+		return m
+	}
+	if _, err := LoadQuestionSets(full(nil)); err != nil {
+		t.Fatalf("well-formed set: %v", err)
+	}
+	cases := map[string]fstest.MapFS{
+		"missing reason":   func() fstest.MapFS { m := full(nil); delete(m, "questionnaires/DUPLICATE.json"); return m }(),
+		"unknown reason":   full(map[string]string{"DUPLICATE": `{"reason":"VIBES","questions":[{"id":"a","text":"A?","type":"YES_NO","required":true}]}`}),
+		"repeated id":      full(map[string]string{"DUPLICATE": `{"reason":"DUPLICATE","questions":[{"id":"a","text":"A?","type":"YES_NO","required":true},{"id":"a","text":"B?","type":"TEXT","required":false}]}`}),
+		"unknown type":     full(map[string]string{"DUPLICATE": `{"reason":"DUPLICATE","questions":[{"id":"a","text":"A?","type":"COLOUR","required":true}]}`}),
+		"nothing required": full(map[string]string{"DUPLICATE": `{"reason":"DUPLICATE","questions":[{"id":"a","text":"A?","type":"TEXT","required":false}]}`}),
+		"not json":         full(map[string]string{"DUPLICATE": `{"reason":`}),
+	}
+	for name, fsys := range cases {
+		if _, err := LoadQuestionSets(fsys); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
 	}
 }

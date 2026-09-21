@@ -1,0 +1,23 @@
+{
+  "reason": "DUPLICATE",
+  "questions": [
+    {
+      "id": "original_on",
+      "text": "When was the transaction you did authorise?",
+      "type": "DATE",
+      "required": true
+    },
+    {
+      "id": "same_merchant",
+      "text": "Was it with the same merchant?",
+      "type": "YES_NO",
+      "required": true
+    },
+    {
+      "id": "details",
+      "text": "Anything else we should know?",
+      "type": "TEXT",
+      "required": false
+    }
+  ]
+}

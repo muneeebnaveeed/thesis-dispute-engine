@@ -1,0 +1,47 @@
+{
+  "reason": "UNAUTHORISED",
+  "questions": [
+    {
+      "id": "recognise_merchant",
+      "text": "Do you recognise the merchant?",
+      "type": "YES_NO",
+      "required": true
+    },
+    {
+      "id": "card_in_possession",
+      "text": "Was your card in your possession at the time?",
+      "type": "YES_NO",
+      "required": true
+    },
+    {
+      "id": "shared_credentials",
+      "text": "Has anyone else had access to your card or its details?",
+      "type": "YES_NO",
+      "required": true
+    },
+    {
+      "id": "prior_disputes_merchant",
+      "text": "Have you disputed a transaction with this merchant before?",
+      "type": "YES_NO",
+      "required": true
+    },
+    {
+      "id": "noticed_on",
+      "text": "When did you notice the transaction?",
+      "type": "DATE",
+      "required": true
+    },
+    {
+      "id": "police_report",
+      "text": "Have you reported the card lost or stolen, or filed a police report?",
+      "type": "YES_NO",
+      "required": true
+    },
+    {
+      "id": "details",
+      "text": "Anything else we should know?",
+      "type": "TEXT",
+      "required": false
+    }
+  ]
+}

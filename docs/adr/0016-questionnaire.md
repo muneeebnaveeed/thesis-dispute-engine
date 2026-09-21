@@ -15,8 +15,12 @@ at all, which made every dispute an "unauthorised transaction" by omission.
 - A dispute carries a `reason` from opening: `UNAUTHORISED` (the default, and what the tenant
   systems already send), `NOT_RECEIVED`, `DUPLICATE`, `AMOUNT_DIFFERS`. The reason is immutable
   and selects the question set.
-- Question sets are code in the domain (`domain/questionnaire.go`): each question has an id, the
-  text, a type (`YES_NO`, `DATE`, `TEXT`, `AMOUNT`) and whether it is required. Sending snapshots
+- Question sets are content, not code: one JSON file per reason under `domain/questionnaires/`,
+  embedded in the binary and validated at start (known reason, unique ids, known types, at least one
+  required question; every reason present). Each question has an id, the text, a type (`YES_NO`,
+  `DATE`, `TEXT`, `AMOUNT`) and whether it is required; the validation and the contradiction rules
+  stay in Go, because they are logic over answers. The file shape is what a per-tenant or
+  per-language set would take later, loaded through the same check. Sending snapshots
   the set onto the dispute (`questionnaires.questions`), so answers always match what was asked
   even after the set changes; sending again replaces the snapshot and clears the answers.
 - Answers travel in the `RECEIVE_QUESTIONNAIRE` payload as `answers`, a map from question id to a
@@ -33,7 +37,7 @@ at all, which made every dispute an "unauthorised transaction" by omission.
 - Easier: a new dispute type is a reason and a question list; the workbench renders any set from
   its types; the fraud scoring reads typed answers rather than free text; an auditor sees exactly
   the questions the customer was shown.
-- Harder: question text is code and not per-tenant or per-language (a tenant wanting its own
-  wording needs a settings-driven set, not built); the event payload remains open, so `answers`
+- Harder: the sets are one language and shared by every tenant (a tenant's own wording is a
+  settings-loaded file through the same validator, not built); the event payload remains open, so `answers`
   on any other event is stored but ignored; `RECEIVE_QUESTIONNAIRE` from the actions list would
   send an empty answer set, so the workbench routes it through the questionnaire form only.
