@@ -7,8 +7,8 @@ A stack is a chain of branches where each PR targets the branch below it instead
 `scripts/stack` walks that chain from the PRs themselves; there is no extra metadata.
 
 - **Create a child:** branch from the parent branch, commit, then
-  `scripts/create-pr --base <parent-branch> --summary ... --why ... --testing ...`.
-  Say in `--notes` that it is stacked on `#<parent>`.
+  `scripts/create-pr --base <parent-branch> --description "..."`.
+  Mention the parent in `--rollout` (for example `after #<parent> merges`).
 - **See the chain:** `scripts/stack show` (default branch at the top, current branch at the bottom).
 - **Parent changed (new commits, force-push):** `scripts/stack restack --push` rebases every
   branch in the chain onto its updated parent and force-pushes with lease. Run without

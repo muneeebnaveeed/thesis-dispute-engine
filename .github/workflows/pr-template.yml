@@ -1,0 +1,35 @@
+name: pr template
+
+# The template only pre-fills the web form; this makes it binding for every PR however it was opened.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Title and body follow the template
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          [[ "$TITLE" =~ ^(feat|fix|chore|refactor|docs|test|perf|build|ci|style)(\([a-z0-9/._-]+\))?!?:\ .+ ]] \
+            || fail "title must be conventional-commit shaped: type(scope): subject"
+          field() { sed -nE "s/^\*\*$1\*\*: *//p" <<<"$BODY" | head -n1; }
+          for f in Type Description "Tests Included" Rollout ADR; do
+            v=$(field "$f")
+            [[ -n "${v//[[:space:]]/}" && "$v" != *"<!--"* ]] || fail "body is missing **$f**: ... (see .github/PULL_REQUEST_TEMPLATE.md)"
+          done
+          [[ "$(field 'Tests Included')" =~ ^(yes|no)$ ]] || fail "Tests Included must be yes or no"
+          scripts/check-pr-description "$(field Description)" || fail "see scripts/check-pr-description output above"
+          echo "template ok"
