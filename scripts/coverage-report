@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Render a Go coverage profile as markdown: total, per-package table, and the delta against a
-# baseline profile when one is given. Generated code (sqlcgen, oapi) and test-only helpers (apptest,
-# pgtest) are excluded from every number.
+# baseline profile when one is given. Generated code (sqlcgen, oapi), test-only helpers (apptest,
+# pgtest) and command wiring (cmd) are excluded from every number.
 #
 #   scripts/coverage-report <coverage.out> [baseline.out]
 set -euo pipefail
@@ -14,7 +14,7 @@ module=$(awk '/^module /{print $2}' "$(repo_root)/backend/go.mod")
 
 # Prints "<package>\t<covered>\t<total>" per package plus a TOTAL row, statements weighted.
 stats() {
-  awk -v gen='/sqlcgen/|/oapi/|/apptest/|/pgtest/' -v mod="$module/" '
+  awk -v gen='/sqlcgen/|/oapi/|/apptest/|/pgtest/|/cmd/' -v mod="$module/" '
     /^mode:/ { next }
     $0 ~ gen { next }
     {
@@ -52,7 +52,7 @@ awk -F'\t' -v have_base="${base:+1}" '
       else head = head " (no baseline yet)"
     }
     print head; print ""
-    print "Statements; generated code and test helpers excluded."; print ""
+    print "Statements; generated code, test helpers and cmd wiring excluded."; print ""
     if (have_base) { print "| Package | Coverage | Delta |"; print "| --- | ---: | ---: |" }
     else { print "| Package | Coverage |"; print "| --- | ---: |" }
     for (i = 1; i <= n; i++) {
