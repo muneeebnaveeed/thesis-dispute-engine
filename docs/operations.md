@@ -75,6 +75,10 @@ scripts/tenant onboard --slug otp --name "OTP Bank" --domains otpbank.hu --timez
     --holidays 2026-01-01,2026-03-15,2026-04-03,2026-04-06,2026-05-01,2026-05-25,2026-08-20,2026-10-23,2026-11-01,2026-12-25,2026-12-26
 ```
 
+`--core` names the tenant's banking core as JSON (docs/adr/0015): `{"kind":"mock"}` for the simulator, with
+optional `declineAbove`, `insufficientFundsAccounts`, `latencyMs` and `outage` to shape its behaviour; omit it for
+book entries only. `DISPUTE_CORE_TIMEOUT` (default 5s) bounds each call.
+
 The time zone and holidays are the calendar the regulatory clocks count business days in (docs/adr/0013);
 a tenant without them gets UTC and weekends only, so give every tenant its own at onboarding and re-run
 `cmd/tenant upsert` when the next year's holidays are published.

@@ -99,6 +99,11 @@ func CodeOf(err error) Code {
 	return internalCode
 }
 
+// WithDetail copies e with a user-safe specific appended to its message; the code and kind stay the same.
+func (e *Error) WithDetail(format string, args ...any) *Error {
+	return &Error{Kind: e.Kind, Code: e.Code, Msg: e.Msg + ": " + fmt.Sprintf(format, args...), Fields: e.Fields}
+}
+
 // WithFields copies e with field-level detail attached.
 func (e *Error) WithFields(fields ...FieldError) *Error {
 	return &Error{Kind: e.Kind, Code: e.Code, Msg: e.Msg, Fields: fields}

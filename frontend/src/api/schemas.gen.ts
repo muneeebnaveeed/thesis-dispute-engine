@@ -66,6 +66,17 @@ export type Balances = Static<typeof Balances>
 const _Balances: Same<Balances, components['schemas']['Balances']> = true
 void _Balances
 
+export const CoreReceipt = Type.Object({
+  rrn: Type.String({
+    description: 'Retrieval reference number (ISO 8583 DE37); empty when the tenant has no core.',
+  }),
+  responseCode: Type.String({ description: 'ISO 8583 DE39; 00 approved' }),
+  latencyMs: Type.Integer({ format: 'int64' }),
+})
+export type CoreReceipt = Static<typeof CoreReceipt>
+const _CoreReceipt: Same<CoreReceipt, components['schemas']['CoreReceipt']> = true
+void _CoreReceipt
+
 export const CreateDisputeRequest = Type.Object({
   transactionId: Type.String({ format: 'uuid' }),
   actor: Type.Optional(
@@ -209,6 +220,7 @@ export const LedgerEntry = Type.Object(
     currency: Type.String({ minLength: 3, maxLength: 3 }),
     reference: Type.String({ description: 'Unique per posting; what the banking core is told.' }),
     postedAt: Type.String({ format: 'date-time' }),
+    core: Type.Optional(CoreReceipt),
   },
   {
     description:
@@ -281,6 +293,7 @@ export const ErrorCode = Type.Union(
     Type.Literal('appeals-exhausted'),
     Type.Literal('invalid-liability'),
     Type.Literal('invalid-settlement'),
+    Type.Literal('core-declined'),
     Type.Literal('concurrent-update'),
     Type.Literal('idempotency-key-reuse'),
     Type.Literal('no-regime'),

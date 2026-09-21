@@ -185,14 +185,23 @@ SET settings = settings || jsonb_build_object('timezone', sqlc.arg(timezone)::te
 WHERE id = sqlc.arg(id);
 
 -- name: InsertLedgerEntry :exec
-INSERT INTO ledger_entries (dispute_id, seq, kind, debit_account, credit_account, amount, currency, reference, posted_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
+INSERT INTO ledger_entries (dispute_id, seq, kind, debit_account, credit_account, amount, currency, reference, posted_at,
+                            core_rrn, core_response_code, core_latency_ms)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
 
 -- name: ListLedgerEntries :many
-SELECT id, dispute_id, seq, kind, debit_account, credit_account, amount, currency, reference, posted_at
+SELECT id, dispute_id, seq, kind, debit_account, credit_account, amount, currency, reference, posted_at,
+       core_rrn, core_response_code, core_latency_ms
 FROM ledger_entries
 WHERE dispute_id = $1
 ORDER BY id;
 
 -- name: SuspenseByRegime :many
 SELECT tenant_id, regime, currency, balance::numeric AS balance FROM suspense_by_regime;
+
+-- name: GetTenantCore :one
+SELECT COALESCE(settings->'core'->>'kind', '')::text AS kind, COALESCE(settings->'core', '{}'::jsonb)::jsonb AS settings
+FROM tenants WHERE id = current_tenant_id();
+
+-- name: SetTenantCore :execrows
+UPDATE tenants SET settings = settings || jsonb_build_object('core', sqlc.arg(core)::jsonb) WHERE id = sqlc.arg(id);

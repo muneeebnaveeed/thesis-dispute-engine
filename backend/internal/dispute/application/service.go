@@ -25,19 +25,32 @@ const scopeName = "github.com/muneeebnaveeed/thesis-dispute-engine/backend/inter
 
 // Service is the dispute use cases.
 type Service struct {
-	store  Store
-	now    Clock
-	tracer trace.Tracer
+	store       Store
+	now         Clock
+	tracer      trace.Tracer
+	core        BankingCore
+	coreTimeout time.Duration
 
 	transitions   metric.Int64Counter
 	replays       metric.Int64Counter
 	timeInState   metric.Float64Histogram
 	deadlineSlack metric.Float64Histogram
 	postings      metric.Int64Counter
+	coreMessages  metric.Int64Counter
+	coreLatency   metric.Float64Histogram
 }
 
+// Option configures a Service beyond its store and clock.
+type Option func(*Service)
+
+// WithCore sets the banking core postings go to; without it postings are book entries only.
+func WithCore(core BankingCore) Option { return func(s *Service) { s.core = core } }
+
+// WithCoreTimeout bounds one core call; the transition is rolled back and reported unavailable when it passes.
+func WithCoreTimeout(d time.Duration) Option { return func(s *Service) { s.coreTimeout = d } }
+
 // NewService wires a Service; a nil clock means time.Now.
-func NewService(store Store, now Clock) (*Service, error) {
+func NewService(store Store, now Clock, opts ...Option) (*Service, error) {
 	if now == nil {
 		now = time.Now
 	}
@@ -59,6 +72,14 @@ func NewService(store Store, now Clock) (*Service, error) {
 		return nil, err
 	}
 	postings, err := m.Int64Counter("dispute.ledger_postings", metric.WithDescription("Ledger postings written, by regime and kind"))
+	if err != nil {
+		return nil, err
+	}
+	coreMessages, err := m.Int64Counter("dispute.core_messages", metric.WithDescription("Instructions sent to a tenant's banking core, by outcome (response code)"))
+	if err != nil {
+		return nil, err
+	}
+	coreLatency, err := m.Float64Histogram("dispute.core_latency", metric.WithDescription("Round trip to the banking core"), metric.WithUnit("s"))
 	if err != nil {
 		return nil, err
 	}
@@ -105,8 +126,13 @@ func NewService(store Store, now Clock) (*Service, error) {
 		})); err != nil {
 		return nil, err
 	}
-	return &Service{store: store, now: now, tracer: otel.Tracer(scopeName), transitions: transitions, replays: replays,
-		timeInState: timeInState, deadlineSlack: deadlineSlack, postings: postings}, nil
+	svc := &Service{store: store, now: now, tracer: otel.Tracer(scopeName), core: CoreRouter{}, coreTimeout: 5 * time.Second,
+		transitions: transitions, replays: replays, timeInState: timeInState, deadlineSlack: deadlineSlack, postings: postings,
+		coreMessages: coreMessages, coreLatency: coreLatency}
+	for _, o := range opts {
+		o(svc)
+	}
+	return svc, nil
 }
 
 // DisputeView is the API representation of a dispute and its log; it is also what idempotent replays return.
@@ -139,6 +165,14 @@ type LedgerView struct {
 	Currency  string             `json:"currency"`
 	Reference string             `json:"reference"`
 	PostedAt  time.Time          `json:"postedAt"`
+	Core      *CoreReceiptView   `json:"core,omitempty"`
+}
+
+// CoreReceiptView is what the banking core answered for a posting.
+type CoreReceiptView struct {
+	RRN          string `json:"rrn"`
+	ResponseCode string `json:"responseCode"`
+	LatencyMs    int64  `json:"latencyMs"`
 }
 
 // Balances are the dispute's running totals per ledger account, from the customer's point of view for
@@ -388,11 +422,49 @@ func (s *Service) post(ctx context.Context, tx Tx, rec DisputeRecord, next domai
 	}
 	entries := make([]LedgerEntry, 0, len(movements))
 	for _, p := range movements {
-		entries = append(entries, LedgerEntry{Seq: seq, Posting: p, PostedAt: now,
-			Reference: fmt.Sprintf("dispute:%s:%d:%s", rec.ID, seq, p.Kind)})
+		entry := LedgerEntry{Seq: seq, Posting: p, PostedAt: now, Reference: fmt.Sprintf("dispute:%s:%d:%s", rec.ID, seq, p.Kind)}
+		// Only movements on the customer's account leave the building; the rest are the bank's own books.
+		if p.Debit == domain.AccountCustomer || p.Credit == domain.AccountCustomer {
+			receipt, err := s.instructCore(ctx, tx, rec, entry)
+			if err != nil {
+				return err
+			}
+			entry.Core = &receipt
+		}
+		entries = append(entries, entry)
 		s.postings.Add(ctx, 1, metric.WithAttributes(tenantAttr(ctx), attribute.String("regime", string(rec.Regime)), attribute.String("kind", string(p.Kind))))
 	}
 	return tx.AppendLedger(ctx, rec.ID, entries)
+}
+
+// instructCore asks the tenant's core to move the money, inside the transition's transaction, so a decline or a
+// silence rolls the transition back. The reference is stable across retries: a client that repeats the request
+// after a timeout reaches the core with the same reference and is answered "duplicate", not paid twice.
+func (s *Service) instructCore(ctx context.Context, tx Tx, rec DisputeRecord, e LedgerEntry) (CoreReceipt, error) {
+	cfg, err := tx.TenantCore(ctx)
+	if err != nil {
+		return CoreReceipt{}, err
+	}
+	ins := CoreInstruction{Reference: e.Reference, DisputeID: rec.ID, AccountID: rec.AccountID, TransactionID: rec.TransactionID,
+		Kind: e.Posting.Kind, CreditAccount: e.Posting.Credit == domain.AccountCustomer, Amount: e.Posting.Amount,
+		Currency: e.Posting.Currency, RequestedAt: e.PostedAt}
+	cctx, cancel := context.WithTimeout(ctx, s.coreTimeout)
+	defer cancel()
+	receipt, err := s.core.Post(cctx, cfg, ins)
+	outcome := "no-answer"
+	if err == nil {
+		outcome = receipt.ResponseCode
+		s.coreLatency.Record(ctx, receipt.Latency.Seconds(), metric.WithAttributes(attribute.String("core", cfg.Kind)))
+	}
+	s.coreMessages.Add(ctx, 1, metric.WithAttributes(tenantAttr(ctx), attribute.String("core", cfg.Kind),
+		attribute.String("kind", string(e.Posting.Kind)), attribute.String("outcome", outcome)))
+	switch {
+	case err != nil:
+		return CoreReceipt{}, errs.Wrap(ErrUnavailable, "banking core: %v", err)
+	case !receipt.Approved:
+		return CoreReceipt{}, ErrCoreDeclined.WithDetail("%s (%s)", receipt.ResponseText, receipt.ResponseCode)
+	}
+	return receipt, nil
 }
 
 func postingsOf(entries []LedgerEntry) []domain.Posting {
@@ -551,8 +623,12 @@ func (s *Service) view(ctx context.Context, tx Tx, rec DisputeRecord) (DisputeVi
 	var bal Balances
 	for _, e := range ledger {
 		p := e.Posting
-		lviews = append(lviews, LedgerView{Seq: e.Seq, Kind: p.Kind, Debit: p.Debit, Credit: p.Credit, Amount: p.Amount,
-			Currency: p.Currency, Reference: e.Reference, PostedAt: e.PostedAt})
+		lv := LedgerView{Seq: e.Seq, Kind: p.Kind, Debit: p.Debit, Credit: p.Credit, Amount: p.Amount,
+			Currency: p.Currency, Reference: e.Reference, PostedAt: e.PostedAt}
+		if e.Core != nil {
+			lv.Core = &CoreReceiptView{RRN: e.Core.RRN, ResponseCode: e.Core.ResponseCode, LatencyMs: e.Core.Latency.Milliseconds()}
+		}
+		lviews = append(lviews, lv)
 		bal.add(p.Debit, p.Amount)
 		bal.add(p.Credit, p.Amount.Neg())
 	}

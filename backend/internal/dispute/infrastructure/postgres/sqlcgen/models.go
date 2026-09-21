@@ -87,17 +87,20 @@ type IdempotencyKey struct {
 }
 
 type LedgerEntry struct {
-	ID            int64
-	TenantID      uuid.UUID
-	DisputeID     uuid.UUID
-	Seq           int32
-	Kind          string
-	DebitAccount  string
-	CreditAccount string
-	Amount        decimal.Decimal
-	Currency      string
-	Reference     string
-	PostedAt      time.Time
+	ID               int64
+	TenantID         uuid.UUID
+	DisputeID        uuid.UUID
+	Seq              int32
+	Kind             string
+	DebitAccount     string
+	CreditAccount    string
+	Amount           decimal.Decimal
+	Currency         string
+	Reference        string
+	PostedAt         time.Time
+	CoreRrn          *string
+	CoreResponseCode *string
+	CoreLatencyMs    *int32
 }
 
 type SuspenseByRegime struct {

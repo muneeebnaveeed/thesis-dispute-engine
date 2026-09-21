@@ -9,6 +9,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -55,8 +56,12 @@ func run(args []string) error {
 		domains := fs.String("domains", "", "comma-separated work-email domains")
 		timezone := fs.String("timezone", "", "IANA zone the regulatory clocks count days in (default UTC)")
 		holidays := fs.String("holidays", "", "comma-separated YYYY-MM-DD dates business-day clocks skip")
+		core := fs.String("core", "", `banking core as JSON, e.g. {"kind":"mock","declineAbove":"5000"}; empty leaves it as it is`)
 		if err := fs.Parse(args[1:]); err != nil {
 			return err
+		}
+		if *core != "" && !json.Valid([]byte(*core)) {
+			return fmt.Errorf("--core must be a JSON object")
 		}
 		if *slug == "" || *name == "" {
 			return fmt.Errorf("upsert needs --slug and --name")
@@ -81,6 +86,11 @@ func run(args []string) error {
 		}
 		if _, err := q.SetTenantCalendar(ctx, sqlcgen.SetTenantCalendarParams{ID: id, Timezone: *timezone, Holidays: splitList(*holidays)}); err != nil {
 			return err
+		}
+		if *core != "" {
+			if _, err := q.SetTenantCore(ctx, sqlcgen.SetTenantCoreParams{ID: id, Core: []byte(*core)}); err != nil {
+				return err
+			}
 		}
 		fmt.Printf("id:     %s\nslug:   %s\nissuer: %s\n", id, *slug, iss)
 	case "disable", "enable":

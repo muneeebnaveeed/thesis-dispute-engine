@@ -13,6 +13,7 @@ export type Failure =
   | { kind: 'not-found'; problem: Problem }
   | { kind: 'signed-out'; problem: Problem }
   | { kind: 'forbidden'; problem: Problem }
+  | { kind: 'declined'; problem: Problem }
   | { kind: 'rate-limited'; problem: Problem; retryAfterSeconds: number }
   | { kind: 'unavailable'; problem: Problem; retryAfterSeconds: number }
   | { kind: 'internal'; problem: Problem }
@@ -62,6 +63,8 @@ export function fromProblem(p: Problem): Failure {
       return { kind: 'signed-out', problem: p }
     case 'forbidden':
       return { kind: 'forbidden', problem: p }
+    case 'core-declined':
+      return { kind: 'declined', problem: p }
     case 'rate-limited':
       return { kind: 'rate-limited', problem: p, retryAfterSeconds: p.retryAfterSeconds ?? 60 }
     case 'unavailable':
@@ -159,6 +162,11 @@ export function describe(f: Failure): { title: string; hint: string } {
       return {
         title: f.problem.detail ?? 'Not allowed.',
         hint: 'This needs a role your account does not have.',
+      }
+    case 'declined':
+      return {
+        title: f.problem.detail ?? 'The banking core declined the posting.',
+        hint: 'Nothing was recorded. Check the amount and the account with your core banking team, then try again.',
       }
     case 'rate-limited':
       return {

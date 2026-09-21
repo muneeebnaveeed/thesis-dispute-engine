@@ -134,6 +134,13 @@ paths:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
         "422": { $ref: "#/components/responses/Unprocessable" }
+        "503":
+          description: >-
+            The tenant's banking core gave no answer in time; nothing was written. Repeat the request with the same
+            Idempotency-Key: the core sees the same posting reference and will not move the money twice.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
   /tenant-keys:
     get:
       operationId: listTenantKeys
@@ -315,7 +322,7 @@ components:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
     Unprocessable:
-      description: Well-formed but not acceptable (idempotency key reused with a different body, or no regime for the transaction).
+      description: Well-formed but not acceptable (idempotency key reused with a different body, no regime for the transaction, a liability or settlement the regime refuses, or a posting the banking core declined).
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -342,6 +349,7 @@ components:
         - appeals-exhausted
         - invalid-liability
         - invalid-settlement
+        - core-declined
         - concurrent-update
         - idempotency-key-reuse
         - no-regime
@@ -505,6 +513,16 @@ components:
         currency: { type: string, minLength: 3, maxLength: 3 }
         reference: { type: string, description: Unique per posting; what the banking core is told. }
         postedAt: { type: string, format: date-time }
+        core:
+          description: The banking core's answer; present for postings that moved the customer's money.
+          $ref: "#/components/schemas/CoreReceipt"
+    CoreReceipt:
+      type: object
+      required: [rrn, responseCode, latencyMs]
+      properties:
+        rrn: { type: string, description: Retrieval reference number (ISO 8583 DE37); empty when the tenant has no core. }
+        responseCode: { type: string, description: ISO 8583 DE39; 00 approved, 94 duplicate of an earlier approval. }
+        latencyMs: { type: integer, format: int64 }
     Balances:
       type: object
       description: Running totals per account; customer from the customer's side (positive means credited), the rest from the bank's.

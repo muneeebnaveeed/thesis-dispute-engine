@@ -43,6 +43,7 @@ var (
 		{"00000000-0000-8000-8000-000000000101", tenantA, accountEUR, "CARD", "125.40", "EUR", "Ryanair", 3},
 		{"00000000-0000-8000-8000-000000000102", tenantA, accountEUR, "CARD", "1899.00", "EUR", "MediaMarkt", 12},
 		{"00000000-0000-8000-8000-000000000103", tenantA, accountEUR, "SEPA_DD", "49.99", "EUR", "Vodafone Hungary", 20},
+		{"00000000-0000-8000-8000-000000000104", tenantA, accountEUR, "CARD", "7450.00", "EUR", "Apple Store", 7},
 		{"00000000-0000-8000-8000-000000000201", tenantA, accountUSD, "CARD", "89.10", "USD", "Amazon", 5},
 		{"00000000-0000-8000-8000-000000000202", tenantA, accountUSD, "CREDIT_CARD", "412.00", "USD", "Delta Air Lines", 9},
 		{"00000000-0000-8000-8000-000000000301", tenantB, accountB, "CARD", "64.00", "EUR", "Bolt", 2},
@@ -88,7 +89,12 @@ func run() error {
 
 	// Slugs double as Keycloak realm names (deploy/keycloak/render-realms.sh renders one realm per row here).
 	keycloak := getenv("KEYCLOAK_URL", "http://localhost:8180")
-	for _, t := range []struct{ id, name, slug, domain string }{{tenantA, "OTP Bank", "otp", "otpbank.hu"}, {tenantB, "Erste Bank", "erste", "erstebank.hu"}} {
+	// Two banks, two cores: OTP's refuses credits above 5000 (so the decline path can be shown on transaction 104),
+	// Erste's answers slowly. Both are the simulated core; the shape is what a real adapter would be configured with.
+	for _, t := range []struct{ id, name, slug, domain, core string }{
+		{tenantA, "OTP Bank", "otp", "otpbank.hu", `{"kind":"mock","declineAbove":"5000.00"}`},
+		{tenantB, "Erste Bank", "erste", "erstebank.hu", `{"kind":"mock","latencyMs":150}`},
+	} {
 		issuer := keycloak + "/realms/" + t.slug
 		if err := q.UpsertTenant(ctx, sqlcgen.UpsertTenantParams{ID: uuid.MustParse(t.id), Name: t.name, Slug: t.slug, OidcIssuer: &issuer}); err != nil {
 			return err
@@ -99,6 +105,9 @@ func run() error {
 		}
 		// Both seed banks are Hungarian: regulatory clocks count Budapest business days and skip public holidays.
 		if _, err := q.SetTenantCalendar(ctx, sqlcgen.SetTenantCalendarParams{ID: uuid.MustParse(t.id), Timezone: "Europe/Budapest", Holidays: hungarianHolidays}); err != nil {
+			return err
+		}
+		if _, err := q.SetTenantCore(ctx, sqlcgen.SetTenantCoreParams{ID: uuid.MustParse(t.id), Core: []byte(t.core)}); err != nil {
 			return err
 		}
 	}

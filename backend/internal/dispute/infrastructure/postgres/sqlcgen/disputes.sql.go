@@ -329,6 +329,23 @@ func (q *Queries) GetTenantCalendar(ctx context.Context) (GetTenantCalendarRow, 
 	return i, err
 }
 
+const getTenantCore = `-- name: GetTenantCore :one
+SELECT COALESCE(settings->'core'->>'kind', '')::text AS kind, COALESCE(settings->'core', '{}'::jsonb)::jsonb AS settings
+FROM tenants WHERE id = current_tenant_id()
+`
+
+type GetTenantCoreRow struct {
+	Kind     string
+	Settings []byte
+}
+
+func (q *Queries) GetTenantCore(ctx context.Context) (GetTenantCoreRow, error) {
+	row := q.db.QueryRow(ctx, getTenantCore)
+	var i GetTenantCoreRow
+	err := row.Scan(&i.Kind, &i.Settings)
+	return i, err
+}
+
 const getTenantKeyForTenant = `-- name: GetTenantKeyForTenant :one
 SELECT id, prefix, label, created_at, last_used_at, expires_at, revoked_at FROM tenant_keys WHERE id = $1 AND tenant_id = $2
 `
@@ -564,20 +581,24 @@ func (q *Queries) InsertIdempotencyKey(ctx context.Context, arg InsertIdempotenc
 }
 
 const insertLedgerEntry = `-- name: InsertLedgerEntry :exec
-INSERT INTO ledger_entries (dispute_id, seq, kind, debit_account, credit_account, amount, currency, reference, posted_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO ledger_entries (dispute_id, seq, kind, debit_account, credit_account, amount, currency, reference, posted_at,
+                            core_rrn, core_response_code, core_latency_ms)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 `
 
 type InsertLedgerEntryParams struct {
-	DisputeID     uuid.UUID
-	Seq           int32
-	Kind          string
-	DebitAccount  string
-	CreditAccount string
-	Amount        decimal.Decimal
-	Currency      string
-	Reference     string
-	PostedAt      time.Time
+	DisputeID        uuid.UUID
+	Seq              int32
+	Kind             string
+	DebitAccount     string
+	CreditAccount    string
+	Amount           decimal.Decimal
+	Currency         string
+	Reference        string
+	PostedAt         time.Time
+	CoreRrn          *string
+	CoreResponseCode *string
+	CoreLatencyMs    *int32
 }
 
 func (q *Queries) InsertLedgerEntry(ctx context.Context, arg InsertLedgerEntryParams) error {
@@ -591,6 +612,9 @@ func (q *Queries) InsertLedgerEntry(ctx context.Context, arg InsertLedgerEntryPa
 		arg.Currency,
 		arg.Reference,
 		arg.PostedAt,
+		arg.CoreRrn,
+		arg.CoreResponseCode,
+		arg.CoreLatencyMs,
 	)
 	return err
 }
@@ -821,23 +845,27 @@ func (q *Queries) ListDisputes(ctx context.Context, arg ListDisputesParams) ([]L
 }
 
 const listLedgerEntries = `-- name: ListLedgerEntries :many
-SELECT id, dispute_id, seq, kind, debit_account, credit_account, amount, currency, reference, posted_at
+SELECT id, dispute_id, seq, kind, debit_account, credit_account, amount, currency, reference, posted_at,
+       core_rrn, core_response_code, core_latency_ms
 FROM ledger_entries
 WHERE dispute_id = $1
 ORDER BY id
 `
 
 type ListLedgerEntriesRow struct {
-	ID            int64
-	DisputeID     uuid.UUID
-	Seq           int32
-	Kind          string
-	DebitAccount  string
-	CreditAccount string
-	Amount        decimal.Decimal
-	Currency      string
-	Reference     string
-	PostedAt      time.Time
+	ID               int64
+	DisputeID        uuid.UUID
+	Seq              int32
+	Kind             string
+	DebitAccount     string
+	CreditAccount    string
+	Amount           decimal.Decimal
+	Currency         string
+	Reference        string
+	PostedAt         time.Time
+	CoreRrn          *string
+	CoreResponseCode *string
+	CoreLatencyMs    *int32
 }
 
 func (q *Queries) ListLedgerEntries(ctx context.Context, disputeID uuid.UUID) ([]ListLedgerEntriesRow, error) {
@@ -860,6 +888,9 @@ func (q *Queries) ListLedgerEntries(ctx context.Context, disputeID uuid.UUID) ([
 			&i.Currency,
 			&i.Reference,
 			&i.PostedAt,
+			&i.CoreRrn,
+			&i.CoreResponseCode,
+			&i.CoreLatencyMs,
 		); err != nil {
 			return nil, err
 		}
@@ -1188,6 +1219,23 @@ type SetTenantCalendarParams struct {
 // The business-day calendar the regulatory clocks use (docs/adr/0013); other settings keys are left alone.
 func (q *Queries) SetTenantCalendar(ctx context.Context, arg SetTenantCalendarParams) (int64, error) {
 	result, err := q.db.Exec(ctx, setTenantCalendar, arg.Timezone, arg.Holidays, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setTenantCore = `-- name: SetTenantCore :execrows
+UPDATE tenants SET settings = settings || jsonb_build_object('core', $1::jsonb) WHERE id = $2
+`
+
+type SetTenantCoreParams struct {
+	Core []byte
+	ID   uuid.UUID
+}
+
+func (q *Queries) SetTenantCore(ctx context.Context, arg SetTenantCoreParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setTenantCore, arg.Core, arg.ID)
 	if err != nil {
 		return 0, err
 	}

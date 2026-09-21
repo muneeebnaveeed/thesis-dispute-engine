@@ -145,3 +145,40 @@ test('a refund with a customer liability posts the difference, an over-cap liabi
   await expect(postings).toContainText('Written off')
   await expect(advanced).toHaveText(/^0\.0000/)
 })
+
+test("the tenant's banking core answers each credit, and a decline leaves the dispute exactly as it was", async ({
+  page,
+  request,
+}) => {
+  // OTP's simulated core refuses credits above 5000 EUR; the seeded 7450 EUR Apple Store purchase trips it.
+  const res = await request.post(`${api}/disputes`, {
+    headers: { Authorization: `Bearer ${tenants.otp.key}`, 'Idempotency-Key': crypto.randomUUID() },
+    data: { transactionId: '00000000-0000-8000-8000-000000000104', actor: 'e2e' },
+  })
+  expect(res.status()).toBe(201)
+  const { id } = (await res.json()) as { id: string }
+  await page.goto(`/otp/disputes/${id}`)
+  await page.getByRole('button', { name: 'OPEN_INVESTIGATION' }).click()
+  await page.getByRole('button', { name: 'ISSUE_REFUND' }).click()
+  const alert = page.getByRole('alert')
+  await expect(alert).toContainText(/declined/)
+  await expect(alert).toContainText('61')
+  await expect(
+    page
+      .getByRole('definition')
+      .filter({ hasText: /^[A-Z_]+$/ })
+      .first(),
+  ).toHaveText('INVESTIGATING')
+  await expect(page.getByText(/No money has moved/)).toBeVisible()
+
+  // A smaller dispute is credited and the ledger shows the core's retrieval reference.
+  const small = await openDisputeViaApi(request, 'otp')
+  await page.goto(`/otp/disputes/${small}`)
+  await page.getByRole('button', { name: 'OPEN_INVESTIGATION' }).click()
+  await page.getByRole('button', { name: 'ISSUE_REFUND' }).click()
+  const row = page
+    .getByRole('table', { name: 'Postings' })
+    .getByRole('row')
+    .filter({ hasText: 'Refund to the customer' })
+  await expect(row).toContainText(/[0-9A-F]{12}/)
+})
