@@ -83,5 +83,7 @@ exists; `frontend/` and `docs/thesis/` get theirs when they gain content.
   machine (API and Grafana moved accordingly).
 - **No C compiler locally:** `go test -race` fails with "requires cgo"; use `make test` and
   let CI run the race detector.
-- **`gh` accounts:** the dev machine has several; the scripts refuse to run unless the active
-  account owns the repo (`gh auth switch --user muneeebnaveeed`).
+- **`gh` accounts:** the dev machine has several. The scripts export the repo owner's token
+  themselves (`gh auth token --user`), and the repo's local `credential.helper` does the
+  same for `git push`, so the active `gh` account does not matter here. Set the helper once
+  per clone: see `make hooks`.

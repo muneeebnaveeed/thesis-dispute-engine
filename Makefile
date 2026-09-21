@@ -10,8 +10,10 @@ GO      := cd $(BACKEND) && go
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
-hooks: ## Point git at .githooks (pre-commit: format + lint staged Go, version drift check)
+hooks: ## Per-clone git setup: hooks path, and a credential helper that pushes as the repo owner whichever gh account is active
 	git config core.hooksPath .githooks
+	git config --replace-all credential.helper ""
+	git config --add credential.helper '!f() { echo "username=muneeebnaveeed"; echo "password=$$(gh auth token --hostname github.com --user muneeebnaveeed)"; }; f'
 
 run: ## Run the API natively (reads DISPUTE_* / OTEL_* env vars; defaults target deploy/compose.yml)
 	$(GO) run ./cmd/api

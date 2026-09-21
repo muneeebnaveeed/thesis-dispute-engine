@@ -15,12 +15,13 @@ require_clean_tree() {
   fi
 }
 
-# gh holds several accounts on the dev machine; PRs and comments must come from the repo owner.
+# gh holds several accounts on the dev machine; act as the repo owner regardless of which one is active.
 require_gh_account() {
-  local owner active
-  owner=$(gh repo view --json owner --jq .owner.login)
-  active=$(gh api user --jq .login)
-  [[ "$active" == "$owner" ]] || die "gh is authenticated as $active, repo owner is $owner; run: gh auth switch --user $owner"
+  local owner token
+  owner=$(git remote get-url origin | sed -E 's#.*[:/]([^/]+)/[^/]+(\.git)?$#\1#')
+  token=$(gh auth token --hostname github.com --user "$owner" 2>/dev/null) || die "gh has no login for $owner; run: gh auth login"
+  export GH_TOKEN="$token"
+  [[ "$(gh api user --jq .login)" == "$owner" ]] || die "token for $owner did not authenticate as $owner"
 }
 
 require_feature_branch() {
