@@ -14,27 +14,24 @@ import (
 )
 
 const countDisputesByState = `-- name: CountDisputesByState :many
-SELECT regime, state, count(*)::bigint AS n
-FROM disputes
-GROUP BY regime, state
+SELECT tenant_id, regime, state, n FROM disputes_by_state
 `
 
-type CountDisputesByStateRow struct {
-	Regime string
-	State  string
-	N      int64
-}
-
-func (q *Queries) CountDisputesByState(ctx context.Context) ([]CountDisputesByStateRow, error) {
+func (q *Queries) CountDisputesByState(ctx context.Context) ([]DisputesByState, error) {
 	rows, err := q.db.Query(ctx, countDisputesByState)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []CountDisputesByStateRow{}
+	items := []DisputesByState{}
 	for rows.Next() {
-		var i CountDisputesByStateRow
-		if err := rows.Scan(&i.Regime, &i.State, &i.N); err != nil {
+		var i DisputesByState
+		if err := rows.Scan(
+			&i.TenantID,
+			&i.Regime,
+			&i.State,
+			&i.N,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -45,29 +42,33 @@ func (q *Queries) CountDisputesByState(ctx context.Context) ([]CountDisputesBySt
 	return items, nil
 }
 
-const deleteIdempotencyKeysBefore = `-- name: DeleteIdempotencyKeysBefore :execrows
-DELETE FROM idempotency_keys WHERE created_at < $1
-`
-
-func (q *Queries) DeleteIdempotencyKeysBefore(ctx context.Context, createdAt time.Time) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteIdempotencyKeysBefore, createdAt)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const getDispute = `-- name: GetDispute :one
-SELECT id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at
+SELECT id, tenant_id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at
 FROM disputes
 WHERE id = $1
 `
 
-func (q *Queries) GetDispute(ctx context.Context, id uuid.UUID) (Dispute, error) {
+type GetDisputeRow struct {
+	ID             uuid.UUID
+	TenantID       uuid.UUID
+	Regime         string
+	State          string
+	Appeals        int32
+	Version        int64
+	TransactionID  uuid.UUID
+	AccountID      uuid.UUID
+	DisputedAmount decimal.Decimal
+	Currency       string
+	OpenedAt       time.Time
+	UpdatedAt      time.Time
+}
+
+func (q *Queries) GetDispute(ctx context.Context, id uuid.UUID) (GetDisputeRow, error) {
 	row := q.db.QueryRow(ctx, getDispute, id)
-	var i Dispute
+	var i GetDisputeRow
 	err := row.Scan(
 		&i.ID,
+		&i.TenantID,
 		&i.Regime,
 		&i.State,
 		&i.Appeals,
@@ -93,9 +94,18 @@ type GetIdempotencyKeyParams struct {
 	Key   string
 }
 
-func (q *Queries) GetIdempotencyKey(ctx context.Context, arg GetIdempotencyKeyParams) (IdempotencyKey, error) {
+type GetIdempotencyKeyRow struct {
+	Scope       string
+	Key         string
+	RequestHash []byte
+	StatusCode  int32
+	Response    []byte
+	CreatedAt   time.Time
+}
+
+func (q *Queries) GetIdempotencyKey(ctx context.Context, arg GetIdempotencyKeyParams) (GetIdempotencyKeyRow, error) {
 	row := q.db.QueryRow(ctx, getIdempotencyKey, arg.Scope, arg.Key)
-	var i IdempotencyKey
+	var i GetIdempotencyKeyRow
 	err := row.Scan(
 		&i.Scope,
 		&i.Key,
@@ -142,18 +152,24 @@ func (q *Queries) GetTransaction(ctx context.Context, id uuid.UUID) (GetTransact
 }
 
 const insertAccount = `-- name: InsertAccount :exec
-INSERT INTO accounts (id, holder_name, currency) VALUES ($1, $2, $3)
+INSERT INTO accounts (id, tenant_id, holder_name, currency) VALUES ($1, $2, $3, $4)
 ON CONFLICT (id) DO NOTHING
 `
 
 type InsertAccountParams struct {
 	ID         uuid.UUID
+	TenantID   uuid.UUID
 	HolderName string
 	Currency   string
 }
 
 func (q *Queries) InsertAccount(ctx context.Context, arg InsertAccountParams) error {
-	_, err := q.db.Exec(ctx, insertAccount, arg.ID, arg.HolderName, arg.Currency)
+	_, err := q.db.Exec(ctx, insertAccount,
+		arg.ID,
+		arg.TenantID,
+		arg.HolderName,
+		arg.Currency,
+	)
 	return err
 }
 
@@ -252,14 +268,30 @@ func (q *Queries) InsertIdempotencyKey(ctx context.Context, arg InsertIdempotenc
 	return err
 }
 
+const insertTenant = `-- name: InsertTenant :exec
+INSERT INTO tenants (id, name) VALUES ($1, $2)
+ON CONFLICT (id) DO NOTHING
+`
+
+type InsertTenantParams struct {
+	ID   uuid.UUID
+	Name string
+}
+
+func (q *Queries) InsertTenant(ctx context.Context, arg InsertTenantParams) error {
+	_, err := q.db.Exec(ctx, insertTenant, arg.ID, arg.Name)
+	return err
+}
+
 const insertTransaction = `-- name: InsertTransaction :exec
-INSERT INTO transactions (id, account_id, rail, amount, currency, merchant, occurred_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO transactions (id, tenant_id, account_id, rail, amount, currency, merchant, occurred_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT (id) DO NOTHING
 `
 
 type InsertTransactionParams struct {
 	ID         uuid.UUID
+	TenantID   uuid.UUID
 	AccountID  uuid.UUID
 	Rail       string
 	Amount     decimal.Decimal
@@ -271,6 +303,7 @@ type InsertTransactionParams struct {
 func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionParams) error {
 	_, err := q.db.Exec(ctx, insertTransaction,
 		arg.ID,
+		arg.TenantID,
 		arg.AccountID,
 		arg.Rail,
 		arg.Amount,
@@ -288,15 +321,29 @@ WHERE dispute_id = $1
 ORDER BY seq
 `
 
-func (q *Queries) ListDisputeEvents(ctx context.Context, disputeID uuid.UUID) ([]DisputeEvent, error) {
+type ListDisputeEventsRow struct {
+	ID             int64
+	DisputeID      uuid.UUID
+	Seq            int32
+	Event          string
+	FromState      string
+	ToState        string
+	Actor          string
+	Payload        []byte
+	IdempotencyKey *string
+	TraceID        *string
+	OccurredAt     time.Time
+}
+
+func (q *Queries) ListDisputeEvents(ctx context.Context, disputeID uuid.UUID) ([]ListDisputeEventsRow, error) {
 	rows, err := q.db.Query(ctx, listDisputeEvents, disputeID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []DisputeEvent{}
+	items := []ListDisputeEventsRow{}
 	for rows.Next() {
-		var i DisputeEvent
+		var i ListDisputeEventsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.DisputeID,
@@ -318,6 +365,17 @@ func (q *Queries) ListDisputeEvents(ctx context.Context, disputeID uuid.UUID) ([
 		return nil, err
 	}
 	return items, nil
+}
+
+const purgeIdempotencyKeys = `-- name: PurgeIdempotencyKeys :one
+SELECT purge_idempotency_keys($1)::bigint AS n
+`
+
+func (q *Queries) PurgeIdempotencyKeys(ctx context.Context, before time.Time) (int64, error) {
+	row := q.db.QueryRow(ctx, purgeIdempotencyKeys, before)
+	var n int64
+	err := row.Scan(&n)
+	return n, err
 }
 
 const updateDisputeState = `-- name: UpdateDisputeState :execrows

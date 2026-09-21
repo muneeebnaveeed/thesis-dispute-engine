@@ -18,6 +18,7 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres/sqlcgen"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
 // Store runs application transactions on a pgx pool.
@@ -28,9 +29,17 @@ type Store struct {
 // NewStore wraps a pool.
 func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 
-// WithTx implements application.Store.
+// WithTx implements application.Store. The tenant is bound to the transaction with a LOCAL setting, which the
+// row-level policies and the tenant_id column defaults read; a pooled connection never carries it past commit.
 func (s *Store) WithTx(ctx context.Context, fn func(application.Tx) error) error {
+	id, ok := tenant.IDFrom(ctx)
+	if !ok {
+		return tenant.ErrMissing
+	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, id.String()); err != nil {
+			return mapErr(err)
+		}
 		return fn(&txn{q: sqlcgen.New(tx)})
 	})
 }
@@ -43,7 +52,7 @@ func (s *Store) CountByState(ctx context.Context) ([]application.StateCount, err
 	}
 	out := make([]application.StateCount, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, application.StateCount{Regime: domain.Regime(r.Regime), State: domain.State(r.State), N: r.N})
+		out = append(out, application.StateCount{TenantID: r.TenantID, Regime: domain.Regime(r.Regime), State: domain.State(r.State), N: r.N})
 	}
 	return out, nil
 }
@@ -52,6 +61,7 @@ func (s *Store) CountByState(ctx context.Context) ([]application.StateCount, err
 const PurgeLockID = 72040002
 
 // PurgeIdempotencyKeys implements application.Store; it skips silently when another session holds PurgeLockID.
+// The delete crosses tenants, so it goes through the owner-defined purge_idempotency_keys function, not the table.
 func (s *Store) PurgeIdempotencyKeys(ctx context.Context, before time.Time) (int64, error) {
 	var n int64
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
@@ -63,7 +73,7 @@ func (s *Store) PurgeIdempotencyKeys(ctx context.Context, before time.Time) (int
 			return nil
 		}
 		var err error
-		n, err = sqlcgen.New(tx).DeleteIdempotencyKeysBefore(ctx, before)
+		n, err = sqlcgen.New(tx).PurgeIdempotencyKeys(ctx, before)
 		return err
 	})
 	return n, mapErr(err)
@@ -98,7 +108,7 @@ func (t *txn) GetDispute(ctx context.Context, id uuid.UUID) (application.Dispute
 		return application.DisputeRecord{}, mapErr(err)
 	}
 	return application.DisputeRecord{
-		ID: row.ID, Regime: domain.Regime(row.Regime), State: domain.State(row.State), Appeals: int(row.Appeals),
+		ID: row.ID, TenantID: row.TenantID, Regime: domain.Regime(row.Regime), State: domain.State(row.State), Appeals: int(row.Appeals),
 		Version: row.Version, TransactionID: row.TransactionID, AccountID: row.AccountID,
 		DisputedAmount: row.DisputedAmount, Currency: row.Currency, OpenedAt: row.OpenedAt, UpdatedAt: row.UpdatedAt,
 	}, nil

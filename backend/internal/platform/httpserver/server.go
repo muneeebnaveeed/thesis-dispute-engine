@@ -17,14 +17,12 @@ type Server struct {
 	logger *slog.Logger
 }
 
-// New builds the middleware-wrapped server around a mux the caller has populated.
-func New(addr string, logger *slog.Logger, mux *http.ServeMux) *Server {
+// New builds the middleware-wrapped server around a mux the caller has populated; extra middleware runs innermost.
+func New(addr string, logger *slog.Logger, mux http.Handler, extra ...Middleware) *Server {
 	// Unmatched requests keep a method-only span name so arbitrary URLs cannot explode cardinality.
 	handler := otelhttp.NewHandler(
 		Chain(mux,
-			Recover(logger),
-			RequestID,
-			Log(logger),
+			append([]Middleware{Recover(logger), RequestID, Log(logger)}, extra...)...,
 		),
 		"http.server",
 		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {

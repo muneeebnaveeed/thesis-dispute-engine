@@ -10,9 +10,20 @@ import (
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
-// MemStore keeps everything in maps; WithTx snapshots and restores on error to mimic rollback.
+// TenantA and TenantB are the tenants unit tests use; Ctx carries TenantA.
+var (
+	TenantA = uuid.MustParse("00000000-0000-8000-8000-00000000a001")
+	TenantB = uuid.MustParse("00000000-0000-8000-8000-00000000a002")
+)
+
+// Ctx returns a context for TenantA.
+func Ctx() context.Context { return tenant.WithID(context.Background(), TenantA) }
+
+// MemStore keeps everything in maps; WithTx snapshots and restores on error to mimic rollback, and every
+// read is scoped to the tenant in the context the way row-level security scopes the real store.
 type MemStore struct {
 	mu           sync.Mutex
 	Transactions map[uuid.UUID]application.TransactionRecord
@@ -31,23 +42,32 @@ func NewMemStore() *MemStore {
 	}
 }
 
-// AddTransaction seeds a transaction and returns its ID.
+// AddTransaction seeds a transaction for TenantA and returns its ID.
 func (m *MemStore) AddTransaction(rail domain.Rail, currency, accountCurrency, amount string) uuid.UUID {
+	return m.AddTransactionFor(TenantA, rail, currency, accountCurrency, amount)
+}
+
+// AddTransactionFor seeds a transaction for one tenant and returns its ID.
+func (m *MemStore) AddTransactionFor(tenantID uuid.UUID, rail domain.Rail, currency, accountCurrency, amount string) uuid.UUID {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	id := uuid.New()
 	m.Transactions[id] = application.TransactionRecord{
-		ID: id, AccountID: uuid.New(), Rail: rail, Amount: mustDecimal(amount), Currency: currency, AccountCurrency: accountCurrency,
+		ID: id, TenantID: tenantID, AccountID: uuid.New(), Rail: rail, Amount: mustDecimal(amount), Currency: currency, AccountCurrency: accountCurrency,
 	}
 	return id
 }
 
 // WithTx serialises callers and rolls back on error.
-func (m *MemStore) WithTx(_ context.Context, fn func(application.Tx) error) error {
+func (m *MemStore) WithTx(ctx context.Context, fn func(application.Tx) error) error {
+	id, ok := tenant.IDFrom(ctx)
+	if !ok {
+		return tenant.ErrMissing
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	snap := m.snapshot()
-	if err := fn(&memTx{s: m}); err != nil {
+	if err := fn(&memTx{s: m, tenant: id}); err != nil {
 		m.restore(snap)
 		return err
 	}
@@ -72,13 +92,13 @@ func (m *MemStore) PurgeIdempotencyKeys(_ context.Context, before time.Time) (in
 func (m *MemStore) CountByState(_ context.Context) ([]application.StateCount, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	counts := map[[2]string]int64{}
+	counts := map[[3]string]int64{}
 	for _, d := range m.Disputes {
-		counts[[2]string{string(d.Regime), string(d.State)}]++
+		counts[[3]string{d.TenantID.String(), string(d.Regime), string(d.State)}]++
 	}
 	out := make([]application.StateCount, 0, len(counts))
 	for k, n := range counts {
-		out = append(out, application.StateCount{Regime: domain.Regime(k[0]), State: domain.State(k[1]), N: n})
+		out = append(out, application.StateCount{TenantID: uuid.MustParse(k[0]), Regime: domain.Regime(k[1]), State: domain.State(k[2]), N: n})
 	}
 	return out, nil
 }
@@ -107,24 +127,28 @@ func (m *MemStore) restore(s snapshotT) {
 	m.Disputes, m.Events, m.Idempotent = s.disputes, s.events, s.idempotent
 }
 
-type memTx struct{ s *MemStore }
+type memTx struct {
+	s      *MemStore
+	tenant uuid.UUID
+}
 
 func (t *memTx) GetTransaction(_ context.Context, id uuid.UUID) (application.TransactionRecord, error) {
 	r, ok := t.s.Transactions[id]
-	if !ok {
+	if !ok || r.TenantID != t.tenant {
 		return application.TransactionRecord{}, application.ErrNotFound
 	}
 	return r, nil
 }
 
 func (t *memTx) InsertDispute(_ context.Context, d application.DisputeRecord) error {
+	d.TenantID = t.tenant
 	t.s.Disputes[d.ID] = d
 	return nil
 }
 
 func (t *memTx) GetDispute(_ context.Context, id uuid.UUID) (application.DisputeRecord, error) {
 	r, ok := t.s.Disputes[id]
-	if !ok {
+	if !ok || r.TenantID != t.tenant {
 		return application.DisputeRecord{}, application.ErrNotFound
 	}
 	return r, nil
@@ -132,7 +156,7 @@ func (t *memTx) GetDispute(_ context.Context, id uuid.UUID) (application.Dispute
 
 func (t *memTx) UpdateDisputeState(_ context.Context, id uuid.UUID, expected int64, state domain.State, appeals int, at time.Time) error {
 	r, ok := t.s.Disputes[id]
-	if !ok || r.Version != expected {
+	if !ok || r.TenantID != t.tenant || r.Version != expected {
 		return application.ErrConflict
 	}
 	r.State, r.Appeals, r.Version, r.UpdatedAt = state, appeals, expected+1, at
@@ -155,7 +179,7 @@ func (t *memTx) ListEvents(_ context.Context, id uuid.UUID) ([]application.Event
 }
 
 func (t *memTx) GetIdempotent(_ context.Context, scope, key string) (application.StoredResponse, error) {
-	r, ok := t.s.Idempotent[scope+"\x00"+key]
+	r, ok := t.s.Idempotent[t.tenant.String()+"\x00"+scope+"\x00"+key]
 	if !ok {
 		return application.StoredResponse{}, application.ErrNotFound
 	}
@@ -166,6 +190,6 @@ func (t *memTx) PutIdempotent(_ context.Context, scope, key string, r applicatio
 	if r.CreatedAt.IsZero() {
 		r.CreatedAt = time.Now()
 	}
-	t.s.Idempotent[scope+"\x00"+key] = r
+	t.s.Idempotent[t.tenant.String()+"\x00"+scope+"\x00"+key] = r
 	return nil
 }

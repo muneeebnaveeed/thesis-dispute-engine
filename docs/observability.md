@@ -28,10 +28,10 @@ Metrics (OTel names; Prometheus flattens dots to underscores and adds `_total` t
 | --- | --- | --- | --- |
 | `http.server.request.duration` | histogram | `http.route`, `http.response.status_code` | from `otelhttp`; carries exemplars linking to traces |
 | `http.server.problems` | counter | `code`, `status` | every problem+json response, keyed by the error taxonomy code |
-| `dispute.transitions` | counter | `regime`, `event`, `from`, `to` | accepted state transitions |
+| `dispute.transitions` | counter | `tenant`, `regime`, `event`, `to` | accepted state transitions |
 | `dispute.idempotent_replays` | counter | `route` | requests answered from the idempotency store |
 | `dispute.time_in_state` | histogram | `regime`, `state` | seconds a dispute spent in the state it just left |
-| `dispute.by_state` | gauge | `regime`, `state` | current population, read from Postgres on each scrape |
+| `dispute.by_state` | gauge | `tenant`, `regime`, `state` | current population, read from Postgres on each scrape |
 
 Traces: one server span per request named by route (`POST /disputes/{disputeId}/events`), an
 application span per use case (`dispute.apply_event`), and one `otelpgx` span per statement named

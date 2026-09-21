@@ -51,6 +51,20 @@ func AppPool(t *testing.T, schema string) *pgxpool.Pool {
 // PoolWithSchema is Pool plus the schema name, for tests that open a second connection into it.
 func PoolWithSchema(t *testing.T) (*pgxpool.Pool, string) {
 	t.Helper()
+	pool, schema := EmptyPool(t)
+	files, err := postgres.Load(migrations.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := postgres.Migrate(context.Background(), pool, files); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	return pool, schema
+}
+
+// EmptyPool is PoolWithSchema without the migrations, for tests that apply them step by step.
+func EmptyPool(t *testing.T) (*pgxpool.Pool, string) {
+	t.Helper()
 	url := os.Getenv(EnvVar)
 	if url == "" {
 		t.Skipf("%s not set", EnvVar)
@@ -83,13 +97,5 @@ func PoolWithSchema(t *testing.T) (*pgxpool.Pool, string) {
 		t.Fatalf("connect to schema: %v", err)
 	}
 	t.Cleanup(pool.Close)
-
-	files, err := postgres.Load(migrations.FS)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := postgres.Migrate(ctx, pool, files); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
 	return pool, schema
 }

@@ -23,6 +23,7 @@ var (
 // DisputeRecord is the persisted state of a dispute.
 type DisputeRecord struct {
 	ID             uuid.UUID
+	TenantID       uuid.UUID
 	Regime         domain.Regime
 	State          domain.State
 	Appeals        int
@@ -56,6 +57,7 @@ type EventRecord struct {
 // TransactionRecord is what the use cases need from a transaction to open a dispute.
 type TransactionRecord struct {
 	ID              uuid.UUID
+	TenantID        uuid.UUID
 	AccountID       uuid.UUID
 	Rail            domain.Rail
 	Amount          decimal.Decimal
@@ -86,9 +88,10 @@ type Tx interface {
 
 // StateCount is how many disputes sit in one state under one regime.
 type StateCount struct {
-	Regime domain.Regime
-	State  domain.State
-	N      int64
+	TenantID uuid.UUID
+	Regime   domain.Regime
+	State    domain.State
+	N        int64
 }
 
 // Store runs fn inside one transaction; a returned error rolls it back.
