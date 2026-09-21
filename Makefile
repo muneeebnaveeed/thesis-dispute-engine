@@ -38,8 +38,11 @@ generate: ## Regenerate sqlc queries and the OpenAPI server from docs/api/openap
 	cd $(BACKEND) && sqlc generate && go generate ./...
 
 GENERATED := $(BACKEND)/internal/dispute/infrastructure/postgres/sqlcgen $(BACKEND)/internal/dispute/ports/http/oapi
-generate-check: generate ## Fail if generated code is out of date
-	git diff --exit-code -- $(GENERATED)
+generate-check: ## Fail if generated code is out of date (compares before and after, so a dirty tree is fine)
+	@before=$$(find $(GENERATED) -type f | sort | xargs sha256sum | sha256sum); \
+	$(MAKE) --no-print-directory generate; \
+	after=$$(find $(GENERATED) -type f | sort | xargs sha256sum | sha256sum); \
+	if [ "$$before" != "$$after" ]; then echo "generated code is out of date, commit the output of make generate"; git --no-pager diff --stat -- $(GENERATED); exit 1; fi
 
 lint: ## golangci-lint (config in backend/.golangci.yml)
 	cd $(BACKEND) && golangci-lint run ./...
@@ -83,8 +86,9 @@ docker-dev: ## PostgreSQL + the API in a Go toolchain container with live reload
 down: ## Stop everything started by up/otel-up (keeps the DB volume)
 	docker compose -f deploy/compose.yml --profile app --profile otel down
 
-otel-up: ## PostgreSQL + API + Grafana LGTM (http://localhost:3001, admin/admin); API exports traces, metrics and logs
+otel-up: ## PostgreSQL + API + Grafana LGTM (http://localhost:3001, admin/admin) + synthetic probe; seeds the DB
 	docker compose -f deploy/compose.yml --env-file deploy/otel.env --profile otel up -d --build
+	$(MAKE) --no-print-directory db-seed
 
 otel-down: ## Stop the otel stack
 	docker compose -f deploy/compose.yml --profile otel down
