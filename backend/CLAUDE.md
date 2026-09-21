@@ -30,7 +30,7 @@ its `domain` or storage.
   `dispute_api`, a member of the `dispute_app` group role whose grants live in the migration
   that creates each table; `migrations/roles_test.go` fails on a table without them. Only
   `cmd/migrate` and `cmd/seed` use the owner URL (`DISPUTE_MIGRATE_DATABASE_URL`).
-- **Auth (docs/adr/0009):** `auth.Bearer` resolves the API key into the tenant; the OpenAPI spec says
+- **Auth (docs/adr/0009):** `auth.Bearer` resolves the tenant key into the tenant; the OpenAPI spec says
   which operations need one (top-level `security`, `security: []` to opt out) and the request
   validator enforces it through `auth.Required`. Handlers never look at `Authorization`. Tests use a
   map-backed resolver and pass `Authorization: ""` to simulate an anonymous call.

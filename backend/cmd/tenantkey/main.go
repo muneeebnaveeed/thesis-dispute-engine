@@ -1,8 +1,8 @@
-// Command apikey issues and revokes tenant API keys as the schema owner. The secret is printed once.
+// Command tenantkey issues and revokes tenant keys as the schema owner. The secret is printed once.
 //
-//	apikey create --tenant <uuid> --label <text>
-//	apikey revoke --id <uuid>
-//	apikey list
+//	tenantkey create --tenant <uuid> --label <text>
+//	tenantkey revoke --id <uuid>
+//	tenantkey list
 package main
 
 import (
@@ -23,14 +23,14 @@ import (
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "apikey:", err)
+		fmt.Fprintln(os.Stderr, "tenantkey:", err)
 		os.Exit(1)
 	}
 }
 
 func run(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: apikey create|revoke|list")
+		return fmt.Errorf("usage: tenantkey create|revoke|list")
 	}
 	cfg, err := config.Load()
 	if err != nil {
@@ -64,7 +64,7 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
-		if err := q.InsertAPIKey(ctx, sqlcgen.InsertAPIKeyParams{ID: id, TenantID: tenantID, KeyHash: auth.HashKey(secret), Label: *label}); err != nil {
+		if err := q.InsertTenantKey(ctx, sqlcgen.InsertTenantKeyParams{ID: id, TenantID: tenantID, KeyHash: auth.HashKey(secret), Label: *label}); err != nil {
 			return err
 		}
 		fmt.Printf("id:  %s\nkey: %s\n\nStore the key now; it is not recoverable.\n", id, secret)
@@ -78,7 +78,7 @@ func run(args []string) error {
 		if err != nil {
 			return fmt.Errorf("revoke needs --id <uuid>")
 		}
-		n, err := q.RevokeAPIKey(ctx, id)
+		n, err := q.RevokeTenantKey(ctx, id)
 		if err != nil {
 			return err
 		}
@@ -87,7 +87,7 @@ func run(args []string) error {
 		}
 		fmt.Println("revoked", id)
 	case "list":
-		keys, err := q.ListAPIKeys(ctx)
+		keys, err := q.ListTenantKeys(ctx)
 		if err != nil {
 			return err
 		}
@@ -110,5 +110,5 @@ func NewSecret() (string, error) {
 	if _, err := rand.Read(b[:]); err != nil {
 		return "", err
 	}
-	return "dk_" + base64.RawURLEncoding.EncodeToString(b[:]), nil
+	return "tk_" + base64.RawURLEncoding.EncodeToString(b[:]), nil
 }

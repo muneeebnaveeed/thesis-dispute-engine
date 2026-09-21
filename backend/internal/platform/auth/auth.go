@@ -1,4 +1,4 @@
-// Package auth resolves the caller's tenant from a bearer API key. Human sign-in (OIDC) will add a second
+// Package auth resolves the caller's tenant from a bearer tenant key. Human sign-in (OIDC) will add a second
 // resolver later; everything below this layer only sees the tenant in the context.
 package auth
 
@@ -18,7 +18,7 @@ import (
 )
 
 // ErrUnauthenticated covers a missing, malformed, unknown or revoked key; the detail never says which.
-var ErrUnauthenticated = errs.New(errs.Unauthorized, "unauthenticated", "a valid API key is required")
+var ErrUnauthenticated = errs.New(errs.Unauthorized, "unauthenticated", "a valid tenant key is required")
 
 // Resolver maps a key hash to its tenant; application.ErrNotFound for unknown or revoked keys.
 type Resolver interface {

@@ -1,6 +1,6 @@
--- Tenant API keys. The secret is shown once at creation; only its SHA-256 is stored. Not under row-level security:
+-- Tenant tenant keys. The secret is shown once at creation; only its SHA-256 is stored. Not under row-level security:
 -- the lookup is what establishes the tenant, so it runs before one is known, and the table holds no tenant data.
-CREATE TABLE api_keys (
+CREATE TABLE tenant_keys (
     id          uuid PRIMARY KEY,
     tenant_id   uuid NOT NULL REFERENCES tenants (id),
     key_hash    bytea NOT NULL UNIQUE,
@@ -9,6 +9,6 @@ CREATE TABLE api_keys (
     revoked_at  timestamptz
 );
 
-CREATE INDEX api_keys_tenant_id_idx ON api_keys (tenant_id);
+CREATE INDEX tenant_keys_tenant_id_idx ON tenant_keys (tenant_id);
 
-GRANT SELECT ON api_keys TO dispute_app;
+GRANT SELECT ON tenant_keys TO dispute_app;

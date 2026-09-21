@@ -20,15 +20,6 @@ type Account struct {
 	TenantID   uuid.UUID
 }
 
-type ApiKey struct {
-	ID        uuid.UUID
-	TenantID  uuid.UUID
-	KeyHash   []byte
-	Label     string
-	CreatedAt time.Time
-	RevokedAt pgtype.Timestamptz
-}
-
 type Dispute struct {
 	ID             uuid.UUID
 	Regime         string
@@ -81,6 +72,15 @@ type Tenant struct {
 	Name      string
 	Settings  []byte
 	CreatedAt time.Time
+}
+
+type TenantKey struct {
+	ID        uuid.UUID
+	TenantID  uuid.UUID
+	KeyHash   []byte
+	Label     string
+	CreatedAt time.Time
+	RevokedAt pgtype.Timestamptz
 }
 
 type Transaction struct {

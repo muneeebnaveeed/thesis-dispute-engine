@@ -41,7 +41,7 @@ func newAPI(t *testing.T, ready disputehttp.Readiness) api {
 	return api{t: t, h: httpserver.RequestID(auth.Bearer(keys)(mux)), store: store}
 }
 
-// keyResolver stands in for the api_keys table; the handler tests care about the contract, not the lookup.
+// keyResolver stands in for the tenant_keys table; the handler tests care about the contract, not the lookup.
 type keyResolver map[string]uuid.UUID
 
 func (k keyResolver) TenantForKeyHash(_ context.Context, hash []byte) (uuid.UUID, error) {

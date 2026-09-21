@@ -1,4 +1,4 @@
-# 0009: API keys for tenant systems, Keycloak OIDC for people
+# 0009: Tenant keys for tenant systems, Keycloak OIDC for people
 
 **Status:** accepted, 2026-09-21; completes ADR 0008
 
@@ -13,10 +13,10 @@ the write-up; hand-rolling the first is sixty lines.
 
 ## Decision
 
-- Tenant systems present an API key: `Authorization: Bearer dk_...`, 32 random bytes shown once at
-  creation, stored as a SHA-256 hash in `api_keys` with `tenant_id`, `label` and `revoked_at`.
-  `cmd/apikey` issues, lists and revokes as the schema owner; the seed installs two fixed dev keys.
-  `api_keys` is not under row-level security because the lookup is what establishes the tenant.
+- Tenant systems present a tenant key: `Authorization: Bearer tk_...`, 32 random bytes shown once at
+  creation, stored as a SHA-256 hash in `tenant_keys` with `tenant_id`, `label` and `revoked_at`.
+  `cmd/tenantkey` issues, lists and revokes as the schema owner; the seed installs two fixed dev keys.
+  `tenant_keys` is not under row-level security because the lookup is what establishes the tenant.
 - The OpenAPI spec is the policy: a top-level `security: [bearerAuth]`, `security: []` on the
   health endpoints. `auth.Bearer` resolves whatever key is presented and records the outcome; the
   request validator's authentication hook (`auth.Required`) runs only for secured operations and
@@ -25,7 +25,7 @@ the write-up; hand-rolling the first is sixty lines.
   OIDC. The backend will validate the ID token with `coreos/go-oidc`, map a `tenant_id` claim to the
   same `tenant` context, and add nothing else: everything below the middleware is shared with the
   API-key path. Keycloak's organisations map one-to-one onto tenants.
-- Keycloak client credentials could later replace API keys for tenant systems with one middleware
+- Keycloak client credentials could later replace tenant keys for tenant systems with one middleware
   and one ADR; not now, because keys work without Keycloak running (CI, probe, curl) and are what
   integrators expect.
 

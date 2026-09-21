@@ -23,17 +23,17 @@ Requires `mise`, Docker with Compose v2, `make`. Optional: a C compiler for `go 
 mise install          # Go, golangci-lint, air; versions in mise.toml
 make db-up            # PostgreSQL on localhost:5432 (plus the API's login role)
 make run              # migrate, then the API on http://localhost:8090  ->  curl localhost:8090/healthz
-make db-seed          # two tenants with fixed dev API keys, accounts and transactions
+make db-seed          # two tenants with fixed dev tenant keys, accounts and transactions
 make dev              # same as run, with live reload
 make ci               # what CI runs
 make help             # every target, including PR and stack tooling
 ```
 
-Every dispute endpoint needs a tenant API key (`Authorization: Bearer ...`); the seed prints two dev
-keys, and `go run ./cmd/apikey create --tenant <uuid> --label <text>` (from `backend/`) issues real ones.
+Every dispute endpoint needs a tenant key (`Authorization: Bearer ...`); the seed prints two dev
+keys, and `go run ./cmd/tenantkey create --tenant <uuid> --label <text>` (from `backend/`) issues real ones.
 
 ```sh
-curl -s localhost:8090/disputes -H 'Authorization: Bearer dk_dev_tenant_a' -H 'Content-Type: application/json' \
+curl -s localhost:8090/disputes -H 'Authorization: Bearer tk_dev_tenant_a' -H 'Content-Type: application/json' \
   -d '{"transactionId":"00000000-0000-8000-8000-000000000101","actor":"demo"}'
 ```
 
@@ -46,7 +46,7 @@ standard `OTEL_*` variables; see `.env.example`.
 
 | Path | What |
 |---|---|
-| `backend/` | Go module: `cmd/{api,migrate,seed,apikey}`, `internal/<context>/{domain,application,infrastructure,ports}`, `internal/platform`, `migrations/` |
+| `backend/` | Go module: `cmd/{api,migrate,seed,tenantkey}`, `internal/<context>/{domain,application,infrastructure,ports}`, `internal/platform`, `migrations/` |
 | `frontend/` | Analyst dashboard (placeholder) |
 | `docs/adr/` | Architecture decision records |
 | `docs/thesis/` | Long-form design document |

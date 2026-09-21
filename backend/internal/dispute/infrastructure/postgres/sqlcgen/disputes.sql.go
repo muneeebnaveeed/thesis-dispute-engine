@@ -118,12 +118,12 @@ func (q *Queries) GetIdempotencyKey(ctx context.Context, arg GetIdempotencyKeyPa
 	return i, err
 }
 
-const getTenantByAPIKeyHash = `-- name: GetTenantByAPIKeyHash :one
-SELECT tenant_id FROM api_keys WHERE key_hash = $1 AND revoked_at IS NULL
+const getTenantByTenantKeyHash = `-- name: GetTenantByTenantKeyHash :one
+SELECT tenant_id FROM tenant_keys WHERE key_hash = $1 AND revoked_at IS NULL
 `
 
-func (q *Queries) GetTenantByAPIKeyHash(ctx context.Context, keyHash []byte) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, getTenantByAPIKeyHash, keyHash)
+func (q *Queries) GetTenantByTenantKeyHash(ctx context.Context, keyHash []byte) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getTenantByTenantKeyHash, keyHash)
 	var tenant_id uuid.UUID
 	err := row.Scan(&tenant_id)
 	return tenant_id, err
@@ -161,27 +161,6 @@ func (q *Queries) GetTransaction(ctx context.Context, id uuid.UUID) (GetTransact
 		&i.AccountCurrency,
 	)
 	return i, err
-}
-
-const insertAPIKey = `-- name: InsertAPIKey :exec
-INSERT INTO api_keys (id, tenant_id, key_hash, label) VALUES ($1, $2, $3, $4)
-`
-
-type InsertAPIKeyParams struct {
-	ID       uuid.UUID
-	TenantID uuid.UUID
-	KeyHash  []byte
-	Label    string
-}
-
-func (q *Queries) InsertAPIKey(ctx context.Context, arg InsertAPIKeyParams) error {
-	_, err := q.db.Exec(ctx, insertAPIKey,
-		arg.ID,
-		arg.TenantID,
-		arg.KeyHash,
-		arg.Label,
-	)
-	return err
 }
 
 const insertAccount = `-- name: InsertAccount :exec
@@ -316,6 +295,27 @@ func (q *Queries) InsertTenant(ctx context.Context, arg InsertTenantParams) erro
 	return err
 }
 
+const insertTenantKey = `-- name: InsertTenantKey :exec
+INSERT INTO tenant_keys (id, tenant_id, key_hash, label) VALUES ($1, $2, $3, $4)
+`
+
+type InsertTenantKeyParams struct {
+	ID       uuid.UUID
+	TenantID uuid.UUID
+	KeyHash  []byte
+	Label    string
+}
+
+func (q *Queries) InsertTenantKey(ctx context.Context, arg InsertTenantKeyParams) error {
+	_, err := q.db.Exec(ctx, insertTenantKey,
+		arg.ID,
+		arg.TenantID,
+		arg.KeyHash,
+		arg.Label,
+	)
+	return err
+}
+
 const insertTransaction = `-- name: InsertTransaction :exec
 INSERT INTO transactions (id, tenant_id, account_id, rail, amount, currency, merchant, occurred_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -345,44 +345,6 @@ func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionPa
 		arg.OccurredAt,
 	)
 	return err
-}
-
-const listAPIKeys = `-- name: ListAPIKeys :many
-SELECT id, tenant_id, label, created_at, revoked_at FROM api_keys ORDER BY created_at
-`
-
-type ListAPIKeysRow struct {
-	ID        uuid.UUID
-	TenantID  uuid.UUID
-	Label     string
-	CreatedAt time.Time
-	RevokedAt pgtype.Timestamptz
-}
-
-func (q *Queries) ListAPIKeys(ctx context.Context) ([]ListAPIKeysRow, error) {
-	rows, err := q.db.Query(ctx, listAPIKeys)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListAPIKeysRow{}
-	for rows.Next() {
-		var i ListAPIKeysRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.TenantID,
-			&i.Label,
-			&i.CreatedAt,
-			&i.RevokedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listDisputeEvents = `-- name: ListDisputeEvents :many
@@ -438,6 +400,44 @@ func (q *Queries) ListDisputeEvents(ctx context.Context, disputeID uuid.UUID) ([
 	return items, nil
 }
 
+const listTenantKeys = `-- name: ListTenantKeys :many
+SELECT id, tenant_id, label, created_at, revoked_at FROM tenant_keys ORDER BY created_at
+`
+
+type ListTenantKeysRow struct {
+	ID        uuid.UUID
+	TenantID  uuid.UUID
+	Label     string
+	CreatedAt time.Time
+	RevokedAt pgtype.Timestamptz
+}
+
+func (q *Queries) ListTenantKeys(ctx context.Context) ([]ListTenantKeysRow, error) {
+	rows, err := q.db.Query(ctx, listTenantKeys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTenantKeysRow{}
+	for rows.Next() {
+		var i ListTenantKeysRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Label,
+			&i.CreatedAt,
+			&i.RevokedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const purgeIdempotencyKeys = `-- name: PurgeIdempotencyKeys :one
 SELECT purge_idempotency_keys($1)::bigint AS n
 `
@@ -449,12 +449,12 @@ func (q *Queries) PurgeIdempotencyKeys(ctx context.Context, before time.Time) (i
 	return n, err
 }
 
-const revokeAPIKey = `-- name: RevokeAPIKey :execrows
-UPDATE api_keys SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL
+const revokeTenantKey = `-- name: RevokeTenantKey :execrows
+UPDATE tenant_keys SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL
 `
 
-func (q *Queries) RevokeAPIKey(ctx context.Context, id uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, revokeAPIKey, id)
+func (q *Queries) RevokeTenantKey(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeTenantKey, id)
 	if err != nil {
 		return 0, err
 	}

@@ -5,7 +5,7 @@ info:
   description: Issuer-side dispute lifecycle. Every mutation appends to the dispute's event log.
 servers:
   - url: http://localhost:8090
-# Every operation needs a tenant API key unless it opts out with an empty security list.
+# Every operation needs a tenant key unless it opts out with an empty security list.
 security:
   - bearerAuth: []
 paths:
@@ -108,7 +108,7 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
-      description: Tenant API key, issued per tenant and shown once; the server stores only its hash.
+      description: Tenant key, issued per tenant and shown once; the server stores only its hash.
   parameters:
     DisputeId:
       name: disputeId
@@ -128,7 +128,7 @@ components:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
     Unauthorized:
-      description: Missing, unknown or revoked API key.
+      description: Missing, unknown or revoked tenant key.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
