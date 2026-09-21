@@ -21,27 +21,46 @@ services:
       POSTGRES_DB: dispute
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # Fresh volumes get the API login at init; `make db-up` also applies it to existing ones.
+      - ./postgres/roles.sql:/docker-entrypoint-initdb.d/10-roles.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dispute -d dispute"]
       interval: 5s
       timeout: 3s
       retries: 10
 
-  api:
+  # Runs to completion before the API starts; the only thing besides seed that connects as the owner.
+  migrate:
     build:
       context: ../backend
       network: host # same bridge problem during `go mod download`; see header
       args:
         GO_VERSION: ${GO_VERSION:-1.27.1}
         VERSION: ${VERSION:-dev}
+    entrypoint: ["/migrate"]
     network_mode: host
-    profiles: [app, otel]
+    profiles: [app, otel, dev]
     depends_on:
       postgres:
         condition: service_healthy
     environment:
+      DISPUTE_MIGRATE_DATABASE_URL: postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable
+
+  api:
+    build:
+      context: ../backend
+      network: host
+      args:
+        GO_VERSION: ${GO_VERSION:-1.27.1}
+        VERSION: ${VERSION:-dev}
+    network_mode: host
+    profiles: [app, otel]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
       DISPUTE_ADDR: ":8090"
-      DISPUTE_DATABASE_URL: postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable
+      DISPUTE_DATABASE_URL: postgres://dispute_api:dispute_api@localhost:5432/dispute?sslmode=disable
       # deploy/otel.env fills these under the otel profile; empty means instrumented, nothing exported.
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-dispute-engine}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
@@ -58,15 +77,15 @@ services:
     working_dir: /src
     command: sh -c "go run github.com/air-verse/air@v1.67.4"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     volumes:
       - ../backend:/src
       - gomod:/go/pkg/mod
       - gobuild:/root/.cache/go-build
     environment:
       DISPUTE_ADDR: ":8090"
-      DISPUTE_DATABASE_URL: postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable
+      DISPUTE_DATABASE_URL: postgres://dispute_api:dispute_api@localhost:5432/dispute?sslmode=disable
 
   # Grafana + Loki + Tempo + Mimir + an OTel Collector in one image; OTLP on 4317/4318, UI on 3001 (admin/admin).
   lgtm:

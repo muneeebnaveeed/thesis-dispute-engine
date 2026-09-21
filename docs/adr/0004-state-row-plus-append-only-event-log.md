@@ -24,7 +24,13 @@ event sourcing (state rebuilt by replaying events) and a state row alongside a l
 - Client retries are idempotent through an `Idempotency-Key` header. Inside the same
   transaction as the write, the key is looked up in `idempotency_keys` (scoped per operation);
   a hit with the same request hash returns the stored response, a hit with a different hash
-  is refused, a miss stores the response before commit.
+  is refused, a miss stores the response before commit. Stored responses live for
+  `DISPUTE_IDEMPOTENCY_TTL` (default 24h); every API instance runs the sweep, a
+  `pg_try_advisory_xact_lock` makes it one deleter at a time.
+- The log is append-only twice over: triggers stop the owner, and the API runs as `dispute_api`,
+  a login in the `dispute_app` group role that has `INSERT` and `SELECT` on `dispute_events`
+  and no `UPDATE`, `DELETE`, `TRUNCATE` or DDL anywhere. Migrations run separately as the owner
+  (`cmd/migrate`); the API checks the schema version at start and refuses to serve behind it.
 - Identifiers are UUIDv7, generated in Go: time-ordered for index locality; no compliance
   regime constrains the format.
 

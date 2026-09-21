@@ -18,6 +18,8 @@ How to work in this repo. What the system does is in `README.md` and `docs/adr/`
   `make db-up` (CI runs them with a service container); without `DISPUTE_TEST_DATABASE_URL`
   those tests skip. `make cover` prints the coverage table CI posts on every PR.
 - `make generate`: regenerate sqlc queries and the OpenAPI server; commit the output.
+- `make migrate`: apply pending migrations as the schema owner; `make run` does it first. The
+  API only checks the schema and refuses to start behind it.
 - `make db-seed`: fixed dev accounts and transactions (idempotent; migrates first).
 - `make test` / `make lint` / `make fmt-fix`: the individual steps. `make test-race` needs cgo;
   the dev machine has no C compiler, CI has one.
@@ -40,7 +42,7 @@ backend/internal/<context>/application   use cases; orchestrates domain and port
 backend/internal/<context>/infrastructure adapters: Postgres, external systems
 backend/internal/<context>/ports/http    HTTP handlers implementing the generated interface (ports/http/oapi)
 backend/internal/platform/{config,httpserver,telemetry,postgres,errs}  shared kernel, no domain knowledge
-backend/migrations                       SQL, forward-only, embedded; applied at startup and by cmd/seed
+backend/migrations                       SQL, forward-only, embedded; applied by cmd/migrate and cmd/seed, checked by cmd/api
 docs/api/openapi.yaml                    the API contract; everything HTTP is generated from it
 deploy/                                  compose.yml (host networking, see below), otel.env, probe.sh, grafana/ and lgtm/ provisioning
 docs/adr, docs/thesis                    decisions; the design document

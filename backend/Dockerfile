@@ -15,10 +15,11 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 go build -trimpath \
       -ldflags "-s -w -X github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/telemetry.Version=${VERSION}" \
-      -o /out/api ./cmd/api
+      -o /out/ ./cmd/...
 
 FROM gcr.io/distroless/static-debian12:nonroot
-COPY --from=build /out/api /api
+# One image, three entrypoints: /api serves, /migrate and /seed run to completion as the schema owner.
+COPY --from=build /out/api /out/migrate /out/seed /
 EXPOSE 8090
 USER nonroot:nonroot
 ENTRYPOINT ["/api"]

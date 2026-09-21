@@ -158,9 +158,12 @@ jobs:
       - name: Keep baseline aside
         if: github.event_name == 'pull_request'
         run: '[ -f coverage.out ] && mv coverage.out coverage-base.out || true'
+      - name: Create the API login role
+        run: psql postgres://dispute:dispute@localhost:5432/dispute -v ON_ERROR_STOP=1 -q -f ../deploy/postgres/roles.sql
       - name: go test -race (unit + Postgres integration)
         env:
           DISPUTE_TEST_DATABASE_URL: postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable
+          DISPUTE_TEST_APP_DATABASE_URL: postgres://dispute_api:dispute_api@localhost:5432/dispute?sslmode=disable
         run: go test -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
       - name: Coverage report
         run: |
@@ -195,7 +198,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
-      # The binary connects and migrates at startup, so the smoke test needs a database.
+      # The API checks the schema at startup, so the smoke test needs a migrated database.
       postgres:
         image: postgres:17-alpine
         env:
@@ -222,15 +225,17 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Smoke test the image
-        # Host networking, same as deploy/compose.yml, so no port mapping is
-        # involved; the container must answer /healthz within a few seconds.
+        # Host networking, same as deploy/compose.yml, so no port mapping is involved. Exercises all three
+        # entrypoints the way compose does: migrate as owner, then the API as the least-privileged login.
         run: |
+          psql postgres://dispute:dispute@localhost:5432/dispute -v ON_ERROR_STOP=1 -q -f deploy/postgres/roles.sql
+          docker run --rm --network host --entrypoint /migrate dispute-engine-api:ci
           docker run -d --network host --name api dispute-engine-api:ci
           for i in $(seq 1 30); do
             if curl -fsS http://localhost:8090/readyz; then echo; exit 0; fi
             sleep 0.5
           done
-          echo "healthz never answered"; docker logs api; exit 1
+          echo "readyz never answered"; docker logs api; exit 1
 
   frontend:
     name: frontend checks
