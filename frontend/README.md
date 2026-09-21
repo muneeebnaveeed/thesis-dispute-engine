@@ -23,17 +23,28 @@ Routes are files under `src/routes/`; `src/routeTree.gen.ts` is generated (`pnpm
 and ignored. Unit tests sit next to the code as `*.test.tsx` and run under a separate
 `vitest.config.ts` so the Start and Nitro plugins stay out of the test process.
 
-## Contract-driven generation (decided)
+## Contract-driven generation
 
-`docs/api/openapi.yaml` is the single source. Generate, check in, diff in CI:
+`docs/api/openapi.yaml` is the single source. `pnpm generate` (or `make fe-generate`) writes two
+files into `src/api/`, both committed and diffed in CI (`pnpm generate:check`):
 
-- Types and client: `openapi-typescript` + `openapi-fetch`.
-- Runtime validation for forms: TypeBox schemas generated from `components.schemas`
-  (`schema2typebox` or `@sinclair/typebox-codegen`); a TypeBox schema is the same JSON Schema
-  object the backend validates with. Register the `uuid` format in `FormatRegistry`; neither
-  side validates it by default.
-- Only structural rules are shared. Business rules arrive from the API (`allowedEvents`,
-  `Problem.errors[].field` as a JSON pointer) and are never duplicated in the UI.
+- `schema.gen.ts`: request, response and path types from `openapi-typescript`, consumed by the
+  `openapi-fetch` client in `src/api/client.ts`.
+- `schemas.gen.ts`: one TypeBox schema per component, emitted by `scripts/generate-api.ts` from
+  the same JSON Schema the backend validates with. Each carries a compile-time assertion that its
+  static type equals the openapi-typescript type, so the two files cannot drift from each other.
+
+`src/api/validate.ts` runs a TypeBox schema over form input (registering the `uuid` format, which
+neither side validates by default) and returns field errors in the same shape the API uses. Only
+structural rules are shared; business rules arrive from the API (`allowedEvents`,
+`Problem.errors[].field` as a JSON pointer) and are never duplicated in the UI.
+
+## Talking to the API
+
+Pages never call the API from the browser. TanStack Start server functions in `src/server/` do,
+with the tenant key from the server's environment (`DISPUTE_API_URL`, `DISPUTE_TENANT_KEY`), and
+return either a value or a `Problem`. `src/server/disputes-core.ts` holds the logic and is unit
+tested against a fake `fetch`; `src/server/disputes.ts` is the thin Start wrapper.
 
 ## Authentication (decided)
 

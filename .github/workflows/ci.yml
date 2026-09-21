@@ -261,6 +261,8 @@ jobs:
             run: pnpm generate-routes && pnpm lint
           - name: format
             run: pnpm fmt
+          - name: generate
+            run: pnpm generate:check
           - name: test
             run: pnpm generate-routes && pnpm test
           - name: build

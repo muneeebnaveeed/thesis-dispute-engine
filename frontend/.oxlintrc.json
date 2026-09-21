@@ -1,16 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": [
-    "typescript",
-    "react",
-    "react-perf",
-    "import",
-    "unicorn",
-    "oxc",
-    "jsx-a11y",
-    "promise",
-    "vitest"
-  ],
+  "plugins": ["typescript", "react", "import", "unicorn", "oxc", "jsx-a11y", "promise", "vitest"],
   "categories": {
     "correctness": "error",
     "suspicious": "error",
@@ -40,6 +30,12 @@
       "files": ["src/test/setup.ts", "src/styles.css"],
       "rules": {
         "import/no-unassigned-import": "off"
+      }
+    },
+    {
+      "files": ["scripts/**"],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
       }
     }
   ]

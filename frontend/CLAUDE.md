@@ -20,8 +20,16 @@ lint and format fixes. `make fe-dev` for the dev server on :3002. Inside `fronte
   after adding a route (typecheck and lint depend on it; `make fe-check` does it).
 - Import app code through the `#/` alias, never relative paths across directories.
 - Components live in `src/components/` as `kebab-case.tsx` with a colocated `*.test.tsx`.
-- Types and the client come from the OpenAPI contract once generated; never hand-write request
-  or response shapes. Business rules (which events are allowed, field errors) arrive from the API.
+- Types, the client and the TypeBox schemas are generated from the OpenAPI contract
+  (`pnpm generate`, committed, diffed in CI); never hand-write request or response shapes. When
+  the spec changes, regenerate here and in the backend in the same PR.
+- The browser never calls the API. Server functions in `src/server/` do, with the tenant key
+  from the server environment; keep logic in `*-core.ts` modules (testable with a fake `fetch`)
+  and the `createServerFn` wrappers thin. Return `{ value, problem }`, never throw for a
+  problem+json response.
+- Show problems through `ProblemBanner`: it renders `detail`, field errors and the retry hint
+  from the contract. Never branch on `title` or `detail` text; branch on `code`.
+- Business rules (which events are allowed, field errors) arrive from the API.
 - No `any`; the lint config is strict on promises, hooks and imports. Fix the code, not the rule.
 - `vitest.config.ts` is deliberately separate from `vite.config.ts`; keep test settings there.
 - Styling is Tailwind utility classes; no CSS modules, no styled-components.
