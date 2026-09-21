@@ -10,12 +10,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application/apptest"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 	disputehttp "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/ports/http"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/auth"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/httpserver"
-	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
 type api struct {
@@ -35,7 +37,20 @@ func newAPI(t *testing.T, ready disputehttp.Readiness) api {
 	if err := disputehttp.Mount(mux, svc, ready); err != nil {
 		t.Fatal(err)
 	}
-	return api{t: t, h: httpserver.RequestID(tenant.Static(apptest.TenantA)(mux)), store: store}
+	keys := keyResolver{"key-a": apptest.TenantA, "key-b": apptest.TenantB}
+	return api{t: t, h: httpserver.RequestID(auth.Bearer(keys)(mux)), store: store}
+}
+
+// keyResolver stands in for the api_keys table; the handler tests care about the contract, not the lookup.
+type keyResolver map[string]uuid.UUID
+
+func (k keyResolver) TenantForKeyHash(_ context.Context, hash []byte) (uuid.UUID, error) {
+	for key, id := range k {
+		if bytes.Equal(auth.HashKey(key), hash) {
+			return id, nil
+		}
+	}
+	return uuid.Nil, application.ErrNotFound
 }
 
 func (a api) do(method, path string, body any, headers map[string]string) (*httptest.ResponseRecorder, map[string]any) {
@@ -48,7 +63,13 @@ func (a api) do(method, path string, body any, headers map[string]string) (*http
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	// Tenant A by default; a test passes its own Authorization (possibly empty) to change that.
+	req.Header.Set("Authorization", "Bearer key-a")
 	for k, v := range headers {
+		if v == "" {
+			req.Header.Del(k)
+			continue
+		}
 		req.Header.Set(k, v)
 	}
 	rec := httptest.NewRecorder()
@@ -176,5 +197,39 @@ func TestUnknownDisputeIs404AndSpecIsServed(t *testing.T) {
 	rec, spec := a.do(http.MethodGet, "/openapi.json", nil, nil)
 	if rec.Code != 200 || spec["openapi"] == nil {
 		t.Errorf("spec: %d", rec.Code)
+	}
+}
+
+func TestAuthenticationFollowsTheSpec(t *testing.T) {
+	a := newAPI(t, func(context.Context) error { return nil })
+	txn := a.store.AddTransaction(domain.RailCard, "EUR", "EUR", "10.00")
+	body := map[string]any{"transactionId": txn.String()}
+
+	// Health endpoints opt out of security in the spec; they need no key.
+	if rec, _ := a.do(http.MethodGet, "/healthz", nil, map[string]string{"Authorization": ""}); rec.Code != http.StatusOK {
+		t.Errorf("healthz without key: %d", rec.Code)
+	}
+	// Dispute operations require one; missing, wrong scheme and unknown keys all read the same to the client.
+	for name, header := range map[string]string{"missing": "", "basic": "Basic key-a", "unknown": "Bearer nope"} {
+		rec, problem := a.do(http.MethodPost, "/disputes", body, map[string]string{"Authorization": header})
+		if rec.Code != http.StatusUnauthorized || problem["code"] != "unauthenticated" || problem["retryable"] != false {
+			t.Errorf("%s: %d %v", name, rec.Code, problem)
+		}
+		if ct := rec.Header().Get("Content-Type"); ct != "application/problem+json" {
+			t.Errorf("%s: content type %q", name, ct)
+		}
+	}
+	// Authentication is checked before the body: an unauthenticated request with a broken body is still a 401.
+	if rec, _ := a.do(http.MethodPost, "/disputes", map[string]any{"transactionId": "nope"}, map[string]string{"Authorization": ""}); rec.Code != http.StatusUnauthorized {
+		t.Errorf("unauthenticated bad body: %d", rec.Code)
+	}
+
+	// A valid key for another tenant sees nothing of this one.
+	rec, created := a.do(http.MethodPost, "/disputes", body, nil)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create: %d %v", rec.Code, created)
+	}
+	if rec, _ := a.do(http.MethodGet, "/disputes/"+created["id"].(string), nil, map[string]string{"Authorization": "Bearer key-b"}); rec.Code != http.StatusNotFound {
+		t.Errorf("cross-tenant get: %d", rec.Code)
 	}
 }

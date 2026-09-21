@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shopspring/decimal"
 )
 
@@ -117,6 +118,17 @@ func (q *Queries) GetIdempotencyKey(ctx context.Context, arg GetIdempotencyKeyPa
 	return i, err
 }
 
+const getTenantByAPIKeyHash = `-- name: GetTenantByAPIKeyHash :one
+SELECT tenant_id FROM api_keys WHERE key_hash = $1 AND revoked_at IS NULL
+`
+
+func (q *Queries) GetTenantByAPIKeyHash(ctx context.Context, keyHash []byte) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getTenantByAPIKeyHash, keyHash)
+	var tenant_id uuid.UUID
+	err := row.Scan(&tenant_id)
+	return tenant_id, err
+}
+
 const getTransaction = `-- name: GetTransaction :one
 SELECT t.id, t.account_id, t.rail, t.amount, t.currency, t.merchant, t.occurred_at, a.currency AS account_currency
 FROM transactions t
@@ -149,6 +161,27 @@ func (q *Queries) GetTransaction(ctx context.Context, id uuid.UUID) (GetTransact
 		&i.AccountCurrency,
 	)
 	return i, err
+}
+
+const insertAPIKey = `-- name: InsertAPIKey :exec
+INSERT INTO api_keys (id, tenant_id, key_hash, label) VALUES ($1, $2, $3, $4)
+`
+
+type InsertAPIKeyParams struct {
+	ID       uuid.UUID
+	TenantID uuid.UUID
+	KeyHash  []byte
+	Label    string
+}
+
+func (q *Queries) InsertAPIKey(ctx context.Context, arg InsertAPIKeyParams) error {
+	_, err := q.db.Exec(ctx, insertAPIKey,
+		arg.ID,
+		arg.TenantID,
+		arg.KeyHash,
+		arg.Label,
+	)
+	return err
 }
 
 const insertAccount = `-- name: InsertAccount :exec
@@ -314,6 +347,44 @@ func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionPa
 	return err
 }
 
+const listAPIKeys = `-- name: ListAPIKeys :many
+SELECT id, tenant_id, label, created_at, revoked_at FROM api_keys ORDER BY created_at
+`
+
+type ListAPIKeysRow struct {
+	ID        uuid.UUID
+	TenantID  uuid.UUID
+	Label     string
+	CreatedAt time.Time
+	RevokedAt pgtype.Timestamptz
+}
+
+func (q *Queries) ListAPIKeys(ctx context.Context) ([]ListAPIKeysRow, error) {
+	rows, err := q.db.Query(ctx, listAPIKeys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAPIKeysRow{}
+	for rows.Next() {
+		var i ListAPIKeysRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Label,
+			&i.CreatedAt,
+			&i.RevokedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDisputeEvents = `-- name: ListDisputeEvents :many
 SELECT id, dispute_id, seq, event, from_state, to_state, actor, payload, idempotency_key, trace_id, occurred_at
 FROM dispute_events
@@ -376,6 +447,18 @@ func (q *Queries) PurgeIdempotencyKeys(ctx context.Context, before time.Time) (i
 	var n int64
 	err := row.Scan(&n)
 	return n, err
+}
+
+const revokeAPIKey = `-- name: RevokeAPIKey :execrows
+UPDATE api_keys SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL
+`
+
+func (q *Queries) RevokeAPIKey(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeAPIKey, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateDisputeState = `-- name: UpdateDisputeState :execrows

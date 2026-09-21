@@ -56,3 +56,15 @@ SELECT purge_idempotency_keys($1)::bigint AS n;
 
 -- name: CountDisputesByState :many
 SELECT tenant_id, regime, state, n FROM disputes_by_state;
+
+-- name: InsertAPIKey :exec
+INSERT INTO api_keys (id, tenant_id, key_hash, label) VALUES ($1, $2, $3, $4);
+
+-- name: GetTenantByAPIKeyHash :one
+SELECT tenant_id FROM api_keys WHERE key_hash = $1 AND revoked_at IS NULL;
+
+-- name: RevokeAPIKey :execrows
+UPDATE api_keys SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL;
+
+-- name: ListAPIKeys :many
+SELECT id, tenant_id, label, created_at, revoked_at FROM api_keys ORDER BY created_at;
