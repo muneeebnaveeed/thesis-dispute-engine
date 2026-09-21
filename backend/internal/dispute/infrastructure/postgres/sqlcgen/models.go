@@ -16,6 +16,7 @@ type Account struct {
 	HolderName string
 	Currency   string
 	OpenedAt   time.Time
+	TenantID   uuid.UUID
 }
 
 type Dispute struct {
@@ -30,6 +31,7 @@ type Dispute struct {
 	Currency       string
 	OpenedAt       time.Time
 	UpdatedAt      time.Time
+	TenantID       uuid.UUID
 }
 
 type DisputeEvent struct {
@@ -44,6 +46,14 @@ type DisputeEvent struct {
 	IdempotencyKey *string
 	TraceID        *string
 	OccurredAt     time.Time
+	TenantID       uuid.UUID
+}
+
+type DisputesByState struct {
+	TenantID uuid.UUID
+	Regime   string
+	State    string
+	N        int64
 }
 
 type IdempotencyKey struct {
@@ -53,6 +63,14 @@ type IdempotencyKey struct {
 	StatusCode  int32
 	Response    []byte
 	CreatedAt   time.Time
+	TenantID    uuid.UUID
+}
+
+type Tenant struct {
+	ID        uuid.UUID
+	Name      string
+	Settings  []byte
+	CreatedAt time.Time
 }
 
 type Transaction struct {
@@ -63,4 +81,5 @@ type Transaction struct {
 	Currency   string
 	Merchant   string
 	OccurredAt time.Time
+	TenantID   uuid.UUID
 }

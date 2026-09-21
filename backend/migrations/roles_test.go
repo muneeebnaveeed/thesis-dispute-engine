@@ -10,7 +10,8 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/postgres/pgtest"
 )
 
-// The API role must be able to read everything and append, and nothing else; a new table without grants fails here.
+// The API role reads everything (within its tenant), appends, and nothing else; cross-tenant work goes through the
+// owner-defined view and function. A new table without grants fails here.
 func TestAppRolePrivileges(t *testing.T) {
 	owner, schema := pgtest.PoolWithSchema(t)
 	app := pgtest.AppPool(t, schema)
@@ -46,6 +47,7 @@ func TestAppRolePrivileges(t *testing.T) {
 		"delete events":  `DELETE FROM dispute_events`,
 		"update events":  `UPDATE dispute_events SET actor = 'x'`,
 		"delete dispute": `DELETE FROM disputes`,
+		"delete keys":    `DELETE FROM idempotency_keys`,
 		"truncate":       `TRUNCATE disputes`,
 		"ddl":            `CREATE TABLE smuggled (id int)`,
 		"migrations":     `INSERT INTO schema_migrations (version, name, checksum) VALUES (999, 'x', 'y')`,
@@ -60,7 +62,8 @@ func TestAppRolePrivileges(t *testing.T) {
 
 	allowed := []string{
 		`SELECT count(*) FROM disputes`,
-		`DELETE FROM idempotency_keys WHERE created_at < now() - interval '1 year'`,
+		`SELECT count(*) FROM disputes_by_state`,
+		`SELECT purge_idempotency_keys(now() - interval '1 year')`,
 	}
 	for _, stmt := range allowed {
 		if _, err := app.Exec(ctx, stmt); err != nil {

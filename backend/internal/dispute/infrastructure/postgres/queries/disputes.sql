@@ -1,10 +1,14 @@
+-- name: InsertTenant :exec
+INSERT INTO tenants (id, name) VALUES ($1, $2)
+ON CONFLICT (id) DO NOTHING;
+
 -- name: InsertAccount :exec
-INSERT INTO accounts (id, holder_name, currency) VALUES ($1, $2, $3)
+INSERT INTO accounts (id, tenant_id, holder_name, currency) VALUES ($1, $2, $3, $4)
 ON CONFLICT (id) DO NOTHING;
 
 -- name: InsertTransaction :exec
-INSERT INTO transactions (id, account_id, rail, amount, currency, merchant, occurred_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO transactions (id, tenant_id, account_id, rail, amount, currency, merchant, occurred_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT (id) DO NOTHING;
 
 -- name: GetTransaction :one
@@ -18,7 +22,7 @@ INSERT INTO disputes (id, regime, state, appeals, version, transaction_id, accou
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10);
 
 -- name: GetDispute :one
-SELECT id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at
+SELECT id, tenant_id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at
 FROM disputes
 WHERE id = $1;
 
@@ -47,10 +51,8 @@ WHERE scope = $1 AND key = $2;
 INSERT INTO idempotency_keys (scope, key, request_hash, status_code, response)
 VALUES ($1, $2, $3, $4, $5);
 
--- name: DeleteIdempotencyKeysBefore :execrows
-DELETE FROM idempotency_keys WHERE created_at < $1;
+-- name: PurgeIdempotencyKeys :one
+SELECT purge_idempotency_keys($1)::bigint AS n;
 
 -- name: CountDisputesByState :many
-SELECT regime, state, count(*)::bigint AS n
-FROM disputes
-GROUP BY regime, state;
+SELECT tenant_id, regime, state, n FROM disputes_by_state;
