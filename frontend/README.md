@@ -19,6 +19,13 @@ make fe-fix             # apply lint and format fixes
 make fe-build           # production build into .output/, run with pnpm start
 ```
 
+`make e2e` (repo root) runs the Playwright suite in `e2e/` against the real stack: it starts
+Postgres, the API and Keycloak, seeds, builds this app and drives Chromium through sign-in at the
+tenant's realm, the `next` redirect, sign-out, opening and advancing a dispute with direct
+browser-to-API calls, validation problems and tenant isolation. `pnpm e2e:ui` for the inspector.
+It has its own workflow (`e2e`) that reports on every PR and keeps running on `main` after merge; it
+is informative, not a merge gate, so a red browser suite is a follow-up, never a blocker.
+
 Routes are files under `src/routes/`; `src/routeTree.gen.ts` is generated (`pnpm generate-routes`)
 and ignored. Unit tests sit next to the code as `*.test.tsx` and run under a separate
 `vitest.config.ts` so the Start and Nitro plugins stay out of the test process.

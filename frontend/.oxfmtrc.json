@@ -3,5 +3,14 @@
   "semi": false,
   "singleQuote": true,
   "printWidth": 110,
-  "ignorePatterns": ["dist", ".nitro", ".output", ".tanstack", "src/routeTree.gen.ts", "pnpm-lock.yaml"]
+  "ignorePatterns": [
+    "dist",
+    ".nitro",
+    ".output",
+    ".tanstack",
+    "src/routeTree.gen.ts",
+    "pnpm-lock.yaml",
+    "playwright-report",
+    "test-results"
+  ]
 }

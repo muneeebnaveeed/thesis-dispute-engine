@@ -1,11 +1,13 @@
 {
   "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules", "dist", ".nitro", ".output", ".tanstack"],
+  "exclude": ["node_modules", "dist", ".nitro", ".output", ".tanstack", "playwright-report", "test-results"],
   "compilerOptions": {
     "target": "ES2023",
     "jsx": "react-jsx",
     "module": "ESNext",
-    "paths": { "#/*": ["./src/*"] },
+    "paths": {
+      "#/*": ["./src/*"]
+    },
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
     "moduleResolution": "bundler",

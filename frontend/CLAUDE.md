@@ -38,4 +38,8 @@ lint and format fixes. `make fe-dev` for the dev server on :3002. Inside `fronte
 - Business rules (which events are allowed, field errors) arrive from the API.
 - No `any`; the lint config is strict on promises, hooks and imports. Fix the code, not the rule.
 - `vitest.config.ts` is deliberately separate from `vite.config.ts`; keep test settings there.
+- Browser tests live in `e2e/` (Playwright) and run against the real stack (`make e2e`). Write
+  them for behaviour a user sees (sign-in, redirects, a dispute advancing), use role and label
+  locators, and keep fixtures pointing at the seeded tenants in `e2e/fixtures.ts`. Unit tests
+  stay in `src/**/*.test.tsx`.
 - Styling is Tailwind utility classes; no CSS modules, no styled-components.
