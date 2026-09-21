@@ -108,11 +108,14 @@ var rules = map[Regime]Rules{
 	},
 }
 
+// ErrUnknownRegime means the regime string is not one this build knows.
+var ErrUnknownRegime = errs.New(errs.Invalid, "unknown-regime", "unknown regulatory regime")
+
 // RulesFor returns the configuration for a regime.
 func RulesFor(r Regime) (Rules, error) {
 	cfg, ok := rules[r]
 	if !ok {
-		return Rules{}, errs.Wrap(errs.New(errs.Invalid, "unknown-regime", "unknown regulatory regime"), "%q", r)
+		return Rules{}, errs.Wrap(ErrUnknownRegime, "%q", r)
 	}
 	return cfg, nil
 }
