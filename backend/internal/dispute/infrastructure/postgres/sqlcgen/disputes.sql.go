@@ -43,6 +43,65 @@ func (q *Queries) CountDisputesByState(ctx context.Context) ([]DisputesByState, 
 	return items, nil
 }
 
+const findTenantKeyByHash = `-- name: FindTenantKeyByHash :one
+SELECT id, tenant_id, label, revoked_at FROM tenant_keys WHERE key_hash = $1
+`
+
+type FindTenantKeyByHashRow struct {
+	ID        uuid.UUID
+	TenantID  uuid.UUID
+	Label     string
+	RevokedAt pgtype.Timestamptz
+}
+
+func (q *Queries) FindTenantKeyByHash(ctx context.Context, keyHash []byte) (FindTenantKeyByHashRow, error) {
+	row := q.db.QueryRow(ctx, findTenantKeyByHash, keyHash)
+	var i FindTenantKeyByHashRow
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Label,
+		&i.RevokedAt,
+	)
+	return i, err
+}
+
+const findTenantKeysByPrefix = `-- name: FindTenantKeysByPrefix :many
+SELECT id, tenant_id, label, revoked_at FROM tenant_keys WHERE prefix = $1
+`
+
+type FindTenantKeysByPrefixRow struct {
+	ID        uuid.UUID
+	TenantID  uuid.UUID
+	Label     string
+	RevokedAt pgtype.Timestamptz
+}
+
+func (q *Queries) FindTenantKeysByPrefix(ctx context.Context, prefix string) ([]FindTenantKeysByPrefixRow, error) {
+	rows, err := q.db.Query(ctx, findTenantKeysByPrefix, prefix)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FindTenantKeysByPrefixRow{}
+	for rows.Next() {
+		var i FindTenantKeysByPrefixRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Label,
+			&i.RevokedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getDispute = `-- name: GetDispute :one
 SELECT id, tenant_id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at
 FROM disputes
@@ -119,14 +178,20 @@ func (q *Queries) GetIdempotencyKey(ctx context.Context, arg GetIdempotencyKeyPa
 }
 
 const getTenantByTenantKeyHash = `-- name: GetTenantByTenantKeyHash :one
-SELECT tenant_id FROM tenant_keys WHERE key_hash = $1 AND revoked_at IS NULL
+SELECT id, tenant_id FROM tenant_keys
+WHERE key_hash = $1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())
 `
 
-func (q *Queries) GetTenantByTenantKeyHash(ctx context.Context, keyHash []byte) (uuid.UUID, error) {
+type GetTenantByTenantKeyHashRow struct {
+	ID       uuid.UUID
+	TenantID uuid.UUID
+}
+
+func (q *Queries) GetTenantByTenantKeyHash(ctx context.Context, keyHash []byte) (GetTenantByTenantKeyHashRow, error) {
 	row := q.db.QueryRow(ctx, getTenantByTenantKeyHash, keyHash)
-	var tenant_id uuid.UUID
-	err := row.Scan(&tenant_id)
-	return tenant_id, err
+	var i GetTenantByTenantKeyHashRow
+	err := row.Scan(&i.ID, &i.TenantID)
+	return i, err
 }
 
 const getTransaction = `-- name: GetTransaction :one
@@ -296,14 +361,16 @@ func (q *Queries) InsertTenant(ctx context.Context, arg InsertTenantParams) erro
 }
 
 const insertTenantKey = `-- name: InsertTenantKey :exec
-INSERT INTO tenant_keys (id, tenant_id, key_hash, label) VALUES ($1, $2, $3, $4)
+INSERT INTO tenant_keys (id, tenant_id, key_hash, prefix, label, expires_at) VALUES ($1, $2, $3, $4, $5, $6)
 `
 
 type InsertTenantKeyParams struct {
-	ID       uuid.UUID
-	TenantID uuid.UUID
-	KeyHash  []byte
-	Label    string
+	ID        uuid.UUID
+	TenantID  uuid.UUID
+	KeyHash   []byte
+	Prefix    string
+	Label     string
+	ExpiresAt pgtype.Timestamptz
 }
 
 func (q *Queries) InsertTenantKey(ctx context.Context, arg InsertTenantKeyParams) error {
@@ -311,7 +378,9 @@ func (q *Queries) InsertTenantKey(ctx context.Context, arg InsertTenantKeyParams
 		arg.ID,
 		arg.TenantID,
 		arg.KeyHash,
+		arg.Prefix,
 		arg.Label,
+		arg.ExpiresAt,
 	)
 	return err
 }
@@ -401,15 +470,18 @@ func (q *Queries) ListDisputeEvents(ctx context.Context, disputeID uuid.UUID) ([
 }
 
 const listTenantKeys = `-- name: ListTenantKeys :many
-SELECT id, tenant_id, label, created_at, revoked_at FROM tenant_keys ORDER BY created_at
+SELECT id, tenant_id, prefix, label, created_at, last_used_at, expires_at, revoked_at FROM tenant_keys ORDER BY created_at
 `
 
 type ListTenantKeysRow struct {
-	ID        uuid.UUID
-	TenantID  uuid.UUID
-	Label     string
-	CreatedAt time.Time
-	RevokedAt pgtype.Timestamptz
+	ID         uuid.UUID
+	TenantID   uuid.UUID
+	Prefix     string
+	Label      string
+	CreatedAt  time.Time
+	LastUsedAt pgtype.Timestamptz
+	ExpiresAt  pgtype.Timestamptz
+	RevokedAt  pgtype.Timestamptz
 }
 
 func (q *Queries) ListTenantKeys(ctx context.Context) ([]ListTenantKeysRow, error) {
@@ -424,8 +496,11 @@ func (q *Queries) ListTenantKeys(ctx context.Context) ([]ListTenantKeysRow, erro
 		if err := rows.Scan(
 			&i.ID,
 			&i.TenantID,
+			&i.Prefix,
 			&i.Label,
 			&i.CreatedAt,
+			&i.LastUsedAt,
+			&i.ExpiresAt,
 			&i.RevokedAt,
 		); err != nil {
 			return nil, err
@@ -459,6 +534,15 @@ func (q *Queries) RevokeTenantKey(ctx context.Context, id uuid.UUID) (int64, err
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const touchTenantKey = `-- name: TouchTenantKey :exec
+UPDATE tenant_keys SET last_used_at = now() WHERE id = $1
+`
+
+func (q *Queries) TouchTenantKey(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, touchTenantKey, id)
+	return err
 }
 
 const updateDisputeState = `-- name: UpdateDisputeState :execrows

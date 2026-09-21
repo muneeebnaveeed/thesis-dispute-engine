@@ -30,7 +30,8 @@ make help             # every target, including PR and stack tooling
 ```
 
 Every dispute endpoint needs a tenant key (`Authorization: Bearer ...`); the seed prints two dev
-keys, and `go run ./cmd/tenantkey create --tenant <uuid> --label <text>` (from `backend/`) issues real ones.
+keys, and `go run ./cmd/tenantkey create --tenant <uuid> --label <text>` (from `backend/`) issues real ones;
+`docs/operations.md` covers rotation, leaks and expiry.
 
 ```sh
 curl -s localhost:8090/disputes -H 'Authorization: Bearer tk_dev_tenant_a' -H 'Content-Type: application/json' \

@@ -31,6 +31,17 @@ func HashKey(key string) []byte {
 	return sum[:]
 }
 
+// PrefixLen is how much of a key is stored in clear so a leaked value can be matched to its row.
+const PrefixLen = 12
+
+// Prefix returns the identifying, non-secret start of a key.
+func Prefix(key string) string {
+	if len(key) < PrefixLen {
+		return key
+	}
+	return key[:PrefixLen]
+}
+
 type ctxKey struct{}
 
 // Bearer resolves the key if one is presented and records the outcome; it never rejects by itself, because the

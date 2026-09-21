@@ -75,12 +75,15 @@ type Tenant struct {
 }
 
 type TenantKey struct {
-	ID        uuid.UUID
-	TenantID  uuid.UUID
-	KeyHash   []byte
-	Label     string
-	CreatedAt time.Time
-	RevokedAt pgtype.Timestamptz
+	ID         uuid.UUID
+	TenantID   uuid.UUID
+	KeyHash    []byte
+	Label      string
+	CreatedAt  time.Time
+	RevokedAt  pgtype.Timestamptz
+	Prefix     string
+	LastUsedAt pgtype.Timestamptz
+	ExpiresAt  pgtype.Timestamptz
 }
 
 type Transaction struct {

@@ -87,7 +87,7 @@ func run() error {
 		{"00000000-0000-8000-8000-00000000c001", tenantA, devKeyA},
 		{"00000000-0000-8000-8000-00000000c002", tenantB, devKeyB},
 	} {
-		if err := q.InsertTenantKey(ctx, sqlcgen.InsertTenantKeyParams{ID: uuid.MustParse(k.id), TenantID: uuid.MustParse(k.tenant), KeyHash: auth.HashKey(k.secret), Label: "dev"}); err != nil && !isUniqueViolation(err) {
+		if err := q.InsertTenantKey(ctx, sqlcgen.InsertTenantKeyParams{ID: uuid.MustParse(k.id), TenantID: uuid.MustParse(k.tenant), KeyHash: auth.HashKey(k.secret), Prefix: auth.Prefix(k.secret), Label: "dev"}); err != nil && !isUniqueViolation(err) {
 			return err
 		}
 	}
