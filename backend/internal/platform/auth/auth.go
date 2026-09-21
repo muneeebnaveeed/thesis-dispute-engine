@@ -5,6 +5,7 @@ package auth
 import (
 	"context"
 	"crypto/sha256"
+	"crypto/subtle"
 	"net/http"
 	"strings"
 
@@ -95,8 +96,38 @@ func Bearer(keys Resolver, oidc *OIDC) httpserver.Middleware {
 	}
 }
 
-// Required is the validator's authentication hook: it runs only for operations the spec marks as secured.
-func Required(ctx context.Context) error {
+type serviceKey struct{}
+
+// ServiceKey marks requests that carry the shared secret for the frontend server's internal endpoints. An empty
+// configured key disables them. Comparison is constant time; the header is never logged.
+func ServiceKey(key string) httpserver.Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			got := r.Header.Get("X-Service-Key")
+			if key != "" && got != "" && subtle.ConstantTimeCompare([]byte(got), []byte(key)) == 1 {
+				httpserver.Annotate(r.Context(), "auth", "service")
+				r = r.WithContext(context.WithValue(r.Context(), serviceKey{}, true))
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// IsService reports whether the request authenticated with the service key.
+func IsService(ctx context.Context) bool {
+	ok, _ := ctx.Value(serviceKey{}).(bool)
+	return ok
+}
+
+// Required is the validator's authentication hook: it runs only for operations the spec marks as secured, once per
+// security scheme the operation lists. bearerAuth needs a tenant; serviceKey needs the shared secret.
+func Required(ctx context.Context, scheme string) error {
+	if scheme == "serviceKey" {
+		if IsService(ctx) {
+			return nil
+		}
+		return ErrUnauthenticated
+	}
 	if _, ok := tenant.IDFrom(ctx); ok {
 		return nil
 	}

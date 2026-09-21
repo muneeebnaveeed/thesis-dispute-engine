@@ -1,9 +1,13 @@
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
+import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 
+import { getViewer } from '#/server/auth/session'
+import { publicConfig } from '#/server/public-config'
 import appCss from '../styles.css?url'
 
+// Every page knows who is signed in (or that nobody is) and the browser-facing API URL, from one server round trip.
 export const Route = createRootRoute({
+  beforeLoad: async () => ({ viewer: await getViewer(), config: await publicConfig() }),
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
@@ -13,6 +17,7 @@ export const Route = createRootRoute({
     links: [{ rel: 'stylesheet', href: appCss }],
   }),
   shellComponent: RootDocument,
+  component: Outlet,
 })
 
 function RootDocument({ children }: { children: ReactNode }) {

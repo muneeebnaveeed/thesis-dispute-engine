@@ -324,6 +324,15 @@ type Problem struct {
 // Regime defines model for Regime.
 type Regime string
 
+// SessionBlob Ciphertext the frontend server produced; the API stores it without being able to read it.
+type SessionBlob struct {
+	Ciphertext []byte    `json:"ciphertext"`
+	ExpiresAt  time.Time `json:"expiresAt"`
+
+	// TenantId Set once the session belongs to a signed-in analyst; informational.
+	TenantId *openapi_types.UUID `json:"tenantId,omitempty"`
+}
+
 // DisputeId defines model for DisputeId.
 type DisputeId = openapi_types.UUID
 
@@ -360,6 +369,9 @@ type CreateDisputeJSONRequestBody = CreateDisputeRequest
 // ApplyDisputeEventJSONRequestBody defines body for ApplyDisputeEvent for application/json ContentType.
 type ApplyDisputeEventJSONRequestBody = ApplyEventRequest
 
+// PutSessionJSONRequestBody defines body for PutSession for application/json ContentType.
+type PutSessionJSONRequestBody = SessionBlob
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// CreateDispute Open a dispute against a transaction
@@ -374,6 +386,15 @@ type ServerInterface interface {
 	// GetHealthz Liveness
 	// (GET /healthz)
 	GetHealthz(w http.ResponseWriter, r *http.Request)
+	// DeleteSession Remove a session
+	// (DELETE /internal/sessions/{sessionId})
+	DeleteSession(w http.ResponseWriter, r *http.Request, sessionId openapi_types.UUID)
+	// GetSession Fetch a session blob that has not expired
+	// (GET /internal/sessions/{sessionId})
+	GetSession(w http.ResponseWriter, r *http.Request, sessionId openapi_types.UUID)
+	// PutSession Store or replace an opaque session blob
+	// (PUT /internal/sessions/{sessionId})
+	PutSession(w http.ResponseWriter, r *http.Request, sessionId openapi_types.UUID)
 	// GetReadyz Readiness (database reachable)
 	// (GET /readyz)
 	GetReadyz(w http.ResponseWriter, r *http.Request)
@@ -510,6 +531,84 @@ func (siw *ServerInterfaceWrapper) GetHealthz(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealthz(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteSession operation middleware
+func (siw *ServerInterfaceWrapper) DeleteSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sessionId" -------------
+	var sessionId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sessionId", r.PathValue("sessionId"), &sessionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sessionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteSession(w, r, sessionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSession operation middleware
+func (siw *ServerInterfaceWrapper) GetSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sessionId" -------------
+	var sessionId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sessionId", r.PathValue("sessionId"), &sessionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sessionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSession(w, r, sessionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutSession operation middleware
+func (siw *ServerInterfaceWrapper) PutSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sessionId" -------------
+	var sessionId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sessionId", r.PathValue("sessionId"), &sessionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sessionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutSession(w, r, sessionId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -658,6 +757,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/disputes", wrapper.CreateDispute)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/disputes/{disputeId}", wrapper.GetDispute)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/disputes/{disputeId}/events", wrapper.ApplyDisputeEvent)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/internal/sessions/{sessionId}", wrapper.DeleteSession)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/internal/sessions/{sessionId}", wrapper.GetSession)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/internal/sessions/{sessionId}", wrapper.PutSession)
 
 	return m
 }
@@ -934,6 +1036,141 @@ func (response GetHealthz200JSONResponse) VisitGetHealthzResponse(w http.Respons
 	return err
 }
 
+type DeleteSessionRequestObject struct {
+	SessionId openapi_types.UUID `json:"sessionId"`
+}
+
+type DeleteSessionResponseObject interface {
+	VisitDeleteSessionResponse(w http.ResponseWriter) error
+}
+
+type DeleteSession204Response struct {
+}
+
+func (response DeleteSession204Response) VisitDeleteSessionResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteSession401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSession401ApplicationProblemPlusJSONResponse) VisitDeleteSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSessionRequestObject struct {
+	SessionId openapi_types.UUID `json:"sessionId"`
+}
+
+type GetSessionResponseObject interface {
+	VisitGetSessionResponse(w http.ResponseWriter) error
+}
+
+type GetSession200JSONResponse SessionBlob
+
+func (response GetSession200JSONResponse) VisitGetSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSession401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetSession401ApplicationProblemPlusJSONResponse) VisitGetSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSession404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetSession404ApplicationProblemPlusJSONResponse) VisitGetSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutSessionRequestObject struct {
+	SessionId openapi_types.UUID `json:"sessionId"`
+	Body      *PutSessionJSONRequestBody
+}
+
+type PutSessionResponseObject interface {
+	VisitPutSessionResponse(w http.ResponseWriter) error
+}
+
+type PutSession204Response struct {
+}
+
+func (response PutSession204Response) VisitPutSessionResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type PutSession400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response PutSession400ApplicationProblemPlusJSONResponse) VisitPutSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutSession401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PutSession401ApplicationProblemPlusJSONResponse) VisitPutSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetReadyzRequestObject struct {
 }
 
@@ -983,6 +1220,15 @@ type StrictServerInterface interface {
 	// GetHealthz Liveness
 	// (GET /healthz)
 	GetHealthz(ctx context.Context, request GetHealthzRequestObject) (GetHealthzResponseObject, error)
+	// DeleteSession Remove a session
+	// (DELETE /internal/sessions/{sessionId})
+	DeleteSession(ctx context.Context, request DeleteSessionRequestObject) (DeleteSessionResponseObject, error)
+	// GetSession Fetch a session blob that has not expired
+	// (GET /internal/sessions/{sessionId})
+	GetSession(ctx context.Context, request GetSessionRequestObject) (GetSessionResponseObject, error)
+	// PutSession Store or replace an opaque session blob
+	// (PUT /internal/sessions/{sessionId})
+	PutSession(ctx context.Context, request PutSessionRequestObject) (PutSessionResponseObject, error)
 	// GetReadyz Readiness (database reachable)
 	// (GET /readyz)
 	GetReadyz(ctx context.Context, request GetReadyzRequestObject) (GetReadyzResponseObject, error)
@@ -1144,6 +1390,91 @@ func (sh *strictHandler) GetHealthz(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// DeleteSession operation middleware
+func (sh *strictHandler) DeleteSession(w http.ResponseWriter, r *http.Request, sessionId openapi_types.UUID) {
+	var request DeleteSessionRequestObject
+
+	request.SessionId = sessionId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteSession(ctx, request.(DeleteSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteSessionResponseObject); ok {
+		if err := validResponse.VisitDeleteSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSession operation middleware
+func (sh *strictHandler) GetSession(w http.ResponseWriter, r *http.Request, sessionId openapi_types.UUID) {
+	var request GetSessionRequestObject
+
+	request.SessionId = sessionId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSession(ctx, request.(GetSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSessionResponseObject); ok {
+		if err := validResponse.VisitGetSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutSession operation middleware
+func (sh *strictHandler) PutSession(w http.ResponseWriter, r *http.Request, sessionId openapi_types.UUID) {
+	var request PutSessionRequestObject
+
+	request.SessionId = sessionId
+
+	var body PutSessionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutSession(ctx, request.(PutSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutSessionResponseObject); ok {
+		if err := validResponse.VisitPutSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetReadyz operation middleware
 func (sh *strictHandler) GetReadyz(w http.ResponseWriter, r *http.Request) {
 	var request GetReadyzRequestObject
@@ -1173,47 +1504,53 @@ func (sh *strictHandler) GetReadyz(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"C0riSCg9+Ln/ro+319v/DgA=",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

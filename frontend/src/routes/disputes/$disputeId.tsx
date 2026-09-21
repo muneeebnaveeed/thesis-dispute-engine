@@ -1,19 +1,27 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router'
-import { useState } from 'react'
+import { createFileRoute, redirect, useRouteContext, useRouter } from '@tanstack/react-router'
+import { useMemo, useState } from 'react'
 
+import { createBrowserApi } from '#/api/browser'
 import type { Problem } from '#/api/problem'
 import { AppShell } from '#/components/app-shell'
 import { EventLog } from '#/components/event-log'
 import { ProblemBanner } from '#/components/problem-banner'
-import { applyEvent, getDispute } from '#/server/disputes'
+import { getDispute, type Dispute } from '#/server/disputes'
 
+// First paint comes from the server with the session's token; actions go straight from the browser to the API.
 export const Route = createFileRoute('/disputes/$disputeId')({
+  // Anonymous visitors go to sign-in and come back here afterwards (the destination rides along as ?next).
+  beforeLoad: ({ context, location }) => {
+    if (!context.viewer) throw redirect({ to: '/', search: { next: location.href } })
+  },
   loader: ({ params }) => getDispute({ data: params.disputeId }),
   component: DisputePage,
 })
 
 function DisputePage() {
   const outcome = Route.useLoaderData()
+  const { config } = useRouteContext({ from: '__root__' })
+  const api = useMemo(() => createBrowserApi(config.apiUrl), [config.apiUrl])
   const router = useRouter()
   const [problem, setProblem] = useState<Problem | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -25,12 +33,16 @@ function DisputePage() {
   }
   const d = outcome.value
 
-  async function apply(event: string) {
+  async function apply(event: Dispute['allowedEvents'][number]) {
     setBusy(event)
     setProblem(null)
-    const res = await applyEvent({ data: { disputeId: d.id, body: { event, actor: 'analyst' } } })
+    const { error } = await api.POST('/disputes/{disputeId}/events', {
+      params: { path: { disputeId: d.id } },
+      body: { event, actor: 'analyst' },
+      headers: { 'Idempotency-Key': crypto.randomUUID() },
+    })
     setBusy(null)
-    if (res.problem) setProblem(res.problem)
+    if (error) setProblem(error)
     else await router.invalidate()
   }
 

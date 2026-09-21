@@ -184,6 +184,9 @@ importers:
       openapi-fetch:
         specifier: ^0.17.0
         version: 0.17.0
+      openid-client:
+        specifier: ^6.8.8
+        version: 6.8.8
       react:
         specifier: ^19.2.0
         version: 19.3.0
@@ -1555,6 +1558,9 @@ packages:
     resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
     hasBin: true
 
+  jose@6.2.12:
+    resolution: {integrity: sha512-9NiFmJEex0sy2Dk58j2UGBSHgUs2ypF9eZSu4L6vjOX3Dp96Sw1F3uL+H+D1sx02jZZdzUT0HgvCy59CuvXcWw==}
+
   js-levenshtein@1.1.6:
     resolution: {integrity: sha512-X2BB11YZtrRqY4EnQcLX5Rh373zbK4alC1FW7D7MBhL2gtcC17cTnr6DmfHZeS0s2rTHjUTMMHfG7gO8SSdw+g==}
     engines: {node: '>=0.10.0'}
@@ -1809,6 +1815,9 @@ packages:
   nwsapi@2.2.28:
     resolution: {integrity: sha512-IlVB7OS7qrOsVYlpnFIkETjMwT9jwvmocJmmM+GZU/PAB3uGi9Ezd7vcWhWBUnSc0ya4ppmQITOyP1ez9gg8cg==}
 
+  oauth4webapi@3.8.8:
+    resolution: {integrity: sha512-8N28E+a/oxfXWBgOMt+ZP/JUf/XR+IFbvkAEPP3gznXOMv9BpAAwiIj0TFNz3tGTPc0ZQ8zmWBNgN1nAys0gng==}
+
   obug@2.2.1:
     resolution: {integrity: sha512-XrsrhT5sybtKI6wakr2SPOlGZWWYbUXZ7a0jT8/QOeAPau+1X/bSegNe5YR75oJmEZQbKningirmGOEJCIk61Q==}
     engines: {node: '>=12.20.0'}
@@ -1833,6 +1842,9 @@ packages:
     hasBin: true
     peerDependencies:
       typescript: ^5.x
+
+  openid-client@6.8.8:
+    resolution: {integrity: sha512-ZsucJA5Ad04Uv7YN4ql+s4GXNmb9uAYQwyJTsJx7CH/MX3JZioLE2pVKi1SC+YrbSLA4Px3Gi30dMjgOZtb6pA==}
 
   oxfmt@0.30.0:
     resolution: {integrity: sha512-AwTndMhJ2e2/AzHnza+b+mZyRcJr1pAKfWwCuilnJgIFgZyvw6NfNIAfxar9/xijlqh2GyjL0AOjh+JZEOw3Og==}
@@ -3512,6 +3524,8 @@ snapshots:
 
   jiti@2.7.0: {}
 
+  jose@6.2.12: {}
+
   js-levenshtein@1.1.6: {}
 
   js-tokens@4.0.0: {}
@@ -3735,6 +3749,8 @@ snapshots:
 
   nwsapi@2.2.28: {}
 
+  oauth4webapi@3.8.8: {}
+
   obug@2.2.1: {}
 
   ocache@0.1.5:
@@ -3760,6 +3776,11 @@ snapshots:
       supports-color: 10.2.2
       typescript: 6.0.3
       yargs-parser: 21.1.1
+
+  openid-client@6.8.8:
+    dependencies:
+      jose: 6.2.12
+      oauth4webapi: 3.8.8
 
   oxfmt@0.30.0:
     dependencies:

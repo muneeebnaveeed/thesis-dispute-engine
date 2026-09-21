@@ -85,6 +85,27 @@ export type paths = {
     patch?: never
     trace?: never
   }
+  '/internal/sessions/{sessionId}': {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        sessionId: string
+      }
+      cookie?: never
+    }
+    /** Fetch a session blob that has not expired */
+    get: operations['getSession']
+    /** Store or replace an opaque session blob */
+    put: operations['putSession']
+    post?: never
+    /** Remove a session */
+    delete: operations['deleteSession']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export type components = {
@@ -135,6 +156,18 @@ export type components = {
       /** @example /transactionId */
       field: string
       message: string
+    }
+    /** @description Ciphertext the frontend server produced; the API stores it without being able to read it. */
+    SessionBlob: {
+      /**
+       * Format: uuid
+       * @description Set once the session belongs to a signed-in analyst; informational.
+       */
+      tenantId?: string
+      /** Format: byte */
+      ciphertext: string
+      /** Format: date-time */
+      expiresAt: string
     }
     /** @enum {string} */
     Regime: 'EU_SEPA_DIRECT_DEBIT' | 'EU_PSD2_CARD' | 'US_REG_E' | 'US_REG_Z'
@@ -421,6 +454,77 @@ export interface operations {
         }
       }
       422: components['responses']['Unprocessable']
+    }
+  }
+  getSession: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        sessionId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The blob. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SessionBlob']
+        }
+      }
+      401: components['responses']['Unauthorized']
+      404: components['responses']['NotFound']
+    }
+  }
+  putSession: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        sessionId: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SessionBlob']
+      }
+    }
+    responses: {
+      /** @description Stored. */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      400: components['responses']['BadRequest']
+      401: components['responses']['Unauthorized']
+    }
+  }
+  deleteSession: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        sessionId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Removed */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      401: components['responses']['Unauthorized']
     }
   }
 }

@@ -41,12 +41,19 @@ structural rules are shared; business rules arrive from the API (`allowedEvents`
 
 ## Talking to the API
 
-Pages never call the API from the browser. TanStack Start server functions in `src/server/` do,
-with the tenant key from the server's environment (`DISPUTE_API_URL`, `DISPUTE_TENANT_KEY`), and
-return either a value or a `Problem`. `src/server/disputes-core.ts` holds the logic and is unit
-tested against a fake `fetch`; `src/server/disputes.ts` is the thin Start wrapper.
+Server-rendered pages and form submissions go through TanStack Start server functions in
+`src/server/`, which call the API with the signed-in analyst's access token and return either a
+value or a `Problem`. In-page actions call the API directly from the browser with the same token
+(`src/api/browser.ts`). `src/server/disputes-core.ts` holds the logic and is unit tested against a
+fake `fetch`; `src/server/disputes.ts` is the thin Start wrapper.
 
-## Authentication (decided)
+## Authentication
 
-Analysts sign in through Keycloak (OIDC); the ID token's `tenant_id` claim scopes everything they
-see. Tenant systems use tenant keys instead (docs/adr/0009). Not wired yet.
+Analysts sign in through their tenant's Keycloak realm at `/t/<slug>` (docs/adr/0010, 0011). The
+Start server runs the code flow with PKCE, seals the token set with `SESSION_SECRET` and stores it
+through the API's internal session endpoints with `DISPUTE_SERVICE_KEY`; the browser gets an
+HttpOnly cookie. Protected routes send anonymous visitors to sign-in and bring them back
+afterwards (`next`). For direct calls, `src/api/browser.ts` asks the server for the session's
+access token, keeps it in memory, and retries once with a fresh token on 401; refresh only ever
+happens on the server (`src/server/auth/session-impl.ts`). `make auth-up` brings Keycloak with
+the `otp` and `erste` realms; sign in as `analyst` / `analyst`.

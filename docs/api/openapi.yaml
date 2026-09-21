@@ -103,12 +103,58 @@ paths:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
         "422": { $ref: "#/components/responses/Unprocessable" }
+  /internal/sessions/{sessionId}:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    put:
+      operationId: putSession
+      summary: Store or replace an opaque session blob
+      tags: [internal]
+      security: [{ serviceKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SessionBlob" }
+      responses:
+        "204": { description: Stored. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    get:
+      operationId: getSession
+      summary: Fetch a session blob that has not expired
+      tags: [internal]
+      security: [{ serviceKey: [] }]
+      responses:
+        "200":
+          description: The blob.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SessionBlob" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteSession
+      summary: Remove a session
+      tags: [internal]
+      security: [{ serviceKey: [] }]
+      responses:
+        "204": { description: Removed, or never existed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
-      description: Tenant key, issued per tenant and shown once; the server stores only its hash.
+      description: A tenant key (issued per tenant, shown once, stored hashed) or an analyst access token from the tenant's realm.
+    serviceKey:
+      type: apiKey
+      in: header
+      name: X-Service-Key
+      description: Shared secret for the frontend server's internal endpoints; never issued to tenants or browsers.
   parameters:
     DisputeId:
       name: disputeId
@@ -197,6 +243,14 @@ components:
       properties:
         field: { type: string, example: "/transactionId" }
         message: { type: string }
+    SessionBlob:
+      type: object
+      description: Ciphertext the frontend server produced; the API stores it without being able to read it.
+      required: [ciphertext, expiresAt]
+      properties:
+        tenantId: { type: string, format: uuid, description: Set once the session belongs to a signed-in analyst; informational. }
+        ciphertext: { type: string, format: byte, maxLength: 16384 }
+        expiresAt: { type: string, format: date-time }
     Regime:
       type: string
       enum: [EU_SEPA_DIRECT_DEBIT, EU_PSD2_CARD, US_REG_E, US_REG_Z]

@@ -19,7 +19,9 @@ type Config struct {
 	IdempotencyTTL     time.Duration
 	// CORSOrigins are browser origins allowed to call the API directly with an analyst token.
 	CORSOrigins []string
-	LogLevel    slog.Level
+	// ServiceKey guards /internal/*, used only by the frontend server; empty disables those routes' authentication.
+	ServiceKey string
+	LogLevel   slog.Level
 }
 
 // Load resolves Config from DISPUTE_* variables; defaults match deploy/compose.yml.
@@ -32,6 +34,7 @@ func Load() (Config, error) {
 		ShutdownTimeout:    10 * time.Second,
 		IdempotencyTTL:     24 * time.Hour,
 		CORSOrigins:        strings.Split(getenv("DISPUTE_CORS_ORIGINS", "http://localhost:3002"), ","),
+		ServiceKey:         getenv("DISPUTE_SERVICE_KEY", "dev-service-key"),
 	}
 
 	if raw := os.Getenv("DISPUTE_IDEMPOTENCY_TTL"); raw != "" {

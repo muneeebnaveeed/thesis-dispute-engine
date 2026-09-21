@@ -18,6 +18,7 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/httpserver"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/postgres"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/telemetry"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/websession"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/migrations"
 )
 
@@ -77,11 +78,13 @@ func run(cfg config.Config, logger *slog.Logger) error {
 	go application.RunIdempotencyPurge(ctx, store, cfg.IdempotencyTTL, logger)
 
 	mux := http.NewServeMux()
-	if err := disputehttp.Mount(mux, svc, pool.Ping); err != nil {
+	sessions := websession.NewStore(pool)
+	go websession.RunPurge(ctx, sessions, logger)
+	if err := disputehttp.Mount(mux, svc, pool.Ping, disputehttp.WithSessions(sessions)); err != nil {
 		return err
 	}
 	keys := disputepg.NewKeyStore(pool)
-	srv := httpserver.New(cfg.Addr, logger, mux, httpserver.CORS(cfg.CORSOrigins), auth.Bearer(keys, auth.NewOIDC(keys)))
+	srv := httpserver.New(cfg.Addr, logger, mux, httpserver.CORS(cfg.CORSOrigins), auth.Bearer(keys, auth.NewOIDC(keys)), auth.ServiceKey(cfg.ServiceKey))
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()

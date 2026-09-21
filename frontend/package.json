@@ -20,7 +20,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "generate": "node scripts/generate-api.ts && oxfmt src/api",
-    "generate:check": "pnpm generate && git diff --exit-code -- src/api"
+    "generate:check": "bash scripts/generate-check.sh"
   },
   "dependencies": {
     "@sinclair/typebox": "^0.34.52",
@@ -29,6 +29,7 @@
     "@tanstack/react-start": "^1.132.0",
     "nitro": "3.0.260610-beta",
     "openapi-fetch": "^0.17.0",
+    "openid-client": "^6.8.8",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tailwindcss": "^4.1.18"
