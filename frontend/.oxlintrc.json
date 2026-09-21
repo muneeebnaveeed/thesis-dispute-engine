@@ -19,7 +19,16 @@
     "unicorn/no-null": "off",
     "react/react-in-jsx-scope": "off"
   },
-  "ignorePatterns": ["dist", ".nitro", ".output", ".tanstack", "src/routeTree.gen.ts", "src/api/*.gen.ts"],
+  "ignorePatterns": [
+    "dist",
+    ".nitro",
+    ".output",
+    ".tanstack",
+    "src/routeTree.gen.ts",
+    "src/api/*.gen.ts",
+    "playwright-report",
+    "test-results"
+  ],
   "settings": {
     "react": {
       "version": "19"
@@ -35,6 +44,16 @@
     {
       "files": ["scripts/**"],
       "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      "files": ["e2e/**"],
+      "rules": {
+        "vitest/valid-title": "off",
+        "vitest/expect-expect": "off",
+        "vitest/no-standalone-expect": "off",
+        "vitest/valid-expect": "off",
         "typescript/no-unsafe-type-assertion": "off"
       }
     }

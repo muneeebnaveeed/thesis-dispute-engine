@@ -5,3 +5,5 @@ dist
 .output
 *.local
 src/routeTree.gen.ts
+playwright-report
+test-results
