@@ -5,7 +5,7 @@ SHELL := /bin/bash
 BACKEND := backend
 GO      := cd $(BACKEND) && go
 
-.PHONY: help hooks run dev build test test-race lint vet fmt fmt-fix tidy vuln versions db-up db-down db-logs up down docker-dev otel-up otel-down image pr ci-logs pr-comments stack ci
+.PHONY: help hooks run dev build test test-race test-integration lint vet fmt fmt-fix tidy vuln versions generate generate-check db-up db-down db-logs db-seed up down docker-dev otel-up otel-down otel-reset image pr ci-logs pr-comments stack ci
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -27,6 +27,17 @@ test: ## Unit tests
 
 test-race: ## Unit tests with the race detector (what CI runs; needs a C compiler for cgo)
 	$(GO) test -race -count=1 ./...
+
+TEST_DB_URL ?= postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable
+test-integration: ## Tests that need PostgreSQL (make db-up first); each test gets its own schema
+	cd $(BACKEND) && DISPUTE_TEST_DATABASE_URL="$(TEST_DB_URL)" go test -count=1 ./...
+
+generate: ## Regenerate sqlc queries and the OpenAPI server from docs/api/openapi.yaml
+	cd $(BACKEND) && sqlc generate && go generate ./...
+
+GENERATED := $(BACKEND)/internal/dispute/infrastructure/postgres/sqlcgen $(BACKEND)/internal/dispute/ports/http/oapi
+generate-check: generate ## Fail if generated code is out of date
+	git diff --exit-code -- $(GENERATED)
 
 lint: ## golangci-lint (config in backend/.golangci.yml)
 	cd $(BACKEND) && golangci-lint run ./...
@@ -58,6 +69,9 @@ db-down: ## Stop PostgreSQL and drop its volume
 db-logs: ## Tail PostgreSQL logs
 	docker compose -f deploy/compose.yml logs -f postgres
 
+db-seed: ## Insert the fixed dev accounts and transactions (idempotent)
+	$(GO) run ./cmd/seed
+
 up: ## PostgreSQL + the API built from backend/Dockerfile
 	docker compose -f deploy/compose.yml --profile app up -d --build
 
@@ -67,11 +81,14 @@ docker-dev: ## PostgreSQL + the API in a Go toolchain container with live reload
 down: ## Stop everything started by up/otel-up (keeps the DB volume)
 	docker compose -f deploy/compose.yml --profile app --profile otel down
 
-otel-up: ## PostgreSQL + API + Grafana LGTM (http://localhost:3000, admin/admin); API exports traces, metrics and logs
+otel-up: ## PostgreSQL + API + Grafana LGTM (http://localhost:3001, admin/admin); API exports traces, metrics and logs
 	docker compose -f deploy/compose.yml --env-file deploy/otel.env --profile otel up -d --build
 
 otel-down: ## Stop the otel stack
 	docker compose -f deploy/compose.yml --profile otel down
+
+otel-reset: ## Stop the otel stack and drop its data volume
+	docker compose -f deploy/compose.yml --profile otel down -v
 
 # --network host for the build stage: on the primary dev machine the VPN drops
 # traffic on Docker's bridge, so `go mod download` inside the build would time
@@ -91,4 +108,4 @@ stack: ## Stacked PRs: make stack ARGS='show|restack --push|retarget'
 pr-comments: ## Export review comments for the current PR into notes/ (ARGS='--pr N')
 	scripts/fetch-pr-comments $(ARGS)
 
-ci: versions fmt vet lint test tidy ## Everything CI runs, locally (race detector needs cgo; see test-race)
+ci: versions generate-check fmt vet lint test tidy ## Everything CI runs, locally (race detector and integration tests need extras; see test-race, test-integration)

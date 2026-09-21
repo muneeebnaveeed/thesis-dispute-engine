@@ -68,15 +68,21 @@ services:
       DISPUTE_ADDR: ":8090"
       DISPUTE_DATABASE_URL: postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable
 
-  # Grafana + Loki + Tempo + Mimir + an OTel Collector in one image; OTLP on 4317/4318, UI on 3000 (admin/admin).
+  # Grafana + Loki + Tempo + Mimir + an OTel Collector in one image; OTLP on 4317/4318, UI on 3001 (admin/admin).
   lgtm:
     image: grafana/otel-lgtm:0.33.1
     network_mode: host
     profiles: [otel]
     environment:
       ENABLE_LOGS_ALL: "false"
+      GF_SERVER_HTTP_PORT: "3001" # 3000 is commonly taken by a Next.js dev server on the dev machine
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - lgtm:/data
+      - ./grafana/provisioning/dashboards/dispute-engine.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/dispute-engine.yaml:ro
+      - ./grafana/dashboards:/otel-lgtm/dispute-engine-dashboards:ro
 
 volumes:
   pgdata:

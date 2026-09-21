@@ -13,17 +13,22 @@ How to work in this repo. What the system does is in `README.md` and `docs/adr/`
 
 ## Commands (run from the repo root)
 
-- `make ci`: everything CI runs (versions, fmt, vet, lint, test, tidy). Run before every push.
+- `make ci`: everything CI runs (versions, generate-check, fmt, vet, lint, test, tidy). Run
+  before every push. `make test-integration` runs the Postgres-backed suites against
+  `make db-up` (CI runs them with a service container); without `DISPUTE_TEST_DATABASE_URL`
+  those tests skip.
+- `make generate`: regenerate sqlc queries and the OpenAPI server; commit the output.
+- `make db-seed`: fixed dev accounts and transactions (idempotent; migrates first).
 - `make test` / `make lint` / `make fmt-fix`: the individual steps. `make test-race` needs cgo;
   the dev machine has no C compiler, CI has one.
 - `make run`: API natively on :8090. `make dev`: same with live reload (air).
 - `make db-up`: PostgreSQL in Docker. `make up`: Postgres + the API image. `make docker-dev`:
   Postgres + the API in a Go toolchain container with live reload. `make otel-up`: plus Grafana LGTM
-  (Grafana at http://localhost:3000, admin/admin; traces in Tempo, metrics in Mimir, logs in Loki).
+  (Grafana at http://localhost:3001, admin/admin; traces in Tempo, metrics in Mimir, logs in Loki).
 - `make image`: build `backend/Dockerfile` locally.
 
-Toolchain is pinned in `mise.toml` (Go, golangci-lint, air); `go.mod` carries `govulncheck`
-as a `tool`. `scripts/check-runtime-versions.sh` fails if go.mod or the Dockerfile disagree.
+Toolchain is pinned in `mise.toml` (Go, golangci-lint, air, sqlc); `go.mod` carries
+`govulncheck` and `oapi-codegen` as `tool`s. `scripts/check-runtime-versions.sh` fails if go.mod or the Dockerfile disagree.
 
 ## Layout
 
@@ -32,15 +37,16 @@ backend/cmd/api                          wiring: config -> telemetry -> server, 
 backend/internal/<context>/domain        entities, value objects, invariants; pure, no I/O
 backend/internal/<context>/application   use cases; orchestrates domain and ports
 backend/internal/<context>/infrastructure adapters: Postgres, external systems
-backend/internal/<context>/ports/http    HTTP handlers and DTOs for the context
-backend/internal/platform/{config,httpserver,telemetry}  shared kernel, no domain knowledge
-backend/migrations                       SQL, forward-only
+backend/internal/<context>/ports/http    HTTP handlers implementing the generated interface (ports/http/oapi)
+backend/internal/platform/{config,httpserver,telemetry,postgres,errs}  shared kernel, no domain knowledge
+backend/migrations                       SQL, forward-only, embedded; applied at startup and by cmd/seed
+docs/api/openapi.yaml                    the API contract; everything HTTP is generated from it
 deploy/                                  compose.yml (host networking, see below), otel.env
 docs/adr, docs/thesis                    decisions; the design document
 ```
 
-Bounded contexts so far: `dispute`. Only `domain` exists until a context needs the other
-layers; do not create empty ones.
+Bounded contexts so far: `dispute` (all four layers). Create a layer only when a context
+needs it.
 
 ## Agent workflow
 
@@ -61,6 +67,11 @@ exists; `frontend/` and `docs/thesis/` get theirs when they gain content.
 - **Writing (docs, comments, commits, CI names):** no em dashes, no emojis.
 - **Comments:** as few as possible, one line, and only to say why; never to restate what the
   code does. Doc comments on exported identifiers stay, one line each.
+- **Spec first:** any HTTP change starts in `docs/api/openapi.yaml`, then `make generate`,
+  then the handler. Never hand-write a route or a response type (docs/adr/0006).
+- **Errors:** create failures with `errs.New(kind, code, userMessage)` and wrap with
+  `errs.Wrap` for log context; ports never map errors by hand, `httpserver.ProblemFrom` does.
+  New codes go into the spec's `ErrorCode` enum in the same change.
 - **Decisions:** an ADR in `docs/adr/` for anything a later reader would ask "why?" about.
 
 ## Sharp edges
@@ -68,7 +79,8 @@ exists; `frontend/` and `docs/thesis/` get theirs when they gain content.
 - **Docker uses host networking on purpose** (`network_mode: host`, `docker build --network
   host`): the dev machine's corporate VPN drops traffic on Docker's bridge, so port mappings
   and in-build `go mod download` silently time out. Do not revert to `ports:`.
-- **Port 8090, not 8080:** 8080 is held by an unrelated local service on the dev machine.
+- **Ports 8090 and 3001:** 8080 and 3000 are held by unrelated local services on the dev
+  machine (API and Grafana moved accordingly).
 - **No C compiler locally:** `go test -race` fails with "requires cgo"; use `make test` and
   let CI run the race detector.
 - **`gh` accounts:** the dev machine has several; the scripts refuse to run unless the active

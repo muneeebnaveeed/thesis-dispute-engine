@@ -30,7 +30,7 @@ make help             # every target, including PR and stack tooling
 
 `make up` runs the API from its container image alongside Postgres; `make docker-dev` runs
 the API in a Go toolchain container with live reload instead; `make otel-up` adds a Grafana LGTM
-stack and the API exports traces, metrics and logs to it (http://localhost:3000). All telemetry is configured through
+stack and the API exports traces, metrics and logs to it (http://localhost:3001). All telemetry is configured through
 standard `OTEL_*` variables; see `.env.example`.
 
 ## Repository

@@ -31,9 +31,10 @@ linters:
     gocritic:
       enabled-tags: [diagnostic, performance]
       disabled-checks:
-        # Small config structs are passed by value on purpose; the copy is
+        # Small structs are passed and ranged by value on purpose; the copy is
         # cheaper to reason about than aliasing.
         - hugeParam
+        - rangeValCopy
     gosec:
       excludes:
         # G101 matches any identifier containing "cred"; this domain is full
