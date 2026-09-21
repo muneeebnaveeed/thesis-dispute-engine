@@ -67,5 +67,6 @@ go run ./cmd/tenant list
 With `DISPUTE_ENV=production` the API refuses to start on dev defaults: a `DISPUTE_SERVICE_KEY` shorter than 32
 characters or equal to the dev value, the dev database credentials, or `sslmode=disable`. `/internal/*` is
 invisible (404) to peers outside `DISPUTE_INTERNAL_CIDRS`; keep it off the public ingress as well. Per-tenant
-request budgets (`DISPUTE_RATE_PER_MINUTE`, default 600) answer 429 with `Retry-After`; an edge rate limiter
-(Cloudflare or similar) should sit in front for per-IP and volumetric abuse, which the application cannot see.
+request budgets (`DISPUTE_RATE_PER_MINUTE`, default 600) answer 429 with `Retry-After`. There is no CDN or
+edge WAF in this deployment by decision, so the application is the whole line: per-tenant budgets here, a
+per-IP limiter on unauthenticated failures at the API, and brute-force detection in each Keycloak realm.
