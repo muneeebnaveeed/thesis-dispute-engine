@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/telemetry"
@@ -24,12 +25,45 @@ func Chain(h http.Handler, mws ...Middleware) http.Handler {
 
 type ctxKey int
 
-const requestIDKey ctxKey = iota
+const requestKey ctxKey = iota
+
+// request is the mutable per-request record inner middleware writes to and Log reads; inner layers clone the
+// *http.Request, so anything they learn (the matched route, the tenant) has to travel back through a pointer.
+type request struct {
+	id    string
+	mu    sync.Mutex
+	route string
+	attrs []slog.Attr
+}
+
+func requestFrom(ctx context.Context) *request {
+	r, _ := ctx.Value(requestKey).(*request)
+	return r
+}
 
 // RequestIDFrom returns the request ID set by RequestID, or "".
 func RequestIDFrom(ctx context.Context) string {
-	id, _ := ctx.Value(requestIDKey).(string)
-	return id
+	if r := requestFrom(ctx); r != nil {
+		return r.id
+	}
+	return ""
+}
+
+// Annotate adds a field to the request log line; a no-op outside a request.
+func Annotate(ctx context.Context, key string, value any) {
+	if r := requestFrom(ctx); r != nil {
+		r.mu.Lock()
+		r.attrs = append(r.attrs, slog.Any(key, value))
+		r.mu.Unlock()
+	}
+}
+
+func setRoute(ctx context.Context, route string) {
+	if r := requestFrom(ctx); r != nil {
+		r.mu.Lock()
+		r.route = route
+		r.mu.Unlock()
+	}
 }
 
 // RequestID honours an inbound X-Request-ID or mints one, and echoes it back.
@@ -40,7 +74,7 @@ func RequestID(next http.Handler) http.Handler {
 			id = newRequestID()
 		}
 		w.Header().Set("X-Request-ID", id)
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), requestIDKey, id)))
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), requestKey, &request{id: id})))
 	})
 }
 
@@ -101,16 +135,25 @@ func Log(logger *slog.Logger) Middleware {
 				rec.status = http.StatusOK
 			}
 			traceID, spanID := telemetry.SpanIDs(r.Context())
-			logger.InfoContext(r.Context(), "request",
-				"request_id", RequestIDFrom(r.Context()),
-				"trace_id", traceID,
-				"span_id", spanID,
-				"method", r.Method,
-				"route", r.Pattern,
-				"path", r.URL.Path,
-				"status", rec.status,
-				"duration_ms", time.Since(start).Milliseconds(),
-			)
+			route, extra := r.Pattern, []slog.Attr(nil)
+			if info := requestFrom(r.Context()); info != nil {
+				info.mu.Lock()
+				if info.route != "" {
+					route = info.route
+				}
+				extra = append(extra, info.attrs...)
+				info.mu.Unlock()
+			}
+			logger.LogAttrs(r.Context(), slog.LevelInfo, "request", append([]slog.Attr{
+				slog.String("request_id", RequestIDFrom(r.Context())),
+				slog.String("trace_id", traceID),
+				slog.String("span_id", spanID),
+				slog.String("method", r.Method),
+				slog.String("route", route),
+				slog.String("path", r.URL.Path),
+				slog.Int("status", rec.status),
+				slog.Int64("duration_ms", time.Since(start).Milliseconds()),
+			}, extra...)...)
 		})
 	}
 }

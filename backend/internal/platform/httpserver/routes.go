@@ -14,6 +14,7 @@ func NameSpanByRoute(next http.Handler) http.Handler {
 			span := trace.SpanFromContext(r.Context())
 			span.SetName(r.Pattern)
 			span.SetAttributes(semconv.HTTPRoute(r.Pattern))
+			setRoute(r.Context(), r.Pattern)
 		}
 		next.ServeHTTP(w, r)
 	})
