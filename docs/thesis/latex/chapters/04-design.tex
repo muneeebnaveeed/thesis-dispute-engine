@@ -185,9 +185,34 @@ log, each keyed to the event that caused it and carrying a reference unique with
 That reference is the idempotency key the banking core adapter (section~\ref{sec:design-core})
 uses, so an instruction repeated after a timeout cannot move money twice.
 
+% Distils ADR 0018.
 \section{Fraud scoring}
 \label{sec:design-fraud}
-% To write: ADR 0018. Stub so the questionnaire section's references resolve.
+
+The proposal ended with a fraud-scoring engine, and the supervisor named it as the first thing
+to cut if time ran short. It survived in a deliberately modest form, and the form is the point.
+A learned model needs labelled outcomes the project does not have and an evaluation the thesis
+cannot honestly perform; and in a process where the customer has a right to know why they were
+refused, a score nobody can explain is a liability rather than an asset. The engine therefore
+scores with fixed, readable rules. Seven signals, each with a fixed weight and a fixed way of
+earning points, each reporting a sentence that says why it scored what it did, whether or not it
+fired: how many other disputes the account raised in twelve months, how many it lost at the
+network, how long after the transaction the dispute came, whether the merchant's category is one
+where disputes concentrate, the amount, the account's age, and the contradictions in the
+questionnaire (section~\ref{sec:design-questionnaire}). The score is the sum, and three
+thresholds make it a tier.
+
+Two decisions keep the score honest. It is assessed when the dispute opens, from what the engine
+already knows, and assessed again when the questionnaire arrives, because that is when the
+consistency signal becomes known; every assessment is kept, so the analyst sees the picture change
+rather than a number that was always there. And its only teeth are a hold: a credit on a dispute
+whose latest tier is high is refused until the analyst records why it should go out anyway, and
+that justification is stored on the event with everything else. The score never denies a dispute,
+never moves a state and never speaks to the customer. It orders the queue and it makes a human
+write a sentence before money leaves on a case the rules distrust, which is what a scoring
+engine in a regulated process can responsibly do. The weights are judgement, not fitted to data;
+chapter~\ref{ch:evaluation} says so and treats them as a demonstration of the mechanism rather
+than a claim about fraud.
 
 % Distils ADR 0016.
 \section{The questionnaire}

@@ -144,6 +144,9 @@ func TestCreateApplyGetRoundTrip(t *testing.T) {
 	if got["deadlines"] == nil || len(got["deadlines"].([]any)) != 2 || got["ledger"] == nil || got["balances"] == nil || got["reason"] != "UNAUTHORISED" {
 		t.Errorf("clocks, ledger, balances and reason must be on every dispute: %v", got)
 	}
+	if risk, ok := got["risk"].(map[string]any); !ok || risk["tier"] != "LOW" || len(risk["signals"].([]any)) != 7 || got["notices"] == nil {
+		t.Errorf("risk and notices must be on every dispute: %v %v", got["risk"], got["notices"])
+	}
 
 	// The questionnaire follows the reason; answers are validated per question with 422 invalid-answers.
 	rec, sent := a.do(http.MethodPost, "/disputes/"+id+"/events", map[string]any{"event": "SEND_QUESTIONNAIRE"}, nil)

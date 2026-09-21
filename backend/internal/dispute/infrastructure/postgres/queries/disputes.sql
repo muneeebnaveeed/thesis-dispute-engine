@@ -3,18 +3,37 @@ INSERT INTO accounts (id, tenant_id, holder_name, currency, email, postal_addres
 ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, postal_address = EXCLUDED.postal_address;
 
 -- name: GetAccount :one
-SELECT id, holder_name, currency, email, postal_address FROM accounts WHERE id = $1;
+SELECT id, holder_name, currency, email, postal_address, opened_at FROM accounts WHERE id = $1;
+
+-- name: CountAccountDisputesSince :one
+SELECT count(*)::int FROM disputes WHERE account_id = $1 AND opened_at >= $2 AND id <> $3;
+
+-- name: CountAccountLostChargebacks :one
+SELECT count(DISTINCT d.id)::int FROM disputes d
+JOIN dispute_events e ON e.dispute_id = d.id
+WHERE d.account_id = $1 AND d.id <> $2 AND e.to_state = 'CHARGEBACK_LOST';
+
+-- name: InsertRiskAssessment :exec
+INSERT INTO risk_assessments (dispute_id, seq, score, tier, signals, assessed_at) VALUES ($1, $2, $3, $4, $5, $6);
+
+-- name: ListRiskAssessments :many
+SELECT id, dispute_id, seq, score, tier, signals, assessed_at FROM risk_assessments WHERE dispute_id = $1 ORDER BY id;
+
+-- name: LatestRiskTiers :many
+-- The newest assessment per dispute in the set, for list rows.
+SELECT DISTINCT ON (dispute_id) dispute_id, score, tier FROM risk_assessments
+WHERE dispute_id = ANY(sqlc.arg(dispute_ids)::uuid[]) ORDER BY dispute_id, id DESC;
 
 -- name: GetTenantName :one
 SELECT name FROM tenants WHERE id = current_tenant_id();
 
 -- name: InsertTransaction :exec
-INSERT INTO transactions (id, tenant_id, account_id, rail, amount, currency, merchant, occurred_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO transactions (id, tenant_id, account_id, rail, amount, currency, merchant, occurred_at, mcc)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+ON CONFLICT (id) DO UPDATE SET mcc = EXCLUDED.mcc;
 
 -- name: GetTransaction :one
-SELECT t.id, t.account_id, t.rail, t.amount, t.currency, t.merchant, t.occurred_at, a.currency AS account_currency
+SELECT t.id, t.account_id, t.rail, t.amount, t.currency, t.merchant, t.occurred_at, t.mcc, a.currency AS account_currency, a.opened_at AS account_opened_at
 FROM transactions t
 JOIN accounts a ON a.id = t.account_id
 WHERE t.id = $1;

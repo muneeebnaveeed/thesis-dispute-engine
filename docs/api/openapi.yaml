@@ -376,6 +376,7 @@ components:
         - core-declined
         - unknown-reason
         - invalid-answers
+        - risk-hold
         - concurrent-update
         - idempotency-key-reuse
         - no-regime
@@ -519,7 +520,9 @@ components:
             invalid-liability); on CLOSE, `settlement` says how an outstanding advance clears (RECOVERED or
             WRITTEN_OFF; the regime's default when absent; refused with invalid-settlement); on
             RECEIVE_QUESTIONNAIRE, `answers` maps question ids to answers and is validated against the questions
-            that were sent (refused with invalid-answers, one error per question).
+            that were sent (refused with invalid-answers, one error per question). On ISSUE_REFUND for a dispute
+            whose latest risk tier is HIGH, `riskOverride` must carry the analyst's justification or the credit is
+            refused with risk-hold.
           additionalProperties: true
           properties:
             liability: { type: string, example: "50.00" }
@@ -527,6 +530,7 @@ components:
             answers:
               type: object
               additionalProperties: { type: string }
+            riskOverride: { type: string, description: Why a credit goes out despite a HIGH risk score; recorded on the event. }
     SuspenseSettlement:
       type: string
       enum: [RECOVERED, WRITTEN_OFF]
@@ -597,6 +601,8 @@ components:
         nextDeadline:
           description: The open regulatory clock that runs out first; absent once every clock is settled.
           $ref: "#/components/schemas/Deadline"
+        riskTier: { $ref: "#/components/schemas/RiskTier" }
+        riskScore: { type: integer }
     DisputePage:
       type: object
       required: [items]
@@ -643,6 +649,42 @@ components:
           description: Every communication owed to the customer so far, in the order it arose.
           type: array
           items: { $ref: "#/components/schemas/Notice" }
+        risk:
+          description: The latest fraud assessment; absent for disputes opened before scoring existed.
+          $ref: "#/components/schemas/Risk"
+    RiskTier:
+      type: string
+      description: LOW proceeds; MEDIUM is flagged for the analyst; HIGH holds credits until a justification is recorded.
+      enum: [LOW, MEDIUM, HIGH]
+    RiskSignal:
+      type: object
+      required: [name, weight, points, detail]
+      properties:
+        name: { type: string }
+        weight: { type: integer, description: The most this signal can add. }
+        points: { type: integer }
+        detail: { type: string, description: Why it scored what it did, in words. }
+    Risk:
+      type: object
+      required: [score, tier, signals, assessedAt, history]
+      properties:
+        score: { type: integer }
+        tier: { $ref: "#/components/schemas/RiskTier" }
+        signals:
+          type: array
+          items: { $ref: "#/components/schemas/RiskSignal" }
+        assessedAt: { type: string, format: date-time }
+        history:
+          type: array
+          description: Earlier assessments, oldest first; the score moves when the questionnaire arrives.
+          items:
+            type: object
+            required: [seq, score, tier, assessedAt]
+            properties:
+              seq: { type: integer }
+              score: { type: integer }
+              tier: { $ref: "#/components/schemas/RiskTier" }
+              assessedAt: { type: string, format: date-time }
     NoticeKind:
       type: string
       enum: [ACKNOWLEDGEMENT, QUESTIONNAIRE, PROVISIONAL_CREDIT, REFUND, REVERSAL, RESOLUTION]

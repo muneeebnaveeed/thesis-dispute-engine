@@ -50,10 +50,15 @@ export const ApplyEventRequest = Type.Object({
         liability: Type.Optional(Type.String({ example: '50.00' })),
         settlement: Type.Optional(SuspenseSettlement),
         answers: Type.Optional(Type.Record(Type.String(), Type.String())),
+        riskOverride: Type.Optional(
+          Type.String({
+            description: 'Why a credit goes out despite a HIGH risk score; recorded on the event.',
+          }),
+        ),
       },
       {
         description:
-          "Event-specific facts, stored verbatim on the log entry. Two are read by the ledger: on ISSUE_REFUND, `liability` is the amount the customer bears (a decimal string, capped by the regime, refused with invalid-liability); on CLOSE, `settlement` says how an outstanding advance clears (RECOVERED or WRITTEN_OFF; the regime's default when absent; refused with invalid-settlement); on RECEIVE_QUESTIONNAIRE, `answers` maps question ids to answers and is validated against the questions that were sent (refused with invalid-answers, one error per question).",
+          "Event-specific facts, stored verbatim on the log entry. Two are read by the ledger: on ISSUE_REFUND, `liability` is the amount the customer bears (a decimal string, capped by the regime, refused with invalid-liability); on CLOSE, `settlement` says how an outstanding advance clears (RECOVERED or WRITTEN_OFF; the regime's default when absent; refused with invalid-settlement); on RECEIVE_QUESTIONNAIRE, `answers` maps question ids to answers and is validated against the questions that were sent (refused with invalid-answers, one error per question). On ISSUE_REFUND for a dispute whose latest risk tier is HIGH, `riskOverride` must carry the analyst's justification or the credit is refused with risk-hold.",
       },
     ),
   ),
@@ -318,6 +323,43 @@ export type Notice = Static<typeof Notice>
 const _Notice: Same<Notice, components['schemas']['Notice']> = true
 void _Notice
 
+export const RiskTier = Type.Union([Type.Literal('LOW'), Type.Literal('MEDIUM'), Type.Literal('HIGH')], {
+  description:
+    'LOW proceeds; MEDIUM is flagged for the analyst; HIGH holds credits until a justification is recorded.',
+})
+export type RiskTier = Static<typeof RiskTier>
+const _RiskTier: Same<RiskTier, components['schemas']['RiskTier']> = true
+void _RiskTier
+
+export const RiskSignal = Type.Object({
+  name: Type.String(),
+  weight: Type.Integer({ description: 'The most this signal can add.' }),
+  points: Type.Integer(),
+  detail: Type.String({ description: 'Why it scored what it did' }),
+})
+export type RiskSignal = Static<typeof RiskSignal>
+const _RiskSignal: Same<RiskSignal, components['schemas']['RiskSignal']> = true
+void _RiskSignal
+
+export const Risk = Type.Object({
+  score: Type.Integer(),
+  tier: RiskTier,
+  signals: Type.Array(RiskSignal),
+  assessedAt: Type.String({ format: 'date-time' }),
+  history: Type.Array(
+    Type.Object({
+      seq: Type.Integer(),
+      score: Type.Integer(),
+      tier: RiskTier,
+      assessedAt: Type.String({ format: 'date-time' }),
+    }),
+    { description: 'Earlier assessments, oldest first; the score moves when the questionnaire arrives.' },
+  ),
+})
+export type Risk = Static<typeof Risk>
+const _Risk: Same<Risk, components['schemas']['Risk']> = true
+void _Risk
+
 export const Dispute = Type.Object({
   id: Type.String({ format: 'uuid' }),
   regime: Regime,
@@ -345,6 +387,7 @@ export const Dispute = Type.Object({
   notices: Type.Array(Notice, {
     description: 'Every communication owed to the customer so far, in the order it arose.',
   }),
+  risk: Type.Optional(Risk),
 })
 export type Dispute = Static<typeof Dispute>
 const _Dispute: Same<Dispute, components['schemas']['Dispute']> = true
@@ -361,6 +404,8 @@ export const DisputeSummary = Type.Object({
   openedAt: Type.String({ format: 'date-time' }),
   updatedAt: Type.String({ format: 'date-time' }),
   nextDeadline: Type.Optional(Deadline),
+  riskTier: Type.Optional(RiskTier),
+  riskScore: Type.Optional(Type.Integer()),
 })
 export type DisputeSummary = Static<typeof DisputeSummary>
 const _DisputeSummary: Same<DisputeSummary, components['schemas']['DisputeSummary']> = true
@@ -389,6 +434,7 @@ export const ErrorCode = Type.Union(
     Type.Literal('core-declined'),
     Type.Literal('unknown-reason'),
     Type.Literal('invalid-answers'),
+    Type.Literal('risk-hold'),
     Type.Literal('concurrent-update'),
     Type.Literal('idempotency-key-reuse'),
     Type.Literal('no-regime'),

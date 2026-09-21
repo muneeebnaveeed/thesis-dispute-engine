@@ -133,6 +133,17 @@ type Questionnaire struct {
 	ReceivedAt pgtype.Timestamptz
 }
 
+type RiskAssessment struct {
+	ID         int64
+	TenantID   uuid.UUID
+	DisputeID  uuid.UUID
+	Seq        int32
+	Score      int32
+	Tier       string
+	Signals    []byte
+	AssessedAt time.Time
+}
+
 type SuspenseByRegime struct {
 	TenantID uuid.UUID
 	Regime   string
@@ -178,6 +189,7 @@ type Transaction struct {
 	Merchant   string
 	OccurredAt time.Time
 	TenantID   uuid.UUID
+	Mcc        *string
 }
 
 type WebSession struct {

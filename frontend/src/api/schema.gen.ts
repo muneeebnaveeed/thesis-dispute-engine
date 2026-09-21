@@ -233,6 +233,7 @@ export type components = {
       | 'core-declined'
       | 'unknown-reason'
       | 'invalid-answers'
+      | 'risk-hold'
       | 'concurrent-update'
       | 'idempotency-key-reuse'
       | 'no-regime'
@@ -369,7 +370,7 @@ export type components = {
       event: components['schemas']['DisputeEvent']
       /** @default system */
       actor?: string
-      /** @description Event-specific facts, stored verbatim on the log entry. Two are read by the ledger: on ISSUE_REFUND, `liability` is the amount the customer bears (a decimal string, capped by the regime, refused with invalid-liability); on CLOSE, `settlement` says how an outstanding advance clears (RECOVERED or WRITTEN_OFF; the regime's default when absent; refused with invalid-settlement); on RECEIVE_QUESTIONNAIRE, `answers` maps question ids to answers and is validated against the questions that were sent (refused with invalid-answers, one error per question). */
+      /** @description Event-specific facts, stored verbatim on the log entry. Two are read by the ledger: on ISSUE_REFUND, `liability` is the amount the customer bears (a decimal string, capped by the regime, refused with invalid-liability); on CLOSE, `settlement` says how an outstanding advance clears (RECOVERED or WRITTEN_OFF; the regime's default when absent; refused with invalid-settlement); on RECEIVE_QUESTIONNAIRE, `answers` maps question ids to answers and is validated against the questions that were sent (refused with invalid-answers, one error per question). On ISSUE_REFUND for a dispute whose latest risk tier is HIGH, `riskOverride` must carry the analyst's justification or the credit is refused with risk-hold. */
       payload?: {
         /** @example 50.00 */
         liability?: string
@@ -377,6 +378,8 @@ export type components = {
         answers?: {
           [key: string]: string
         }
+        /** @description Why a credit goes out despite a HIGH risk score; recorded on the event. */
+        riskOverride?: string
       } & {
         [key: string]: unknown
       }
@@ -459,6 +462,8 @@ export type components = {
       updatedAt: string
       /** @description The open regulatory clock that runs out first; absent once every clock is settled. */
       nextDeadline?: components['schemas']['Deadline']
+      riskTier?: components['schemas']['RiskTier']
+      riskScore?: number
     }
     DisputePage: {
       items: components['schemas']['DisputeSummary'][]
@@ -499,6 +504,36 @@ export type components = {
       questionnaire?: components['schemas']['Questionnaire']
       /** @description Every communication owed to the customer so far, in the order it arose. */
       notices: components['schemas']['Notice'][]
+      /** @description The latest fraud assessment; absent for disputes opened before scoring existed. */
+      risk?: components['schemas']['Risk']
+    }
+    /**
+     * @description LOW proceeds; MEDIUM is flagged for the analyst; HIGH holds credits until a justification is recorded.
+     * @enum {string}
+     */
+    RiskTier: 'LOW' | 'MEDIUM' | 'HIGH'
+    RiskSignal: {
+      name: string
+      /** @description The most this signal can add. */
+      weight: number
+      points: number
+      /** @description Why it scored what it did */
+      detail: string
+    }
+    Risk: {
+      score: number
+      tier: components['schemas']['RiskTier']
+      signals: components['schemas']['RiskSignal'][]
+      /** Format: date-time */
+      assessedAt: string
+      /** @description Earlier assessments, oldest first; the score moves when the questionnaire arrives. */
+      history: {
+        seq: number
+        score: number
+        tier: components['schemas']['RiskTier']
+        /** Format: date-time */
+        assessedAt: string
+      }[]
     }
     /** @enum {string} */
     NoticeKind:

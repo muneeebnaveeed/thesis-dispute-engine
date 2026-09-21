@@ -36,6 +36,7 @@ type MemStore struct {
 	Ledger       map[uuid.UUID][]application.LedgerEntry
 	Questions    map[uuid.UUID]application.Questionnaire
 	Notices      []application.NoticeRecord
+	Risk         map[uuid.UUID][]application.RiskRecord
 	Accounts     map[uuid.UUID]application.AccountRecord
 	Names        map[uuid.UUID]string
 	nextNotice   int64
@@ -56,6 +57,7 @@ func NewMemStore() *MemStore {
 		Ledger:       map[uuid.UUID][]application.LedgerEntry{},
 		Questions:    map[uuid.UUID]application.Questionnaire{},
 		Accounts:     map[uuid.UUID]application.AccountRecord{},
+		Risk:         map[uuid.UUID][]application.RiskRecord{},
 		Names:        map[uuid.UUID]string{},
 		Calendars:    map[uuid.UUID]domain.Calendar{},
 		Cores:        map[uuid.UUID]application.CoreConfig{},
@@ -73,10 +75,11 @@ func (m *MemStore) AddTransactionFor(tenantID uuid.UUID, rail domain.Rail, curre
 	defer m.mu.Unlock()
 	id := uuid.New()
 	account := uuid.New()
-	m.Accounts[account] = application.AccountRecord{ID: account, Holder: "Test Holder", Currency: accountCurrency, Email: "holder@example.com", PostalAddress: "1 Test Street"}
+	opened := time.Now().AddDate(-3, 0, 0)
+	m.Accounts[account] = application.AccountRecord{ID: account, Holder: "Test Holder", Currency: accountCurrency, Email: "holder@example.com", PostalAddress: "1 Test Street", OpenedAt: opened}
 	m.Transactions[id] = application.TransactionRecord{
 		ID: id, TenantID: tenantID, AccountID: account, Rail: rail, Amount: mustDecimal(amount), Currency: currency, AccountCurrency: accountCurrency,
-		Merchant: "ACME", OccurredAt: time.Now().Add(-48 * time.Hour),
+		AccountOpenedAt: opened, Merchant: "ACME", OccurredAt: time.Now().Add(-48 * time.Hour),
 	}
 	return id
 }
@@ -134,6 +137,7 @@ type snapshotT struct {
 	ledger     map[uuid.UUID][]application.LedgerEntry
 	questions  map[uuid.UUID]application.Questionnaire
 	notices    []application.NoticeRecord
+	risk       map[uuid.UUID][]application.RiskRecord
 }
 
 func (m *MemStore) snapshot() snapshotT {
@@ -144,6 +148,10 @@ func (m *MemStore) snapshot() snapshotT {
 		s.questions[k] = v
 	}
 	s.notices = append([]application.NoticeRecord(nil), m.Notices...)
+	s.risk = map[uuid.UUID][]application.RiskRecord{}
+	for k, v := range m.Risk {
+		s.risk[k] = append([]application.RiskRecord(nil), v...)
+	}
 	for k, v := range m.Deadlines {
 		s.deadlines[k] = append([]domain.Deadline(nil), v...)
 	}
@@ -163,7 +171,7 @@ func (m *MemStore) snapshot() snapshotT {
 }
 
 func (m *MemStore) restore(s snapshotT) {
-	m.Disputes, m.Events, m.Idempotent, m.Deadlines, m.Ledger, m.Questions, m.Notices = s.disputes, s.events, s.idempotent, s.deadlines, s.ledger, s.questions, s.notices
+	m.Disputes, m.Events, m.Idempotent, m.Deadlines, m.Ledger, m.Questions, m.Notices, m.Risk = s.disputes, s.events, s.idempotent, s.deadlines, s.ledger, s.questions, s.notices, s.risk
 }
 
 // ClaimNotices implements application.Store; backoff is not modelled, every unsent email is offered each pass.
@@ -510,4 +518,51 @@ func (t *memTx) GetNotice(_ context.Context, disputeID uuid.UUID, id int64) (app
 		}
 	}
 	return application.NoticeRecord{}, application.ErrNotFound
+}
+
+func (t *memTx) AccountHistory(_ context.Context, accountID, exclude uuid.UUID, since time.Time) (int, int, error) {
+	var disputes, lost int
+	for id, d := range t.s.Disputes {
+		if d.TenantID != t.tenant || d.AccountID != accountID || id == exclude {
+			continue
+		}
+		if !d.OpenedAt.Before(since) {
+			disputes++
+		}
+		for _, e := range t.s.Events[id] {
+			if e.ToState == domain.StateChargebackLost {
+				lost++
+				break
+			}
+		}
+	}
+	return disputes, lost, nil
+}
+
+func (t *memTx) InsertRisk(_ context.Context, id uuid.UUID, r application.RiskRecord) error {
+	if _, err := t.GetDispute(context.Background(), id); err != nil {
+		return err
+	}
+	t.s.Risk[id] = append(t.s.Risk[id], r)
+	return nil
+}
+
+func (t *memTx) ListRisk(_ context.Context, id uuid.UUID) ([]application.RiskRecord, error) {
+	if _, err := t.GetDispute(context.Background(), id); err != nil {
+		return nil, err
+	}
+	return append([]application.RiskRecord(nil), t.s.Risk[id]...), nil
+}
+
+func (t *memTx) LatestRisk(_ context.Context, ids []uuid.UUID) (map[uuid.UUID]domain.Assessment, error) {
+	out := map[uuid.UUID]domain.Assessment{}
+	for _, id := range ids {
+		if d, ok := t.s.Disputes[id]; !ok || d.TenantID != t.tenant {
+			continue
+		}
+		if rs := t.s.Risk[id]; len(rs) > 0 {
+			out[id] = rs[len(rs)-1].Assessment
+		}
+	}
+	return out, nil
 }

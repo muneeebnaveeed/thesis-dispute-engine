@@ -158,7 +158,11 @@ test("the tenant's banking core answers each credit, and a decline leaves the di
   expect(res.status()).toBe(201)
   const { id } = (await res.json()) as { id: string }
   await page.goto(`/otp/disputes/${id}`)
+  // On a well-used account the fraud score may already hold the credit; that gate is exercised elsewhere.
+  const onHold = await page.getByText(/On hold/).isVisible()
   await page.getByRole('button', { name: 'OPEN_INVESTIGATION' }).click()
+  const why = page.getByLabel(/Justification for crediting/)
+  if (onHold) await why.fill('e2e: exercising the core decline')
   await page.getByRole('button', { name: 'ISSUE_REFUND' }).click()
   const alert = page.getByRole('alert')
   await expect(alert).toContainText(/declined/)
@@ -174,7 +178,9 @@ test("the tenant's banking core answers each credit, and a decline leaves the di
   // A smaller dispute is credited and the ledger shows the core's retrieval reference.
   const small = await openDisputeViaApi(request, 'otp')
   await page.goto(`/otp/disputes/${small}`)
+  const smallOnHold = await page.getByText(/On hold/).isVisible()
   await page.getByRole('button', { name: 'OPEN_INVESTIGATION' }).click()
+  if (smallOnHold) await why.fill('e2e: exercising the core receipt')
   await page.getByRole('button', { name: 'ISSUE_REFUND' }).click()
   const row = page
     .getByRole('table', { name: 'Postings' })
@@ -267,4 +273,39 @@ test('every step writes to the customer: the acknowledgement email lands in the 
   await expect(page.getByRole('heading', { name: 'We have received your dispute' })).toBeVisible()
   await expect(page.getByText('Dear Jordan Lee,')).toBeVisible()
   await expect(page.getByText(regE)).toBeVisible()
+})
+
+test('a repeat disputer scores HIGH, the credit is held until the analyst records why, and the score is explained', async ({
+  page,
+  request,
+}) => {
+  // Three earlier disputes on the same account inside the year, then a large one on a watch-list merchant.
+  for (let i = 0; i < 3; i++) await openDisputeViaApi(request, 'otp')
+  const res = await request.post(`${api}/disputes`, {
+    headers: { Authorization: `Bearer ${tenants.otp.key}`, 'Idempotency-Key': crypto.randomUUID() },
+    data: { transactionId: '00000000-0000-8000-8000-000000000104', actor: 'e2e' }, // 7450 EUR, MCC 5815
+  })
+  const { id } = (await res.json()) as { id: string }
+  await page.goto(`/otp/disputes/${id}`)
+  const signals = page.getByRole('table', { name: 'Risk signals' })
+  await expect(signals).toContainText('other disputes on this account')
+  await expect(page.getByText(/On hold: a credit needs a recorded justification/)).toBeVisible()
+
+  await page.getByRole('button', { name: 'OPEN_INVESTIGATION' }).click()
+  const why = page.getByLabel(/Justification for crediting/)
+  await expect(why).toBeVisible()
+  await page.getByRole('button', { name: 'ISSUE_REFUND' }).click()
+  await expect(why).toHaveAttribute('aria-invalid', 'true')
+  await expect(page.locator('#riskOverride-error')).toContainText(/HIGH/)
+  await expect(
+    page
+      .getByRole('definition')
+      .filter({ hasText: /^[A-Z_]+$/ })
+      .first(),
+  ).toHaveText('INVESTIGATING')
+
+  // With a justification the hold lifts; this tenant's core then declines the amount, which is the next gate.
+  await why.fill('Customer verified in branch; police report 2026/1234 confirms the card was stolen.')
+  await page.getByRole('button', { name: 'ISSUE_REFUND' }).click()
+  await expect(page.getByRole('alert')).toContainText(/declined/)
 })
