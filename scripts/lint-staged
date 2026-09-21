@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
-# Pre-commit: format and lint only the Go packages with staged changes, then re-stage formatting.
+# Pre-commit: format and lint only what is staged (Go packages, frontend files), then re-stage formatting.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
-mapfile -t files < <(git diff --cached --name-only --diff-filter=ACMR -- 'backend/*.go' 'backend/**/*.go')
-((${#files[@]})) || exit 0
-mapfile -t pkgs < <(printf '%s\n' "${files[@]}" | sed 's|^backend/||; s|/[^/]*$||' | sort -u | sed 's|^|./|')
-(cd backend && golangci-lint fmt "${pkgs[@]}" && golangci-lint run "${pkgs[@]}")
-git add -- "${files[@]}"
+
+mapfile -t gofiles < <(git diff --cached --name-only --diff-filter=ACMR -- 'backend/*.go' 'backend/**/*.go')
+if ((${#gofiles[@]})); then
+  mapfile -t pkgs < <(printf '%s\n' "${gofiles[@]}" | sed 's|^backend/||; s|/[^/]*$||' | sort -u | sed 's|^|./|')
+  (cd backend && golangci-lint fmt "${pkgs[@]}" && golangci-lint run "${pkgs[@]}")
+  git add -- "${gofiles[@]}"
+fi
+
+mapfile -t fefiles < <(git diff --cached --name-only --diff-filter=ACMR -- 'frontend/**/*.ts' 'frontend/**/*.tsx' 'frontend/*.ts' 'frontend/*.json' 'frontend/**/*.json' 'frontend/**/*.css' | grep -v 'routeTree.gen.ts\|pnpm-lock' || true)
+if ((${#fefiles[@]})) && [[ -d frontend/node_modules ]]; then
+  rel=("${fefiles[@]#frontend/}")
+  (cd frontend && pnpm exec oxfmt "${rel[@]}" && pnpm exec oxlint "${rel[@]}")
+  git add -- "${fefiles[@]}"
+fi

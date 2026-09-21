@@ -1,0 +1,46 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript",
+    "react",
+    "react-perf",
+    "import",
+    "unicorn",
+    "oxc",
+    "jsx-a11y",
+    "promise",
+    "vitest"
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "warn",
+    "pedantic": "off"
+  },
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/switch-exhaustiveness-check": "error",
+    "react/exhaustive-deps": "error",
+    "react/rules-of-hooks": "error",
+    "import/no-cycle": "error",
+    "unicorn/no-null": "off",
+    "react/react-in-jsx-scope": "off"
+  },
+  "ignorePatterns": ["dist", ".nitro", ".output", ".tanstack", "src/routeTree.gen.ts", "src/api/*.gen.ts"],
+  "settings": {
+    "react": {
+      "version": "19"
+    }
+  },
+  "overrides": [
+    {
+      "files": ["src/test/setup.ts", "src/styles.css"],
+      "rules": {
+        "import/no-unassigned-import": "off"
+      }
+    }
+  ]
+}

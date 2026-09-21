@@ -5,7 +5,7 @@ SHELL := /bin/bash
 BACKEND := backend
 GO      := cd $(BACKEND) && go
 
-.PHONY: help hooks run migrate dev build test test-race test-integration cover lint vet fmt fmt-fix tidy vuln versions generate generate-check db-up db-down db-logs db-seed up down docker-dev otel-up otel-down otel-reset image pr ci-logs pr-comments stack ci
+.PHONY: help hooks run migrate dev build fe-install fe-dev fe-check fe-fix fe-build fe-image test test-race test-integration cover lint vet fmt fmt-fix tidy vuln versions generate generate-check db-up db-down db-logs db-seed up down docker-dev otel-up otel-down otel-reset image pr ci-logs pr-comments stack ci
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -109,6 +109,27 @@ otel-reset: ## Stop the otel stack and drop its data volume
 # --network host for the build stage: on the primary dev machine the VPN drops
 # traffic on Docker's bridge, so `go mod download` inside the build would time
 # out. Runtime containers get the same via compose. CI does not need it.
+FRONTEND := frontend
+PNPM := pnpm -C $(FRONTEND)
+
+fe-install: ## Install frontend dependencies (pnpm, pinned in mise.toml)
+	$(PNPM) install --frozen-lockfile
+
+fe-dev: ## Frontend dev server on http://localhost:3002 (expects the API on :8090)
+	$(PNPM) dev
+
+fe-check: ## Frontend typecheck, lint, format check and tests (what CI runs)
+	$(PNPM) generate-routes && $(PNPM) typecheck && $(PNPM) lint && $(PNPM) fmt && $(PNPM) test
+
+fe-fix: ## Apply frontend lint and format fixes
+	$(PNPM) lint:fix && $(PNPM) fmt:fix
+
+fe-build: ## Production build into frontend/.output
+	$(PNPM) generate-routes && $(PNPM) build
+
+fe-image: ## Build the frontend container image
+	docker build --network host -t dispute-engine-frontend:dev --build-arg NODE_VERSION=$$(sed -n 's/^node = "\(.*\)"$$/\1/p' mise.toml) --build-arg PNPM_VERSION=$$(sed -n 's/^pnpm = "\(.*\)"$$/\1/p' mise.toml) $(FRONTEND)
+
 image: ## Build the API image locally
 	docker build --network host -t dispute-engine-api:local --build-arg VERSION=$$(git rev-parse --short HEAD) $(BACKEND)
 
@@ -124,4 +145,4 @@ stack: ## Stacked PRs: make stack ARGS='show|restack --push|retarget'
 pr-comments: ## Export review comments for the current PR into notes/ (ARGS='--pr N')
 	scripts/fetch-pr-comments $(ARGS)
 
-ci: versions generate-check fmt vet lint test tidy ## Everything CI runs, locally (race detector and integration tests need extras; see test-race, test-integration)
+ci: versions generate-check fmt vet lint test tidy fe-check ## Everything CI runs, locally (race detector and integration tests need extras; see test-race, test-integration)
