@@ -10,7 +10,7 @@
 #   make db-up      postgres only (the usual `make run` loop)
 #   make up         postgres + the API built from backend/Dockerfile
 #   make docker-dev postgres + the API in a Go toolchain container with live reload
-#   make otel-up    the above plus Jaeger; the API exports traces to it
+#   make otel-up    the above plus otel-lgtm; the API exports traces, metrics and logs to it
 services:
   postgres:
     image: postgres:17-alpine
@@ -42,12 +42,13 @@ services:
     environment:
       DISPUTE_ADDR: ":8090"
       DISPUTE_DATABASE_URL: postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable
-      # Set by the otel profile via deploy/otel.env; empty means "instrumented,
-      # nothing exported".
+      # deploy/otel.env fills these under the otel profile; empty means instrumented, nothing exported.
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-dispute-engine}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-}
       OTEL_METRICS_EXPORTER: ${OTEL_METRICS_EXPORTER:-}
+      OTEL_LOGS_EXPORTER: ${OTEL_LOGS_EXPORTER:-}
+      OTEL_METRIC_EXPORT_INTERVAL: ${OTEL_METRIC_EXPORT_INTERVAL:-}
 
   # Toolchain container for a fully dockerised dev loop; air watches the bind mount.
   api-dev:
@@ -67,14 +68,18 @@ services:
       DISPUTE_ADDR: ":8090"
       DISPUTE_DATABASE_URL: postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable
 
-  # Jaeger v2 speaks OTLP natively (4317 gRPC, 4318 HTTP) and serves its UI on
-  # 16686, so no separate collector is needed for local tracing.
-  jaeger:
-    image: jaegertracing/jaeger:2.21.0
+  # Grafana + Loki + Tempo + Mimir + an OTel Collector in one image; OTLP on 4317/4318, UI on 3000 (admin/admin).
+  lgtm:
+    image: grafana/otel-lgtm:0.33.1
     network_mode: host
     profiles: [otel]
+    environment:
+      ENABLE_LOGS_ALL: "false"
+    volumes:
+      - lgtm:/data
 
 volumes:
   pgdata:
   gomod:
   gobuild:
+  lgtm:

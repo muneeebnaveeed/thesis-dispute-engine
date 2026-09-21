@@ -9,7 +9,9 @@ import (
 
 	"go.opentelemetry.io/contrib/exporters/autoexport"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/log/global"
 	"go.opentelemetry.io/otel/propagation"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -42,9 +44,10 @@ func Setup(ctx context.Context, logger *slog.Logger) (Shutdown, error) {
 		propagation.Baggage{},
 	))
 
-	shutdowns := make([]Shutdown, 0, 2)
+	shutdowns := make([]Shutdown, 0, 3)
 	tracerOpts := []sdktrace.TracerProviderOption{sdktrace.WithResource(res)}
 	meterOpts := []metric.Option{metric.WithResource(res)}
+	logOpts := []sdklog.LoggerProviderOption{sdklog.WithResource(res)}
 
 	if exportEnabled() {
 		spanExporter, err := autoexport.NewSpanExporter(ctx)
@@ -59,9 +62,16 @@ func Setup(ctx context.Context, logger *slog.Logger) (Shutdown, error) {
 		}
 		meterOpts = append(meterOpts, metric.WithReader(reader))
 
+		logExporter, err := autoexport.NewLogExporter(ctx)
+		if err != nil {
+			return nil, err
+		}
+		logOpts = append(logOpts, sdklog.WithProcessor(sdklog.NewBatchProcessor(logExporter)))
+
 		logger.Info("telemetry: exporting",
 			"traces", envOr("OTEL_TRACES_EXPORTER", "otlp"),
 			"metrics", envOr("OTEL_METRICS_EXPORTER", "otlp"),
+			"logs", envOr("OTEL_LOGS_EXPORTER", "otlp"),
 			"endpoint", os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
 		)
 	}
@@ -73,6 +83,10 @@ func Setup(ctx context.Context, logger *slog.Logger) (Shutdown, error) {
 	mp := metric.NewMeterProvider(meterOpts...)
 	otel.SetMeterProvider(mp)
 	shutdowns = append(shutdowns, mp.Shutdown)
+
+	lp := sdklog.NewLoggerProvider(logOpts...)
+	global.SetLoggerProvider(lp)
+	shutdowns = append(shutdowns, lp.Shutdown)
 
 	return func(ctx context.Context) error {
 		var errs []error
@@ -98,8 +112,10 @@ func exportEnabled() bool {
 		"OTEL_EXPORTER_OTLP_ENDPOINT",
 		"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
 		"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+		"OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
 		"OTEL_TRACES_EXPORTER",
 		"OTEL_METRICS_EXPORTER",
+		"OTEL_LOGS_EXPORTER",
 	} {
 		if os.Getenv(key) != "" {
 			return true

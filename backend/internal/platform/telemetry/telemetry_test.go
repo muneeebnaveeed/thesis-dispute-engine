@@ -1,9 +1,11 @@
 package telemetry
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"log/slog"
+	"strings"
 	"testing"
 
 	"go.opentelemetry.io/otel"
@@ -11,7 +13,7 @@ import (
 )
 
 func TestSetupWithoutEnvInstallsProvidersAndExportsNothing(t *testing.T) {
-	for _, key := range []string{"OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_TRACES_EXPORTER", "OTEL_METRICS_EXPORTER"} {
+	for _, key := range []string{"OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_TRACES_EXPORTER", "OTEL_METRICS_EXPORTER", "OTEL_LOGS_EXPORTER"} {
 		t.Setenv(key, "")
 	}
 	shutdown, err := Setup(context.Background(), slog.New(slog.NewTextHandler(io.Discard, nil)))
@@ -31,6 +33,7 @@ func TestSetupWithoutEnvInstallsProvidersAndExportsNothing(t *testing.T) {
 func TestSetupHonoursConsoleExporterEnv(t *testing.T) {
 	t.Setenv("OTEL_TRACES_EXPORTER", "console")
 	t.Setenv("OTEL_METRICS_EXPORTER", "none")
+	t.Setenv("OTEL_LOGS_EXPORTER", "none")
 	shutdown, err := Setup(context.Background(), slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatalf("Setup() error = %v", err)
@@ -52,5 +55,20 @@ func TestSpanIDs(t *testing.T) {
 	tid, sid := SpanIDs(ctx)
 	if tid != "0102030405060708090a0b0c0d0e0f10" || sid != "0102030405060708" {
 		t.Errorf("SpanIDs = %q,%q", tid, sid)
+	}
+}
+
+func TestHandlerFansOutAndKeepsBaseBehaviour(t *testing.T) {
+	var buf bytes.Buffer
+	base := slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo})
+	logger := slog.New(Handler(base)).With("component", "test").WithGroup("req")
+	logger.Debug("dropped")
+	logger.Info("kept", "id", 7)
+	out := buf.String()
+	if !strings.Contains(out, `"msg":"kept"`) || strings.Contains(out, "dropped") {
+		t.Fatalf("base handler output = %s", out)
+	}
+	if !strings.Contains(out, `"component":"test"`) || !strings.Contains(out, `"req":{"id":7}`) {
+		t.Errorf("attrs/groups not forwarded: %s", out)
 	}
 }

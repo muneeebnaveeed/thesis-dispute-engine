@@ -14,7 +14,8 @@ import (
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	// Records go to stdout and, once Setup installs a provider, to OTLP with trace context attached.
+	logger := slog.New(telemetry.Handler(slog.NewJSONHandler(os.Stdout, nil)))
 	slog.SetDefault(logger)
 
 	if err := run(logger); err != nil {

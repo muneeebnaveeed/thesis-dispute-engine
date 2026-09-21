@@ -67,7 +67,7 @@ docker-dev: ## PostgreSQL + the API in a Go toolchain container with live reload
 down: ## Stop everything started by up/otel-up (keeps the DB volume)
 	docker compose -f deploy/compose.yml --profile app --profile otel down
 
-otel-up: ## PostgreSQL + API + Jaeger (UI at http://localhost:16686); API exports traces to it
+otel-up: ## PostgreSQL + API + Grafana LGTM (http://localhost:3000, admin/admin); API exports traces, metrics and logs
 	docker compose -f deploy/compose.yml --env-file deploy/otel.env --profile otel up -d --build
 
 otel-down: ## Stop the otel stack
