@@ -112,7 +112,7 @@ otel-reset: ## Stop the otel stack and drop its data volume
 image: ## Build the API image locally
 	docker build --network host -t dispute-engine-api:local --build-arg VERSION=$$(git rev-parse --short HEAD) $(BACKEND)
 
-pr: ## Open a PR: make pr ARGS='--summary ... --why ... --testing ...'
+pr: ## Open a PR: make pr ARGS='--description "..."' (see .claude/skills/create-pr)
 	scripts/create-pr $(ARGS)
 
 ci-logs: ## Download failing CI logs for the current PR into notes/ (ARGS='--pr N --wait')

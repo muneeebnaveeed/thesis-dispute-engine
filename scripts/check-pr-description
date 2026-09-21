@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Rejects PR descriptions that paraphrase the diff. Shared by create-pr and the pr-template CI check.
+#
+#   scripts/check-pr-description "<description>"
+set -euo pipefail
+d=$1
+fail() { echo "description rejected: $*" >&2; exit 1; }
+
+[[ -n "${d//[[:space:]]/}" ]] || fail "empty"
+[[ "$d" != *"<!--"* ]] || fail "template placeholder left in place"
+sentences=$(grep -oE '[.!?](\s|$)' <<<"$d" | wc -l)
+(( sentences <= 3 )) || fail "$sentences sentences; write 2, at most 3, about scope and impact"
+(( ${#d} <= 600 )) || fail "${#d} characters; keep it under 600"
+grep -qE '`' <<<"$d" && fail "contains backticks; identifiers belong in the diff, not the description"
+grep -qE '\b[A-Za-z0-9_./-]+\.(go|sql|ya?ml|ts|tsx|js|md|sh)\b' <<<"$d" && fail "names a file; describe the effect instead"
+grep -qE '\b[a-zA-Z_][a-zA-Z0-9_]*\(\)' <<<"$d" && fail "names a function; describe the effect instead"
+grep -qE '(^|\s)--[a-z]' <<<"$d" && fail "names a flag; describe the effect instead"
+exit 0
