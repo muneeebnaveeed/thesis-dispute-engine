@@ -26,6 +26,7 @@ type txn struct {
 	currency            string
 	merchant            string
 	daysAgo             int
+	mcc                 string // merchant category code; 5815 (digital goods) is on the fraud watch list
 }
 
 // Fixed IDs so scripts and docs can refer to them; the version nibble is 8 to keep them out of the v7 space.
@@ -40,14 +41,14 @@ var (
 	accountUSD = "00000000-0000-8000-8000-000000000002"
 	accountB   = "00000000-0000-8000-8000-000000000003"
 	seedTxns   = []txn{
-		{"00000000-0000-8000-8000-000000000101", tenantA, accountEUR, "CARD", "125.40", "EUR", "Ryanair", 3},
-		{"00000000-0000-8000-8000-000000000102", tenantA, accountEUR, "CARD", "1899.00", "EUR", "MediaMarkt", 12},
-		{"00000000-0000-8000-8000-000000000103", tenantA, accountEUR, "SEPA_DD", "49.99", "EUR", "Vodafone Hungary", 20},
-		{"00000000-0000-8000-8000-000000000104", tenantA, accountEUR, "CARD", "7450.00", "EUR", "Apple Store", 7},
-		{"00000000-0000-8000-8000-000000000201", tenantA, accountUSD, "CARD", "89.10", "USD", "Amazon", 5},
-		{"00000000-0000-8000-8000-000000000202", tenantA, accountUSD, "CREDIT_CARD", "412.00", "USD", "Delta Air Lines", 9},
-		{"00000000-0000-8000-8000-000000000301", tenantB, accountB, "CARD", "64.00", "EUR", "Bolt", 2},
-		{"00000000-0000-8000-8000-000000000302", tenantB, accountB, "SEPA_DD", "29.90", "EUR", "Telekom", 15},
+		{"00000000-0000-8000-8000-000000000101", tenantA, accountEUR, "CARD", "125.40", "EUR", "Ryanair", 3, "4511"},
+		{"00000000-0000-8000-8000-000000000102", tenantA, accountEUR, "CARD", "1899.00", "EUR", "MediaMarkt", 12, "5732"},
+		{"00000000-0000-8000-8000-000000000103", tenantA, accountEUR, "SEPA_DD", "49.99", "EUR", "Vodafone Hungary", 20, "4814"},
+		{"00000000-0000-8000-8000-000000000104", tenantA, accountEUR, "CARD", "7450.00", "EUR", "Apple Store", 7, "5815"},
+		{"00000000-0000-8000-8000-000000000201", tenantA, accountUSD, "CARD", "89.10", "USD", "Amazon", 5, "5942"},
+		{"00000000-0000-8000-8000-000000000202", tenantA, accountUSD, "CREDIT_CARD", "412.00", "USD", "Delta Air Lines", 9, "4511"},
+		{"00000000-0000-8000-8000-000000000301", tenantB, accountB, "CARD", "64.00", "EUR", "Bolt", 2, "4121"},
+		{"00000000-0000-8000-8000-000000000302", tenantB, accountB, "SEPA_DD", "29.90", "EUR", "Telekom", 15, "4814"},
 	}
 )
 
@@ -136,7 +137,7 @@ func run() error {
 		if err := q.InsertTransaction(ctx, sqlcgen.InsertTransactionParams{
 			ID: uuid.MustParse(t.id), TenantID: uuid.MustParse(t.tenant), AccountID: uuid.MustParse(t.account), Rail: t.rail,
 			Amount: decimal.RequireFromString(t.amount), Currency: t.currency, Merchant: t.merchant,
-			OccurredAt: time.Now().AddDate(0, 0, -t.daysAgo),
+			OccurredAt: time.Now().AddDate(0, 0, -t.daysAgo), Mcc: mccPtr(t.mcc),
 		}); err != nil {
 			return err
 		}
@@ -146,6 +147,13 @@ func run() error {
 		fmt.Printf("  %s  tenant %s  %-11s %8s %s  %s\n", t.id, t.tenant[len(t.tenant)-4:], t.rail, t.amount, t.currency, t.merchant)
 	}
 	return nil
+}
+
+func mccPtr(m string) *string {
+	if m == "" {
+		return nil
+	}
+	return &m
 }
 
 func isUniqueViolation(err error) bool {

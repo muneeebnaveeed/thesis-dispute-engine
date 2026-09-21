@@ -100,6 +100,41 @@ func (q *Queries) ClaimNotices(ctx context.Context, batch int32) ([]ClaimNotices
 	return items, nil
 }
 
+const countAccountDisputesSince = `-- name: CountAccountDisputesSince :one
+SELECT count(*)::int FROM disputes WHERE account_id = $1 AND opened_at >= $2 AND id <> $3
+`
+
+type CountAccountDisputesSinceParams struct {
+	AccountID uuid.UUID
+	OpenedAt  time.Time
+	ID        uuid.UUID
+}
+
+func (q *Queries) CountAccountDisputesSince(ctx context.Context, arg CountAccountDisputesSinceParams) (int32, error) {
+	row := q.db.QueryRow(ctx, countAccountDisputesSince, arg.AccountID, arg.OpenedAt, arg.ID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const countAccountLostChargebacks = `-- name: CountAccountLostChargebacks :one
+SELECT count(DISTINCT d.id)::int FROM disputes d
+JOIN dispute_events e ON e.dispute_id = d.id
+WHERE d.account_id = $1 AND d.id <> $2 AND e.to_state = 'CHARGEBACK_LOST'
+`
+
+type CountAccountLostChargebacksParams struct {
+	AccountID uuid.UUID
+	ID        uuid.UUID
+}
+
+func (q *Queries) CountAccountLostChargebacks(ctx context.Context, arg CountAccountLostChargebacksParams) (int32, error) {
+	row := q.db.QueryRow(ctx, countAccountLostChargebacks, arg.AccountID, arg.ID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countDeadlinesOverdue = `-- name: CountDeadlinesOverdue :many
 SELECT tenant_id, regime, kind, n FROM deadlines_overdue
 `
@@ -285,7 +320,7 @@ func (q *Queries) FinishNotice(ctx context.Context, arg FinishNoticeParams) erro
 }
 
 const getAccount = `-- name: GetAccount :one
-SELECT id, holder_name, currency, email, postal_address FROM accounts WHERE id = $1
+SELECT id, holder_name, currency, email, postal_address, opened_at FROM accounts WHERE id = $1
 `
 
 type GetAccountRow struct {
@@ -294,6 +329,7 @@ type GetAccountRow struct {
 	Currency      string
 	Email         *string
 	PostalAddress *string
+	OpenedAt      time.Time
 }
 
 func (q *Queries) GetAccount(ctx context.Context, id uuid.UUID) (GetAccountRow, error) {
@@ -305,6 +341,7 @@ func (q *Queries) GetAccount(ctx context.Context, id uuid.UUID) (GetAccountRow, 
 		&i.Currency,
 		&i.Email,
 		&i.PostalAddress,
+		&i.OpenedAt,
 	)
 	return i, err
 }
@@ -573,7 +610,7 @@ func (q *Queries) GetTenantName(ctx context.Context) (string, error) {
 }
 
 const getTransaction = `-- name: GetTransaction :one
-SELECT t.id, t.account_id, t.rail, t.amount, t.currency, t.merchant, t.occurred_at, a.currency AS account_currency
+SELECT t.id, t.account_id, t.rail, t.amount, t.currency, t.merchant, t.occurred_at, t.mcc, a.currency AS account_currency, a.opened_at AS account_opened_at
 FROM transactions t
 JOIN accounts a ON a.id = t.account_id
 WHERE t.id = $1
@@ -587,7 +624,9 @@ type GetTransactionRow struct {
 	Currency        string
 	Merchant        string
 	OccurredAt      time.Time
+	Mcc             *string
 	AccountCurrency string
+	AccountOpenedAt time.Time
 }
 
 func (q *Queries) GetTransaction(ctx context.Context, id uuid.UUID) (GetTransactionRow, error) {
@@ -601,7 +640,9 @@ func (q *Queries) GetTransaction(ctx context.Context, id uuid.UUID) (GetTransact
 		&i.Currency,
 		&i.Merchant,
 		&i.OccurredAt,
+		&i.Mcc,
 		&i.AccountCurrency,
+		&i.AccountOpenedAt,
 	)
 	return i, err
 }
@@ -852,6 +893,31 @@ func (q *Queries) InsertNotice(ctx context.Context, arg InsertNoticeParams) (int
 	return id, err
 }
 
+const insertRiskAssessment = `-- name: InsertRiskAssessment :exec
+INSERT INTO risk_assessments (dispute_id, seq, score, tier, signals, assessed_at) VALUES ($1, $2, $3, $4, $5, $6)
+`
+
+type InsertRiskAssessmentParams struct {
+	DisputeID  uuid.UUID
+	Seq        int32
+	Score      int32
+	Tier       string
+	Signals    []byte
+	AssessedAt time.Time
+}
+
+func (q *Queries) InsertRiskAssessment(ctx context.Context, arg InsertRiskAssessmentParams) error {
+	_, err := q.db.Exec(ctx, insertRiskAssessment,
+		arg.DisputeID,
+		arg.Seq,
+		arg.Score,
+		arg.Tier,
+		arg.Signals,
+		arg.AssessedAt,
+	)
+	return err
+}
+
 const insertTenantKey = `-- name: InsertTenantKey :exec
 INSERT INTO tenant_keys (id, tenant_id, key_hash, prefix, label, expires_at) VALUES ($1, $2, $3, $4, $5, $6)
 `
@@ -878,9 +944,9 @@ func (q *Queries) InsertTenantKey(ctx context.Context, arg InsertTenantKeyParams
 }
 
 const insertTransaction = `-- name: InsertTransaction :exec
-INSERT INTO transactions (id, tenant_id, account_id, rail, amount, currency, merchant, occurred_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-ON CONFLICT (id) DO NOTHING
+INSERT INTO transactions (id, tenant_id, account_id, rail, amount, currency, merchant, occurred_at, mcc)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+ON CONFLICT (id) DO UPDATE SET mcc = EXCLUDED.mcc
 `
 
 type InsertTransactionParams struct {
@@ -892,6 +958,7 @@ type InsertTransactionParams struct {
 	Currency   string
 	Merchant   string
 	OccurredAt time.Time
+	Mcc        *string
 }
 
 func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionParams) error {
@@ -904,8 +971,41 @@ func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionPa
 		arg.Currency,
 		arg.Merchant,
 		arg.OccurredAt,
+		arg.Mcc,
 	)
 	return err
+}
+
+const latestRiskTiers = `-- name: LatestRiskTiers :many
+SELECT DISTINCT ON (dispute_id) dispute_id, score, tier FROM risk_assessments
+WHERE dispute_id = ANY($1::uuid[]) ORDER BY dispute_id, id DESC
+`
+
+type LatestRiskTiersRow struct {
+	DisputeID uuid.UUID
+	Score     int32
+	Tier      string
+}
+
+// The newest assessment per dispute in the set, for list rows.
+func (q *Queries) LatestRiskTiers(ctx context.Context, disputeIds []uuid.UUID) ([]LatestRiskTiersRow, error) {
+	rows, err := q.db.Query(ctx, latestRiskTiers, disputeIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LatestRiskTiersRow{}
+	for rows.Next() {
+		var i LatestRiskTiersRow
+		if err := rows.Scan(&i.DisputeID, &i.Score, &i.Tier); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listDeadlines = `-- name: ListDeadlines :many
@@ -1179,6 +1279,48 @@ func (q *Queries) ListNotices(ctx context.Context, disputeID uuid.UUID) ([]ListN
 			&i.SentAt,
 			&i.Attempts,
 			&i.LastError,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRiskAssessments = `-- name: ListRiskAssessments :many
+SELECT id, dispute_id, seq, score, tier, signals, assessed_at FROM risk_assessments WHERE dispute_id = $1 ORDER BY id
+`
+
+type ListRiskAssessmentsRow struct {
+	ID         int64
+	DisputeID  uuid.UUID
+	Seq        int32
+	Score      int32
+	Tier       string
+	Signals    []byte
+	AssessedAt time.Time
+}
+
+func (q *Queries) ListRiskAssessments(ctx context.Context, disputeID uuid.UUID) ([]ListRiskAssessmentsRow, error) {
+	rows, err := q.db.Query(ctx, listRiskAssessments, disputeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRiskAssessmentsRow{}
+	for rows.Next() {
+		var i ListRiskAssessmentsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.DisputeID,
+			&i.Seq,
+			&i.Score,
+			&i.Tier,
+			&i.Signals,
+			&i.AssessedAt,
 		); err != nil {
 			return nil, err
 		}

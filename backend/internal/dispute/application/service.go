@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,6 +41,7 @@ type Service struct {
 	postings      metric.Int64Counter
 	coreMessages  metric.Int64Counter
 	coreLatency   metric.Float64Histogram
+	riskTiers     metric.Int64Counter
 }
 
 // Option configures a Service beyond its store and clock.
@@ -88,6 +90,10 @@ func NewService(store Store, now Clock, opts ...Option) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	riskTiers, err := m.Int64Counter("dispute.risk_assessments", metric.WithDescription("Risk assessments recorded, by regime and tier"))
+	if err != nil {
+		return nil, err
+	}
 	if _, err := m.Float64ObservableGauge("dispute.suspense", metric.WithDescription("What the bank has advanced on open disputes and not yet cleared"),
 		metric.WithFloat64Callback(func(ctx context.Context, o metric.Float64Observer) error {
 			balances, err := store.SuspenseBalances(ctx)
@@ -133,7 +139,7 @@ func NewService(store Store, now Clock, opts ...Option) (*Service, error) {
 	}
 	svc := &Service{store: store, now: now, tracer: otel.Tracer(scopeName), core: CoreRouter{}, coreTimeout: 5 * time.Second, afterCommit: func() {},
 		transitions: transitions, replays: replays, timeInState: timeInState, deadlineSlack: deadlineSlack, postings: postings,
-		coreMessages: coreMessages, coreLatency: coreLatency}
+		coreMessages: coreMessages, coreLatency: coreLatency, riskTiers: riskTiers}
 	for _, o := range opts {
 		o(svc)
 	}
@@ -161,6 +167,24 @@ type DisputeView struct {
 	Balances       Balances           `json:"balances"`
 	Questionnaire  *QuestionnaireView `json:"questionnaire,omitempty"`
 	Notices        []NoticeView       `json:"notices"`
+	Risk           *RiskView          `json:"risk,omitempty"`
+}
+
+// RiskView is the latest assessment and the ones before it.
+type RiskView struct {
+	Score      int               `json:"score"`
+	Tier       domain.RiskTier   `json:"tier"`
+	Signals    []domain.Signal   `json:"signals"`
+	AssessedAt time.Time         `json:"assessedAt"`
+	History    []RiskHistoryView `json:"history"`
+}
+
+// RiskHistoryView is one earlier assessment, score and tier only.
+type RiskHistoryView struct {
+	Seq        int             `json:"seq"`
+	Score      int             `json:"score"`
+	Tier       domain.RiskTier `json:"tier"`
+	AssessedAt time.Time       `json:"assessedAt"`
 }
 
 // NoticeView is one communication as listed on the dispute; the document itself is fetched separately.
@@ -323,6 +347,9 @@ func (s *Service) CreateDispute(ctx context.Context, in CreateDisputeInput) (Res
 		if err := s.notify(ctx, tx, rec, domain.StateInitiated, 1, now); err != nil {
 			return DisputeView{}, err
 		}
+		if err := s.assess(ctx, tx, rec, txn, 1, now); err != nil {
+			return DisputeView{}, err
+		}
 		span.SetAttributes(attribute.String("dispute.id", id.String()), attribute.String("dispute.regime", string(regime)))
 		s.transitions.Add(ctx, 1, metric.WithAttributes(tenantAttr(ctx),
 			attribute.String("regime", string(regime)), attribute.String("event", "OPENED"), attribute.String("to", string(domain.StateInitiated))))
@@ -344,6 +371,11 @@ func (s *Service) ApplyEvent(ctx context.Context, in ApplyEventInput) (Result, e
 		next, err := rec.Lifecycle().Apply(in.Event)
 		if err != nil {
 			return DisputeView{}, err
+		}
+		if in.Event == domain.EventIssueRefund {
+			if err := s.holdCheck(ctx, tx, rec, in.Payload); err != nil {
+				return DisputeView{}, err
+			}
 		}
 		now := s.now()
 		if err := tx.UpdateDisputeState(ctx, rec.ID, rec.Version, next.State, next.Appeals, now); err != nil {
@@ -372,6 +404,15 @@ func (s *Service) ApplyEvent(ctx context.Context, in ApplyEventInput) (Result, e
 		}
 		if err := s.notify(ctx, tx, rec, next.State, ev.Seq, now); err != nil {
 			return DisputeView{}, err
+		}
+		if in.Event == domain.EventReceiveQuestionnaire {
+			txn, err := tx.GetTransaction(ctx, rec.TransactionID)
+			if err != nil {
+				return DisputeView{}, err
+			}
+			if err := s.assess(ctx, tx, rec, txn, ev.Seq, now); err != nil {
+				return DisputeView{}, err
+			}
 		}
 		span.SetAttributes(attribute.String("dispute.regime", string(rec.Regime)),
 			attribute.String("dispute.from", string(rec.State)), attribute.String("dispute.to", string(next.State)))
@@ -426,9 +467,52 @@ func (s *Service) settleDeadlines(ctx context.Context, tx Tx, rec DisputeRecord,
 
 // eventFacts are the analyst-supplied facts an event may carry; anything else in the payload is kept verbatim.
 type eventFacts struct {
-	Liability  *string           `json:"liability"`
-	Settlement string            `json:"settlement"`
-	Answers    map[string]string `json:"answers"`
+	Liability    *string           `json:"liability"`
+	Settlement   string            `json:"settlement"`
+	Answers      map[string]string `json:"answers"`
+	RiskOverride string            `json:"riskOverride"`
+}
+
+// assess scores the dispute from the account's history, the transaction and the questionnaire, and records it.
+func (s *Service) assess(ctx context.Context, tx Tx, rec DisputeRecord, txn TransactionRecord, seq int, now time.Time) error {
+	disputes, lost, err := tx.AccountHistory(ctx, rec.AccountID, rec.ID, now.AddDate(-1, 0, 0))
+	if err != nil {
+		return err
+	}
+	in := domain.RiskInput{
+		DisputesLast12Months: disputes, LostChargebacks: lost,
+		TransactionAgeDays: domain.DaysBetween(txn.OccurredAt, rec.OpenedAt),
+		Amount:             rec.DisputedAmount,
+		AccountAgeDays:     domain.DaysBetween(txn.AccountOpenedAt, rec.OpenedAt),
+	}
+	_, in.HighRiskMerchant = domain.HighRiskMCC(txn.MCC)
+	switch q, err := tx.GetQuestionnaire(ctx, rec.ID); {
+	case err == nil && q.ReceivedAt != nil:
+		in.QuestionnaireKnown = true
+		in.Inconsistencies = len(domain.Inconsistencies(q.Reason, q.Answers))
+	case err != nil && !errors.Is(err, ErrNotFound):
+		return err
+	}
+	a := domain.Assess(in)
+	s.riskTiers.Add(ctx, 1, metric.WithAttributes(tenantAttr(ctx), attribute.String("regime", string(rec.Regime)), attribute.String("tier", string(a.Tier))))
+	return tx.InsertRisk(ctx, rec.ID, RiskRecord{Seq: seq, Assessment: a, AssessedAt: now})
+}
+
+// holdCheck refuses a credit on a HIGH-risk dispute unless the payload carries the analyst's justification.
+func (s *Service) holdCheck(ctx context.Context, tx Tx, rec DisputeRecord, payload json.RawMessage) error {
+	history, err := tx.ListRisk(ctx, rec.ID)
+	if err != nil || len(history) == 0 {
+		return err
+	}
+	var facts eventFacts
+	if len(payload) > 0 {
+		if err := json.Unmarshal(payload, &facts); err != nil {
+			return errs.New(errs.Invalid, "malformed-request", "the event payload is not an object").
+				WithFields(errs.FieldError{Field: "body.payload", Message: err.Error()})
+		}
+	}
+	latest := history[len(history)-1].Assessment
+	return domain.CreditAllowed(&latest, strings.TrimSpace(facts.RiskOverride))
 }
 
 // questionnaire sends the reason's question set or records the customer's answers, validated against the
@@ -695,6 +779,7 @@ type DisputeSummary struct {
 	OpenedAt       time.Time
 	UpdatedAt      time.Time
 	NextDeadline   *DeadlineView
+	Risk           *domain.Assessment // score and tier only
 }
 
 // Page is one page of a list plus where the next one starts.
@@ -729,6 +814,10 @@ func (s *Service) ListDisputes(ctx context.Context, q ListQuery) (Page, error) {
 		if err != nil {
 			return err
 		}
+		risk, err := tx.LatestRisk(ctx, ids)
+		if err != nil {
+			return err
+		}
 		page.Items = make([]DisputeSummary, 0, len(recs))
 		for _, r := range recs {
 			item := DisputeSummary{ID: r.ID, Regime: r.Regime, Reason: r.Reason, State: r.State, TransactionID: r.TransactionID,
@@ -736,6 +825,9 @@ func (s *Service) ListDisputes(ctx context.Context, q ListQuery) (Page, error) {
 			if d, ok := next[r.ID]; ok {
 				v := deadlineView(d, now)
 				item.NextDeadline = &v
+			}
+			if a, ok := risk[r.ID]; ok {
+				item.Risk = &a
 			}
 			page.Items = append(page.Items, item)
 		}
@@ -858,6 +950,16 @@ func (s *Service) view(ctx context.Context, tx Tx, rec DisputeRecord) (DisputeVi
 	for _, n := range notices {
 		view.Notices = append(view.Notices, NoticeView{ID: n.ID, Seq: n.Seq, Kind: n.Kind, Channel: n.Channel, Recipient: n.Recipient, Subject: n.Subject,
 			CreatedAt: n.CreatedAt, SentAt: n.SentAt, Error: n.LastError})
+	}
+	if risk, err := tx.ListRisk(ctx, rec.ID); err != nil {
+		return DisputeView{}, err
+	} else if len(risk) > 0 {
+		latest := risk[len(risk)-1]
+		rv := &RiskView{Score: latest.Assessment.Score, Tier: latest.Assessment.Tier, Signals: latest.Assessment.Signals, AssessedAt: latest.AssessedAt, History: []RiskHistoryView{}}
+		for _, r := range risk[:len(risk)-1] {
+			rv.History = append(rv.History, RiskHistoryView{Seq: r.Seq, Score: r.Assessment.Score, Tier: r.Assessment.Tier, AssessedAt: r.AssessedAt})
+		}
+		view.Risk = rv
 	}
 	switch q, err := tx.GetQuestionnaire(ctx, rec.ID); {
 	case err == nil:

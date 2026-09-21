@@ -142,9 +142,16 @@ func (t *txn) GetTransaction(ctx context.Context, id uuid.UUID) (application.Tra
 	}
 	return application.TransactionRecord{
 		ID: row.ID, AccountID: row.AccountID, Rail: domain.Rail(row.Rail),
-		Amount: row.Amount, Currency: row.Currency, AccountCurrency: row.AccountCurrency,
-		Merchant: row.Merchant, OccurredAt: row.OccurredAt,
+		Amount: row.Amount, Currency: row.Currency, AccountCurrency: row.AccountCurrency, AccountOpenedAt: row.AccountOpenedAt,
+		Merchant: row.Merchant, OccurredAt: row.OccurredAt, MCC: derefString(row.Mcc),
 	}, nil
+}
+
+func derefString(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }
 
 func (t *txn) InsertDispute(ctx context.Context, d application.DisputeRecord) error {
@@ -440,7 +447,7 @@ func (t *txn) GetAccount(ctx context.Context, id uuid.UUID) (application.Account
 	if err != nil {
 		return application.AccountRecord{}, mapErr(err)
 	}
-	a := application.AccountRecord{ID: row.ID, Holder: row.HolderName, Currency: row.Currency}
+	a := application.AccountRecord{ID: row.ID, Holder: row.HolderName, Currency: row.Currency, OpenedAt: row.OpenedAt}
 	if row.Email != nil {
 		a.Email = *row.Email
 	}
@@ -494,4 +501,53 @@ func noticeOf(id int64, disputeID uuid.UUID, seq int32, kind, channel, recipient
 		n.SentAt = &at
 	}
 	return n
+}
+
+func (t *txn) AccountHistory(ctx context.Context, accountID, exclude uuid.UUID, since time.Time) (int, int, error) {
+	disputes, err := t.q.CountAccountDisputesSince(ctx, sqlcgen.CountAccountDisputesSinceParams{AccountID: accountID, OpenedAt: since, ID: exclude})
+	if err != nil {
+		return 0, 0, mapErr(err)
+	}
+	lost, err := t.q.CountAccountLostChargebacks(ctx, sqlcgen.CountAccountLostChargebacksParams{AccountID: accountID, ID: exclude})
+	if err != nil {
+		return 0, 0, mapErr(err)
+	}
+	return int(disputes), int(lost), nil
+}
+
+func (t *txn) InsertRisk(ctx context.Context, disputeID uuid.UUID, r application.RiskRecord) error {
+	signals, err := json.Marshal(r.Assessment.Signals)
+	if err != nil {
+		return err
+	}
+	return mapErr(t.q.InsertRiskAssessment(ctx, sqlcgen.InsertRiskAssessmentParams{DisputeID: disputeID, Seq: int32Of(r.Seq), Score: int32Of(r.Assessment.Score),
+		Tier: string(r.Assessment.Tier), Signals: signals, AssessedAt: r.AssessedAt}))
+}
+
+func (t *txn) ListRisk(ctx context.Context, disputeID uuid.UUID) ([]application.RiskRecord, error) {
+	rows, err := t.q.ListRiskAssessments(ctx, disputeID)
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	out := make([]application.RiskRecord, 0, len(rows))
+	for _, r := range rows {
+		rec := application.RiskRecord{Seq: int(r.Seq), AssessedAt: r.AssessedAt, Assessment: domain.Assessment{Score: int(r.Score), Tier: domain.RiskTier(r.Tier)}}
+		if err := json.Unmarshal(r.Signals, &rec.Assessment.Signals); err != nil {
+			return nil, fmt.Errorf("postgres: risk signals: %w", err)
+		}
+		out = append(out, rec)
+	}
+	return out, nil
+}
+
+func (t *txn) LatestRisk(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]domain.Assessment, error) {
+	rows, err := t.q.LatestRiskTiers(ctx, ids)
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	out := make(map[uuid.UUID]domain.Assessment, len(rows))
+	for _, r := range rows {
+		out[r.DisputeID] = domain.Assessment{Score: int(r.Score), Tier: domain.RiskTier(r.Tier)}
+	}
+	return out, nil
 }

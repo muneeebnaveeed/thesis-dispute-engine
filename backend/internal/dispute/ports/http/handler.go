@@ -417,6 +417,10 @@ func (h *Handler) ListDisputes(ctx context.Context, req oapi.ListDisputesRequest
 			nd := toDeadline(*d.NextDeadline)
 			item.NextDeadline = &nd
 		}
+		if d.Risk != nil {
+			tier, score := oapi.RiskTier(d.Risk.Tier), d.Risk.Score
+			item.RiskTier, item.RiskScore = &tier, &score
+		}
 		out.Items = append(out.Items, item)
 	}
 	if page.Next != nil {
@@ -609,6 +613,27 @@ func toAPI(v application.DisputeView) oapi.Dispute {
 	for _, n := range v.Notices {
 		out.Notices = append(out.Notices, oapi.Notice{Id: n.ID, Seq: n.Seq, Kind: oapi.NoticeKind(n.Kind), Channel: oapi.Channel(n.Channel),
 			Recipient: n.Recipient, Subject: n.Subject, CreatedAt: n.CreatedAt, SentAt: n.SentAt, Error: n.Error})
+	}
+	if r := v.Risk; r != nil {
+		signals := make([]oapi.RiskSignal, 0, len(r.Signals))
+		for _, sg := range r.Signals {
+			signals = append(signals, oapi.RiskSignal{Name: sg.Name, Weight: sg.Weight, Points: sg.Points, Detail: sg.Detail})
+		}
+		history := make([]struct {
+			AssessedAt time.Time     `json:"assessedAt"`
+			Score      int           `json:"score"`
+			Seq        int           `json:"seq"`
+			Tier       oapi.RiskTier `json:"tier"`
+		}, 0, len(r.History))
+		for _, h := range r.History {
+			history = append(history, struct {
+				AssessedAt time.Time     `json:"assessedAt"`
+				Score      int           `json:"score"`
+				Seq        int           `json:"seq"`
+				Tier       oapi.RiskTier `json:"tier"`
+			}{AssessedAt: h.AssessedAt, Score: h.Score, Seq: h.Seq, Tier: oapi.RiskTier(h.Tier)})
+		}
+		out.Risk = &oapi.Risk{Score: r.Score, Tier: oapi.RiskTier(r.Tier), Signals: signals, AssessedAt: r.AssessedAt, History: history}
 	}
 	if q := v.Questionnaire; q != nil {
 		questions := make([]oapi.Question, 0, len(q.Questions))

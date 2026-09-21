@@ -11,6 +11,7 @@ import { FailureBanner, FieldError } from '#/components/failure-banner'
 import { Ledger } from '#/components/ledger'
 import { Notices } from '#/components/notices'
 import { QuestionnairePanel } from '#/components/questionnaire'
+import { RiskPanel } from '#/components/risk'
 import { TenantMismatch } from '#/components/tenant-mismatch'
 import { getDispute, type Dispute } from '#/server/disputes'
 
@@ -37,6 +38,7 @@ function DisputePage() {
   // Facts an action may carry: the customer's share of a refund, and how an outstanding advance clears on close.
   const [liability, setLiability] = useState('')
   const [settlement, setSettlement] = useState('')
+  const [riskOverride, setRiskOverride] = useState('')
 
   if (viewer && viewer.tenantSlug !== tenant) return <TenantMismatch wanted={tenant} />
   if (outcome.problem || !outcome.value) {
@@ -65,6 +67,7 @@ function DisputePage() {
     const key = crypto.randomUUID()
     const payload: Record<string, unknown> = { ...extra }
     if (event === 'ISSUE_REFUND' && liability.trim()) payload.liability = liability.trim()
+    if (event === 'ISSUE_REFUND' && riskOverride.trim()) payload.riskOverride = riskOverride.trim()
     if (event === 'CLOSE' && settlement) payload.settlement = settlement
     const res = await call(
       () =>
@@ -83,6 +86,7 @@ function DisputePage() {
     } else {
       setLiability('')
       setSettlement('')
+      setRiskOverride('')
       await router.invalidate()
     }
   }
@@ -96,6 +100,13 @@ function DisputePage() {
         <Field label="Amount" value={`${d.disputedAmount} ${d.currency}`} />
         <Field label="Appeals used" value={String(d.appeals)} />
       </dl>
+
+      {d.risk && (
+        <section className="mb-8">
+          <h2 className="mb-2 text-lg font-medium">Fraud risk</h2>
+          <RiskPanel risk={d.risk} />
+        </section>
+      )}
 
       <section className="mb-8">
         <h2 className="mb-2 text-lg font-medium">Regulatory clocks</h2>
@@ -153,6 +164,20 @@ function DisputePage() {
                 <FieldError id="liability-error" message={fields.liability} />
               </label>
             )}
+            {canRefund && d.risk?.tier === 'HIGH' && (
+              <label className="block basis-full">
+                Justification for crediting despite the HIGH risk score
+                <textarea
+                  value={riskOverride}
+                  onChange={(e) => setRiskOverride(e.target.value)}
+                  rows={2}
+                  aria-invalid={fields.riskOverride ? true : undefined}
+                  aria-describedby={fields.riskOverride ? 'riskOverride-error' : undefined}
+                  className={`mt-1 block w-full max-w-xl rounded-md border px-2 py-1 ${fields.riskOverride ? 'border-red-400' : 'border-neutral-300'}`}
+                />
+                <FieldError id="riskOverride-error" message={fields.riskOverride} />
+              </label>
+            )}
             {canSettle && (
               <label className="block">
                 Outstanding advance on close
@@ -174,6 +199,7 @@ function DisputePage() {
         {failure &&
           !(
             fields.liability ||
+            fields.riskOverride ||
             fields.settlement ||
             Object.keys(fields).some((k) => k.startsWith('answers.'))
           ) && (

@@ -64,7 +64,9 @@ type TransactionRecord struct {
 	Amount          decimal.Decimal
 	Currency        string
 	AccountCurrency string
+	AccountOpenedAt time.Time
 	Merchant        string
+	MCC             string
 	OccurredAt      time.Time
 }
 
@@ -75,6 +77,14 @@ type AccountRecord struct {
 	Currency      string
 	Email         string
 	PostalAddress string
+	OpenedAt      time.Time
+}
+
+// RiskRecord is one stored assessment of a dispute.
+type RiskRecord struct {
+	Seq        int
+	Assessment domain.Assessment
+	AssessedAt time.Time
 }
 
 // NoticeRecord is one communication owed or sent; Document is the composed notice as JSON (notice.Document).
@@ -139,6 +149,12 @@ type Tx interface {
 	InsertNotice(ctx context.Context, n NoticeRecord) (int64, error)
 	ListNotices(ctx context.Context, disputeID uuid.UUID) ([]NoticeRecord, error)
 	GetNotice(ctx context.Context, disputeID uuid.UUID, id int64) (NoticeRecord, error)
+	// AccountHistory counts the account's other disputes since a date and the ones lost at the network, for scoring.
+	AccountHistory(ctx context.Context, accountID, excludeDispute uuid.UUID, since time.Time) (disputes, lostChargebacks int, err error)
+	InsertRisk(ctx context.Context, disputeID uuid.UUID, r RiskRecord) error
+	ListRisk(ctx context.Context, disputeID uuid.UUID) ([]RiskRecord, error)
+	// LatestRisk returns the newest assessment per dispute that has one.
+	LatestRisk(ctx context.Context, disputeIDs []uuid.UUID) (map[uuid.UUID]domain.Assessment, error)
 }
 
 // Questionnaire is what was asked of the customer and, once received, what they answered.

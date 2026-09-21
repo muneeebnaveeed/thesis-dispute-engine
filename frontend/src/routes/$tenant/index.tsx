@@ -5,6 +5,7 @@ import { classify, type Failure } from '#/api/failure'
 import { CreateDisputeRequest } from '#/api/schemas.gen'
 import { AppShell } from '#/components/app-shell'
 import { DeadlineBadge, remaining } from '#/components/deadlines'
+import { RiskBadge } from '#/components/risk'
 import { FailureBanner, FieldError } from '#/components/failure-banner'
 import { TenantMismatch } from '#/components/tenant-mismatch'
 import { serverFields, validateForm } from '#/forms/validate-form'
@@ -132,6 +133,7 @@ function Workbench() {
                   <th className="py-1 pr-4 font-normal">State</th>
                   <th className="py-1 pr-4 font-normal">Regime</th>
                   <th className="py-1 pr-4 font-normal">Amount</th>
+                  <th className="py-1 pr-4 font-normal">Risk</th>
                   <th className="py-1 pr-4 font-normal">Next clock</th>
                   <th className="py-1 font-normal">Opened</th>
                 </tr>
@@ -152,6 +154,13 @@ function Workbench() {
                     <td className="py-1 pr-4 font-mono">{d.regime}</td>
                     <td className="py-1 pr-4">
                       {d.disputedAmount} {d.currency}
+                    </td>
+                    <td className="py-1 pr-4">
+                      {d.riskTier ? (
+                        <RiskBadge tier={d.riskTier} score={d.riskScore} />
+                      ) : (
+                        <span className="text-neutral-400">none</span>
+                      )}
                     </td>
                     <td className="py-1 pr-4">
                       {d.nextDeadline ? (
