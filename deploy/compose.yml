@@ -62,6 +62,8 @@ services:
       DISPUTE_ADDR: ":8090"
       DISPUTE_DATABASE_URL: postgres://dispute_api:dispute_api@localhost:5432/dispute?sslmode=disable
       DISPUTE_SERVICE_KEY: ${DISPUTE_SERVICE_KEY:-dev-service-key}
+      DISPUTE_RATE_PER_MINUTE: ${DISPUTE_RATE_PER_MINUTE:-600}
+      DISPUTE_INTERNAL_CIDRS: ${DISPUTE_INTERNAL_CIDRS:-127.0.0.0/8,::1/128}
       # deploy/otel.env fills these under the otel profile; empty means instrumented, nothing exported.
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-dispute-engine}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}

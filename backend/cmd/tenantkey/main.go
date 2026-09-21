@@ -4,6 +4,7 @@
 //	tenantkey list
 //	tenantkey find <key or prefix>      which row a leaked value belongs to; prints nothing secret
 //	tenantkey revoke --id <uuid> | --prefix <text>
+//	tenantkey audit [--stale 180] [--idle 30]   exit 1 when live keys are older than --stale days or unused for --idle days
 package main
 
 import (
@@ -67,6 +68,8 @@ func run(args []string) error {
 		return find(ctx, q, args[1])
 	case "revoke":
 		return revoke(ctx, q, args[1:])
+	case "audit":
+		return audit(ctx, q, args[1:])
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
@@ -174,6 +177,47 @@ func revoke(ctx context.Context, q *sqlcgen.Queries, args []string) error {
 		return fmt.Errorf("no live key with id %s", id)
 	}
 	fmt.Println("revoked", id)
+	return nil
+}
+
+// audit is meant for a cron: it lists live keys that should be rotated or revoked and fails when there are any.
+func audit(ctx context.Context, q *sqlcgen.Queries, args []string) error {
+	fs := flag.NewFlagSet("audit", flag.ContinueOnError)
+	stale := fs.Int("stale", 180, "days after which a live key should be rotated")
+	idle := fs.Int("idle", 30, "days without use after which a live key should be revoked")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	keys, err := q.ListTenantKeys(ctx)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	findings := 0
+	for _, k := range keys {
+		if k.RevokedAt.Valid || (k.ExpiresAt.Valid && !k.ExpiresAt.Time.After(now)) {
+			continue
+		}
+		var why []string
+		if now.Sub(k.CreatedAt) > time.Duration(*stale)*24*time.Hour {
+			why = append(why, fmt.Sprintf("created %d days ago", int(now.Sub(k.CreatedAt).Hours()/24)))
+		}
+		last := k.CreatedAt
+		if k.LastUsedAt.Valid {
+			last = k.LastUsedAt.Time
+		}
+		if now.Sub(last) > time.Duration(*idle)*24*time.Hour {
+			why = append(why, fmt.Sprintf("unused for %d days", int(now.Sub(last).Hours()/24)))
+		}
+		if len(why) > 0 {
+			findings++
+			fmt.Printf("%s  tenant %s  %-12s  %-20s %s\n", k.ID, k.TenantID, k.Prefix, k.Label, strings.Join(why, ", "))
+		}
+	}
+	if findings > 0 {
+		return fmt.Errorf("%d key(s) need attention", findings)
+	}
+	fmt.Println("no stale or idle keys")
 	return nil
 }
 

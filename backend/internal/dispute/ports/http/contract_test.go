@@ -9,6 +9,9 @@ import (
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/httpserver"
+
+	// Middleware outside this package emits codes too; cmd/api wires it, so the contract must count it.
+	_ "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/ratelimit"
 )
 
 // The spec enum and the codes the Go side can emit are maintained by hand in two places; this keeps them equal.
@@ -50,7 +53,7 @@ func TestErrorCodesMatchContract(t *testing.T) {
 
 // Retryable is a promise in the Problem schema's description; pin which codes may make it.
 func TestRetryableCodes(t *testing.T) {
-	want := []string{"concurrent-update", "unavailable"}
+	want := []string{"concurrent-update", "rate-limited", "unavailable"}
 	var got []string
 	for code, kinds := range errs.Codes() {
 		p := httpserver.ProblemFrom(context.Background(), "/x", errs.New(kinds[0], code, "test"))

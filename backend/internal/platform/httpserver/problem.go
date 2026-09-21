@@ -47,6 +47,7 @@ var statusByKind = map[errs.Kind]int{
 	errs.Unauthorized:  http.StatusUnauthorized,
 	errs.Forbidden:     http.StatusForbidden,
 	errs.Unavailable:   http.StatusServiceUnavailable,
+	errs.RateLimited:   http.StatusTooManyRequests,
 	errs.Internal:      http.StatusInternalServerError,
 }
 
@@ -58,7 +59,14 @@ var titleByKind = map[errs.Kind]string{
 	errs.Unauthorized:  "Authentication required",
 	errs.Forbidden:     "Not allowed",
 	errs.Unavailable:   "Temporarily unavailable",
+	errs.RateLimited:   "Too many requests",
 	errs.Internal:      "Something went wrong on our side",
+}
+
+// WithRetryAfter returns a copy carrying the Retry-After hint.
+func (p Problem) WithRetryAfter(seconds int) Problem {
+	p.RetryAfterSeconds = &seconds
+	return p
 }
 
 // ProblemFrom classifies err; unclassified errors become a generic 500 whose detail carries only the request ID.
