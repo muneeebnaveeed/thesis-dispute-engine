@@ -1,0 +1,23 @@
+{
+  "reason": "AMOUNT_DIFFERS",
+  "questions": [
+    {
+      "id": "amount_agreed",
+      "text": "What amount did you agree to?",
+      "type": "AMOUNT",
+      "required": true
+    },
+    {
+      "id": "receipt_available",
+      "text": "Do you have a receipt showing that amount?",
+      "type": "YES_NO",
+      "required": true
+    },
+    {
+      "id": "details",
+      "text": "Describe the difference.",
+      "type": "TEXT",
+      "required": true
+    }
+  ]
+}

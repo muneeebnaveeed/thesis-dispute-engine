@@ -1,0 +1,29 @@
+{
+  "reason": "NOT_RECEIVED",
+  "questions": [
+    {
+      "id": "expected_on",
+      "text": "When were the goods or services due?",
+      "type": "DATE",
+      "required": true
+    },
+    {
+      "id": "contacted_merchant",
+      "text": "Have you contacted the merchant?",
+      "type": "YES_NO",
+      "required": true
+    },
+    {
+      "id": "merchant_response",
+      "text": "What did the merchant say?",
+      "type": "TEXT",
+      "required": false
+    },
+    {
+      "id": "partial_delivery",
+      "text": "Did you receive part of the order?",
+      "type": "YES_NO",
+      "required": true
+    }
+  ]
+}
