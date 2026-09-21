@@ -1,7 +1,3 @@
--- name: InsertTenant :exec
-INSERT INTO tenants (id, name) VALUES ($1, $2)
-ON CONFLICT (id) DO NOTHING;
-
 -- name: InsertAccount :exec
 INSERT INTO accounts (id, tenant_id, holder_name, currency) VALUES ($1, $2, $3, $4)
 ON CONFLICT (id) DO NOTHING;
@@ -78,3 +74,13 @@ SELECT id, tenant_id, label, revoked_at FROM tenant_keys WHERE key_hash = $1;
 
 -- name: ListTenantKeys :many
 SELECT id, tenant_id, prefix, label, created_at, last_used_at, expires_at, revoked_at FROM tenant_keys ORDER BY created_at;
+
+-- name: UpsertTenant :exec
+INSERT INTO tenants (id, name, slug, oidc_issuer) VALUES ($1, $2, $3, $4)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, slug = EXCLUDED.slug, oidc_issuer = EXCLUDED.oidc_issuer;
+
+-- name: GetTenantByIssuer :one
+SELECT id, slug FROM tenants WHERE oidc_issuer = $1;
+
+-- name: ListTenants :many
+SELECT id, name, slug, oidc_issuer FROM tenants ORDER BY name;

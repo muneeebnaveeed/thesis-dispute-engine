@@ -77,8 +77,11 @@ func run() error {
 	}
 	q := sqlcgen.New(pool)
 
-	for _, t := range []struct{ id, name string }{{tenantA, "default"}, {tenantB, "Beta PSP"}} {
-		if err := q.InsertTenant(ctx, sqlcgen.InsertTenantParams{ID: uuid.MustParse(t.id), Name: t.name}); err != nil {
+	// Slugs double as Keycloak realm names (deploy/keycloak/render-realms.sh renders one realm per row here).
+	keycloak := getenv("KEYCLOAK_URL", "http://localhost:8180")
+	for _, t := range []struct{ id, name, slug string }{{tenantA, "Alpha Bank", "alpha"}, {tenantB, "Beta PSP", "beta"}} {
+		issuer := keycloak + "/realms/" + t.slug
+		if err := q.UpsertTenant(ctx, sqlcgen.UpsertTenantParams{ID: uuid.MustParse(t.id), Name: t.name, Slug: t.slug, OidcIssuer: &issuer}); err != nil {
 			return err
 		}
 	}
@@ -109,7 +112,7 @@ func run() error {
 			return err
 		}
 	}
-	fmt.Printf("seeded 2 tenants (tenant keys %s, %s), 3 accounts and %d transactions\n", devKeyA, devKeyB, len(seedTxns))
+	fmt.Printf("seeded 2 tenants (alpha, beta; tenant keys %s, %s; analyst/analyst in each realm), 3 accounts and %d transactions\n", devKeyA, devKeyB, len(seedTxns))
 	for _, t := range seedTxns {
 		fmt.Printf("  %s  tenant %s  %-11s %8s %s  %s\n", t.id, t.tenant[len(t.tenant)-4:], t.rail, t.amount, t.currency, t.merchant)
 	}
@@ -119,4 +122,11 @@ func run() error {
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+func getenv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }

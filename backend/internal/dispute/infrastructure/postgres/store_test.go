@@ -3,6 +3,7 @@ package postgres_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -29,7 +30,7 @@ func seedFor(t *testing.T, pool *pgxpool.Pool, tenantID uuid.UUID, rail domain.R
 	t.Helper()
 	ctx := context.Background()
 	q := sqlcgen.New(pool)
-	if err := q.InsertTenant(ctx, sqlcgen.InsertTenantParams{ID: tenantID, Name: "test"}); err != nil {
+	if err := q.UpsertTenant(ctx, sqlcgen.UpsertTenantParams{ID: tenantID, Name: "test", Slug: strings.ReplaceAll(tenantID.String(), "-", "")}); err != nil {
 		t.Fatal(err)
 	}
 	account := uuid.New()

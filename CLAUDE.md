@@ -28,7 +28,8 @@ How to work in this repo. What the system does is in `README.md` and `docs/adr/`
 - `make db-up`: PostgreSQL in Docker. `make up`: Postgres + the API image. `make docker-dev`:
   Postgres + the API in a Go toolchain container with live reload. `make otel-up`: plus Grafana LGTM
   (Grafana at http://localhost:3001, admin/admin; traces in Tempo, metrics in Mimir, logs in Loki)
-  plus a synthetic probe. Cheat sheet: `docs/observability.md`.
+  plus a synthetic probe. Cheat sheet: `docs/observability.md`. `make auth-up`: plus Keycloak with
+  one realm per seeded tenant (`alpha`, `beta`; analyst/analyst; admin console admin/admin on :8180).
 - `make image`: build `backend/Dockerfile` locally.
 
 Toolchain is pinned in `mise.toml` (Go, golangci-lint, air, sqlc); `go.mod` carries
@@ -85,8 +86,8 @@ Each area has its own CLAUDE.md, loaded when working under that path. `backend/C
 - **Docker uses host networking on purpose** (`network_mode: host`, `docker build --network
   host`): the dev machine's corporate VPN drops traffic on Docker's bridge, so port mappings
   and in-build `go mod download` silently time out. Do not revert to `ports:`.
-- **Ports 8090 and 3001:** 8080 and 3000 are held by unrelated local services on the dev
-  machine (API and Grafana moved accordingly).
+- **Ports 8090, 3001, 3002, 8180:** 8080 and 3000 are held by unrelated local services on the dev
+  machine (API and Grafana moved accordingly); the frontend is on 3002 and Keycloak on 8180.
 - **No C compiler locally:** `go test -race` fails with "requires cgo"; use `make test` and
   let CI run the race detector.
 - **`gh` accounts:** the dev machine has several. The scripts export the repo owner's token
