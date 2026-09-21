@@ -1,0 +1,44 @@
+{
+  "started": "2026-09-22T01:26:04.960714047+02:00",
+  "ended": "2026-09-22T01:28:04.989244577+02:00",
+  "targetRps": 1.5,
+  "achievedRps": 7.648181611552264,
+  "requests": 918,
+  "statuses": {
+    "200": 540,
+    "201": 198,
+    "409": 180
+  },
+  "idempotentReplays": 18,
+  "disputesOpened": 180,
+  "transitionsApplied": 360,
+  "latencyByRoute": {
+    "p5": {
+      "GET /disputes/{disputeId}": "0.0025152439024390245",
+      "GET /readyz": "0.0025",
+      "POST /disputes": "0.012821104138403495",
+      "POST /disputes/{disputeId}/events": "0.0027075056242298907"
+    },
+    "p95": {
+      "GET /disputes/{disputeId}": "0.004778963414634146",
+      "GET /readyz": "0.00475",
+      "POST /disputes": "0.02378211041384035",
+      "POST /disputes/{disputeId}/events": "0.007107814755941422"
+    },
+    "p99": {
+      "GET /disputes/{disputeId}": "0.004980182926829268",
+      "GET /readyz": "0.00495",
+      "POST /disputes": "0.02475642208276807",
+      "POST /disputes/{disputeId}/events": "0.013843749999999998"
+    }
+  },
+  "problemsByCode": {
+    "contract-violation": "8.30762840285844",
+    "invalid-transition": "206.65225652110368"
+  },
+  "clientLatencyOverall": {
+    "p50": "2.995918ms",
+    "p95": "15.590204ms",
+    "p99": "17.151985ms"
+  }
+}
