@@ -9,6 +9,7 @@ import { Deadlines } from '#/components/deadlines'
 import { EventLog } from '#/components/event-log'
 import { FailureBanner, FieldError } from '#/components/failure-banner'
 import { Ledger } from '#/components/ledger'
+import { Notices } from '#/components/notices'
 import { QuestionnairePanel } from '#/components/questionnaire'
 import { TenantMismatch } from '#/components/tenant-mismatch'
 import { getDispute, type Dispute } from '#/server/disputes'
@@ -185,6 +186,11 @@ function DisputePage() {
       <section className="mb-8">
         <h2 className="mb-2 text-lg font-medium">Ledger</h2>
         <Ledger ledger={d.ledger} balances={d.balances} currency={d.currency} />
+      </section>
+
+      <section className="mb-8">
+        <h2 className="mb-2 text-lg font-medium">Communications</h2>
+        <Notices notices={d.notices} tenant={tenant} disputeId={d.id} />
       </section>
 
       <section>

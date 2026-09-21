@@ -20,6 +20,10 @@ type Config struct {
 	IdempotencyTTL     time.Duration
 	// CoreTimeout bounds one instruction to a tenant's banking core; past it the transition rolls back as unavailable.
 	CoreTimeout time.Duration
+	// SMTPAddr is the mail relay for customer notices (host:port, no authentication); empty logs instead of sending.
+	SMTPAddr string
+	// MailFrom is the sender on every notice email.
+	MailFrom string
 	// CORSOrigins are browser origins allowed to call the API directly with an analyst token.
 	CORSOrigins []string
 	// ServiceKey guards /internal/*, used only by the frontend server; empty disables those routes' authentication.
@@ -45,6 +49,8 @@ func Load() (Config, error) {
 		ShutdownTimeout:       10 * time.Second,
 		IdempotencyTTL:        24 * time.Hour,
 		CoreTimeout:           5 * time.Second,
+		SMTPAddr:              os.Getenv("DISPUTE_SMTP_ADDR"),
+		MailFrom:              getenv("DISPUTE_MAIL_FROM", "disputes@localhost"),
 		CORSOrigins:           strings.Split(getenv("DISPUTE_CORS_ORIGINS", "http://localhost:3002"), ","),
 		ServiceKey:            getenv("DISPUTE_SERVICE_KEY", "dev-service-key"),
 		InternalCIDRs:         strings.Split(getenv("DISPUTE_INTERNAL_CIDRS", "127.0.0.0/8,::1/128"), ","),

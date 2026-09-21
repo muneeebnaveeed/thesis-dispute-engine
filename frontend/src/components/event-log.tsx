@@ -4,7 +4,7 @@ import type { Dispute } from '#/server/disputes'
 export function EventLog({ events }: { events: Dispute['events'] }) {
   const rows = events.toSorted((a, b) => b.seq - a.seq)
   return (
-    <table className="w-full text-left text-sm">
+    <table className="w-full text-left text-sm" aria-label="Event log">
       <thead className="text-neutral-500">
         <tr>
           <th className="py-1 pr-4 font-normal">#</th>

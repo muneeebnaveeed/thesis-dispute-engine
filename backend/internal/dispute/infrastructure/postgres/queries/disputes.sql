@@ -1,6 +1,12 @@
 -- name: InsertAccount :exec
-INSERT INTO accounts (id, tenant_id, holder_name, currency) VALUES ($1, $2, $3, $4)
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO accounts (id, tenant_id, holder_name, currency, email, postal_address) VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, postal_address = EXCLUDED.postal_address;
+
+-- name: GetAccount :one
+SELECT id, holder_name, currency, email, postal_address FROM accounts WHERE id = $1;
+
+-- name: GetTenantName :one
+SELECT name FROM tenants WHERE id = current_tenant_id();
 
 -- name: InsertTransaction :exec
 INSERT INTO transactions (id, tenant_id, account_id, rail, amount, currency, merchant, occurred_at)
@@ -217,3 +223,22 @@ UPDATE questionnaires SET answers = $2, received_at = $3 WHERE dispute_id = $1 A
 
 -- name: GetQuestionnaire :one
 SELECT dispute_id, reason, questions, answers, sent_at, received_at FROM questionnaires WHERE dispute_id = $1;
+
+-- name: InsertNotice :one
+INSERT INTO notices (dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id;
+
+-- name: ListNotices :many
+SELECT id, dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at, attempts, last_error
+FROM notices WHERE dispute_id = $1 ORDER BY id;
+
+-- name: GetNotice :one
+SELECT id, dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at, attempts, last_error
+FROM notices WHERE id = $1 AND dispute_id = $2;
+
+-- name: ClaimNotices :many
+SELECT id, tenant_id, dispute_id, seq, kind, channel, recipient, subject, document, created_at, attempts FROM claim_notices($1);
+
+-- name: FinishNotice :exec
+SELECT finish_notice(sqlc.arg(notice_id), sqlc.narg(failure)::text);

@@ -35,6 +35,10 @@ type MemStore struct {
 	Deadlines    map[uuid.UUID][]domain.Deadline
 	Ledger       map[uuid.UUID][]application.LedgerEntry
 	Questions    map[uuid.UUID]application.Questionnaire
+	Notices      []application.NoticeRecord
+	Accounts     map[uuid.UUID]application.AccountRecord
+	Names        map[uuid.UUID]string
+	nextNotice   int64
 	// Calendars holds a tenant's business-day calendar; a tenant without one gets the default.
 	Calendars map[uuid.UUID]domain.Calendar
 	// Cores holds a tenant's banking-core configuration; a tenant without one books postings without a core.
@@ -51,6 +55,8 @@ func NewMemStore() *MemStore {
 		Deadlines:    map[uuid.UUID][]domain.Deadline{},
 		Ledger:       map[uuid.UUID][]application.LedgerEntry{},
 		Questions:    map[uuid.UUID]application.Questionnaire{},
+		Accounts:     map[uuid.UUID]application.AccountRecord{},
+		Names:        map[uuid.UUID]string{},
 		Calendars:    map[uuid.UUID]domain.Calendar{},
 		Cores:        map[uuid.UUID]application.CoreConfig{},
 	}
@@ -66,8 +72,11 @@ func (m *MemStore) AddTransactionFor(tenantID uuid.UUID, rail domain.Rail, curre
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	id := uuid.New()
+	account := uuid.New()
+	m.Accounts[account] = application.AccountRecord{ID: account, Holder: "Test Holder", Currency: accountCurrency, Email: "holder@example.com", PostalAddress: "1 Test Street"}
 	m.Transactions[id] = application.TransactionRecord{
-		ID: id, TenantID: tenantID, AccountID: uuid.New(), Rail: rail, Amount: mustDecimal(amount), Currency: currency, AccountCurrency: accountCurrency,
+		ID: id, TenantID: tenantID, AccountID: account, Rail: rail, Amount: mustDecimal(amount), Currency: currency, AccountCurrency: accountCurrency,
+		Merchant: "ACME", OccurredAt: time.Now().Add(-48 * time.Hour),
 	}
 	return id
 }
@@ -124,6 +133,7 @@ type snapshotT struct {
 	deadlines  map[uuid.UUID][]domain.Deadline
 	ledger     map[uuid.UUID][]application.LedgerEntry
 	questions  map[uuid.UUID]application.Questionnaire
+	notices    []application.NoticeRecord
 }
 
 func (m *MemStore) snapshot() snapshotT {
@@ -133,6 +143,7 @@ func (m *MemStore) snapshot() snapshotT {
 	for k, v := range m.Questions {
 		s.questions[k] = v
 	}
+	s.notices = append([]application.NoticeRecord(nil), m.Notices...)
 	for k, v := range m.Deadlines {
 		s.deadlines[k] = append([]domain.Deadline(nil), v...)
 	}
@@ -152,7 +163,40 @@ func (m *MemStore) snapshot() snapshotT {
 }
 
 func (m *MemStore) restore(s snapshotT) {
-	m.Disputes, m.Events, m.Idempotent, m.Deadlines, m.Ledger, m.Questions = s.disputes, s.events, s.idempotent, s.deadlines, s.ledger, s.questions
+	m.Disputes, m.Events, m.Idempotent, m.Deadlines, m.Ledger, m.Questions, m.Notices = s.disputes, s.events, s.idempotent, s.deadlines, s.ledger, s.questions, s.notices
+}
+
+// ClaimNotices implements application.Store; backoff is not modelled, every unsent email is offered each pass.
+func (m *MemStore) ClaimNotices(_ context.Context, batch int) ([]application.NoticeRecord, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []application.NoticeRecord
+	for i := range m.Notices {
+		n := &m.Notices[i]
+		if n.SentAt == nil && n.Channel == domain.ChannelEmail && len(out) < batch {
+			n.Attempts++
+			out = append(out, *n)
+		}
+	}
+	return out, nil
+}
+
+// FinishNotice implements application.Store.
+func (m *MemStore) FinishNotice(_ context.Context, id int64, failure string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i := range m.Notices {
+		if m.Notices[i].ID == id {
+			if failure == "" {
+				now := time.Now()
+				m.Notices[i].SentAt, m.Notices[i].LastError = &now, nil
+			} else {
+				f := failure
+				m.Notices[i].LastError = &f
+			}
+		}
+	}
+	return nil
 }
 
 // SuspenseBalances implements application.Store.
@@ -415,4 +459,55 @@ func (t *memTx) GetQuestionnaire(_ context.Context, id uuid.UUID) (application.Q
 		return application.Questionnaire{}, application.ErrNotFound
 	}
 	return q, nil
+}
+
+func (t *memTx) GetAccount(_ context.Context, id uuid.UUID) (application.AccountRecord, error) {
+	a, ok := t.s.Accounts[id]
+	if !ok {
+		return application.AccountRecord{}, application.ErrNotFound
+	}
+	return a, nil
+}
+
+func (t *memTx) TenantName(_ context.Context) (string, error) {
+	if n, ok := t.s.Names[t.tenant]; ok {
+		return n, nil
+	}
+	return "Test Bank", nil
+}
+
+func (t *memTx) InsertNotice(_ context.Context, n application.NoticeRecord) (int64, error) {
+	if _, err := t.GetDispute(context.Background(), n.DisputeID); err != nil {
+		return 0, err
+	}
+	t.s.nextNotice++
+	n.ID, n.TenantID = t.s.nextNotice, t.tenant
+	t.s.Notices = append(t.s.Notices, n)
+	return n.ID, nil
+}
+
+func (t *memTx) ListNotices(_ context.Context, disputeID uuid.UUID) ([]application.NoticeRecord, error) {
+	if _, err := t.GetDispute(context.Background(), disputeID); err != nil {
+		return nil, err
+	}
+	var out []application.NoticeRecord
+	for _, n := range t.s.Notices {
+		if n.DisputeID == disputeID {
+			out = append(out, n)
+		}
+	}
+	return out, nil
+}
+
+func (t *memTx) GetNotice(_ context.Context, disputeID uuid.UUID, id int64) (application.NoticeRecord, error) {
+	list, err := t.ListNotices(context.Background(), disputeID)
+	if err != nil {
+		return application.NoticeRecord{}, err
+	}
+	for _, n := range list {
+		if n.ID == id {
+			return n, nil
+		}
+	}
+	return application.NoticeRecord{}, application.ErrNotFound
 }

@@ -86,6 +86,26 @@ export type paths = {
     patch?: never
     trace?: never
   }
+  '/disputes/{disputeId}/notices/{noticeId}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * One communication to the customer, as composed
+     * @description The paragraphs as sent or as ready to print; the workbench renders letters from this.
+     */
+    get: operations['getNotice']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/tenant-keys': {
     parameters: {
       query?: never
@@ -477,6 +497,58 @@ export type components = {
       balances: components['schemas']['Balances']
       /** @description Present once SEND_QUESTIONNAIRE has been applied. */
       questionnaire?: components['schemas']['Questionnaire']
+      /** @description Every communication owed to the customer so far, in the order it arose. */
+      notices: components['schemas']['Notice'][]
+    }
+    /** @enum {string} */
+    NoticeKind:
+      | 'ACKNOWLEDGEMENT'
+      | 'QUESTIONNAIRE'
+      | 'PROVISIONAL_CREDIT'
+      | 'REFUND'
+      | 'REVERSAL'
+      | 'RESOLUTION'
+    /**
+     * @description EMAIL goes out through the mail relay; LETTER is a printable document, ready the moment it exists.
+     * @enum {string}
+     */
+    Channel: 'EMAIL' | 'LETTER'
+    Notice: {
+      /** Format: int64 */
+      id: number
+      /** @description The event that caused it. */
+      seq: number
+      kind: components['schemas']['NoticeKind']
+      channel: components['schemas']['Channel']
+      recipient: string
+      subject: string
+      /** Format: date-time */
+      createdAt: string
+      /**
+       * Format: date-time
+       * @description Absent while an email waits in the outbox.
+       */
+      sentAt?: string
+      /** @description The last delivery failure */
+      error?: string
+    }
+    NoticeDocument: {
+      /** Format: int64 */
+      id: number
+      kind: components['schemas']['NoticeKind']
+      channel: components['schemas']['Channel']
+      recipient: string
+      bank: string
+      /** Format: date-time */
+      date: string
+      subject: string
+      greeting: string
+      paragraphs: string[]
+      closing: string
+      /** @description The provision the notice satisfies */
+      basis?: string
+      /** Format: date-time */
+      sentAt?: string
     }
     /**
      * @description How an answer is validated; every answer travels as a string ("yes"/"no", YYYY-MM-DD, free text, decimal).
@@ -782,6 +854,32 @@ export interface operations {
           'application/problem+json': components['schemas']['Problem']
         }
       }
+    }
+  }
+  getNotice: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        disputeId: string
+        noticeId: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The notice. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['NoticeDocument']
+        }
+      }
+      401: components['responses']['Unauthorized']
+      404: components['responses']['NotFound']
+      429: components['responses']['TooManyRequests']
     }
   }
   listTenantKeys: {

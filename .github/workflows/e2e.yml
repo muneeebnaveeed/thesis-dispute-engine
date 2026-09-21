@@ -47,7 +47,7 @@ jobs:
         run: |
           docker compose -f deploy/compose.yml up -d --wait postgres
           docker compose -f deploy/compose.yml exec -T postgres psql -U dispute -d dispute -v ON_ERROR_STOP=1 -q < deploy/postgres/roles.sql
-          GO_VERSION=${{ steps.versions.outputs.go }} docker compose -f deploy/compose.yml --profile app --profile auth up -d --build --wait migrate api keycloak
+          GO_VERSION=${{ steps.versions.outputs.go }} docker compose -f deploy/compose.yml --profile app --profile auth up -d --build --wait migrate api keycloak mailpit
           docker compose -f deploy/compose.yml exec -T postgres psql -U dispute -d dispute -v ON_ERROR_STOP=1 -q < deploy/postgres/roles.sql
           docker compose -f deploy/compose.yml --profile app run --rm --no-deps --entrypoint /seed api
       - run: pnpm install --frozen-lockfile

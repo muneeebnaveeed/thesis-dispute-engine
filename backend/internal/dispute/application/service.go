@@ -17,6 +17,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/notice"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
@@ -30,6 +31,7 @@ type Service struct {
 	tracer      trace.Tracer
 	core        BankingCore
 	coreTimeout time.Duration
+	afterCommit func() // nudges the notice dispatcher once a transition is durable
 
 	transitions   metric.Int64Counter
 	replays       metric.Int64Counter
@@ -48,6 +50,9 @@ func WithCore(core BankingCore) Option { return func(s *Service) { s.core = core
 
 // WithCoreTimeout bounds one core call; the transition is rolled back and reported unavailable when it passes.
 func WithCoreTimeout(d time.Duration) Option { return func(s *Service) { s.coreTimeout = d } }
+
+// WithAfterCommit runs fn after each successful write, typically Dispatcher.Kick; it must not block.
+func WithAfterCommit(fn func()) Option { return func(s *Service) { s.afterCommit = fn } }
 
 // NewService wires a Service; a nil clock means time.Now.
 func NewService(store Store, now Clock, opts ...Option) (*Service, error) {
@@ -126,7 +131,7 @@ func NewService(store Store, now Clock, opts ...Option) (*Service, error) {
 		})); err != nil {
 		return nil, err
 	}
-	svc := &Service{store: store, now: now, tracer: otel.Tracer(scopeName), core: CoreRouter{}, coreTimeout: 5 * time.Second,
+	svc := &Service{store: store, now: now, tracer: otel.Tracer(scopeName), core: CoreRouter{}, coreTimeout: 5 * time.Second, afterCommit: func() {},
 		transitions: transitions, replays: replays, timeInState: timeInState, deadlineSlack: deadlineSlack, postings: postings,
 		coreMessages: coreMessages, coreLatency: coreLatency}
 	for _, o := range opts {
@@ -155,6 +160,20 @@ type DisputeView struct {
 	Ledger         []LedgerView       `json:"ledger"`
 	Balances       Balances           `json:"balances"`
 	Questionnaire  *QuestionnaireView `json:"questionnaire,omitempty"`
+	Notices        []NoticeView       `json:"notices"`
+}
+
+// NoticeView is one communication as listed on the dispute; the document itself is fetched separately.
+type NoticeView struct {
+	ID        int64             `json:"id"`
+	Seq       int               `json:"seq"`
+	Kind      domain.NoticeKind `json:"kind"`
+	Channel   domain.Channel    `json:"channel"`
+	Recipient string            `json:"recipient"`
+	Subject   string            `json:"subject"`
+	CreatedAt time.Time         `json:"createdAt"`
+	SentAt    *time.Time        `json:"sentAt,omitempty"`
+	Error     *string           `json:"error,omitempty"`
 }
 
 // QuestionnaireView is the questionnaire as exposed by the API, with the contradictions found in the answers.
@@ -301,6 +320,9 @@ func (s *Service) CreateDispute(ctx context.Context, in CreateDisputeInput) (Res
 		if err := tx.InsertDeadlines(ctx, id, rules.OpeningDeadlines(now, cal)); err != nil {
 			return DisputeView{}, err
 		}
+		if err := s.notify(ctx, tx, rec, domain.StateInitiated, 1, now); err != nil {
+			return DisputeView{}, err
+		}
 		span.SetAttributes(attribute.String("dispute.id", id.String()), attribute.String("dispute.regime", string(regime)))
 		s.transitions.Add(ctx, 1, metric.WithAttributes(tenantAttr(ctx),
 			attribute.String("regime", string(regime)), attribute.String("event", "OPENED"), attribute.String("to", string(domain.StateInitiated))))
@@ -346,6 +368,9 @@ func (s *Service) ApplyEvent(ctx context.Context, in ApplyEventInput) (Result, e
 			return DisputeView{}, err
 		}
 		if err := s.post(ctx, tx, rec, next, ev.Seq, payload, now); err != nil {
+			return DisputeView{}, err
+		}
+		if err := s.notify(ctx, tx, rec, next.State, ev.Seq, now); err != nil {
 			return DisputeView{}, err
 		}
 		span.SetAttributes(attribute.String("dispute.regime", string(rec.Regime)),
@@ -523,6 +548,141 @@ func postingsOf(entries []LedgerEntry) []domain.Posting {
 	return out
 }
 
+// notify composes and stores the notices entering a state obliges, one row per channel the regime requires, and
+// settles the acknowledgement clock when the acknowledgement goes out. Letters are complete at once; emails wait
+// in the outbox for the dispatcher.
+func (s *Service) notify(ctx context.Context, tx Tx, rec DisputeRecord, entered domain.State, seq int, now time.Time) error {
+	rules, err := domain.RulesFor(rec.Regime)
+	if err != nil {
+		return err
+	}
+	kinds := domain.NoticesFor(rules, entered)
+	if len(kinds) == 0 {
+		return nil
+	}
+	facts, err := s.facts(ctx, tx, rec, now)
+	if err != nil {
+		return err
+	}
+	for _, kind := range kinds {
+		doc := notice.Compose(kind, facts.Facts)
+		body, err := json.Marshal(doc)
+		if err != nil {
+			return err
+		}
+		for _, ch := range domain.ChannelsFor(rules, kind) {
+			n := NoticeRecord{DisputeID: rec.ID, Seq: seq, Kind: kind, Channel: ch, Subject: doc.Subject, Document: body, CreatedAt: now}
+			switch ch {
+			case domain.ChannelEmail:
+				n.Recipient = facts.Email
+			case domain.ChannelLetter:
+				// A letter exists the moment it is composed; printing is the tenant's business.
+				n.Recipient, n.SentAt = facts.PostalAddress, &now
+			}
+			if n.Recipient == "" {
+				continue // no address on file for this channel; the other channel still goes out
+			}
+			if _, err := tx.InsertNotice(ctx, n); err != nil {
+				return err
+			}
+		}
+		if kind == domain.NoticeAcknowledgement {
+			if err := tx.SettleDeadline(ctx, rec.ID, domain.DeadlineAcknowledge, 0, true, now); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// facts gathers what a notice may say from the dispute, its account, its transaction, clocks and ledger.
+func (s *Service) facts(ctx context.Context, tx Tx, rec DisputeRecord, now time.Time) (noticeFacts, error) {
+	bank, err := tx.TenantName(ctx)
+	if err != nil {
+		return noticeFacts{}, err
+	}
+	account, err := tx.GetAccount(ctx, rec.AccountID)
+	if err != nil {
+		return noticeFacts{}, err
+	}
+	txn, err := tx.GetTransaction(ctx, rec.TransactionID)
+	if err != nil {
+		return noticeFacts{}, err
+	}
+	f := noticeFacts{Facts: notice.Facts{Bank: bank, Customer: account.Holder, DisputeID: rec.ID.String(), Reason: rec.Reason, Regime: rec.Regime,
+		Merchant: txn.Merchant, Amount: rec.DisputedAmount, Currency: rec.Currency, OccurredAt: txn.OccurredAt, OpenedAt: rec.OpenedAt, Now: now},
+		Email: account.Email, PostalAddress: account.PostalAddress}
+	deadlines, err := tx.ListDeadlines(ctx, rec.ID)
+	if err != nil {
+		return noticeFacts{}, err
+	}
+	for _, d := range deadlines {
+		if d.Kind == domain.DeadlineResolution && d.Open() {
+			due := d.DueAt
+			f.ResolutionDue = &due
+		}
+	}
+	ledger, err := tx.ListLedger(ctx, rec.ID)
+	if err != nil {
+		return noticeFacts{}, err
+	}
+	var bal Balances
+	for _, e := range ledger {
+		bal.add(e.Posting.Debit, e.Posting.Amount)
+		bal.add(e.Posting.Credit, e.Posting.Amount.Neg())
+		if e.Posting.Kind == domain.PostingProvisionalCreditReversal {
+			f.ReversalAmount = e.Posting.Amount
+		}
+	}
+	f.Credited = bal.Customer
+	switch {
+	case f.ReversalAmount.IsPositive():
+		f.Outcome = notice.OutcomeReversed
+	case bal.Customer.IsPositive() && bal.Recovery.IsPositive():
+		f.Outcome = notice.OutcomeRecovered
+	case bal.Customer.IsPositive():
+		f.Outcome = notice.OutcomeCredited
+	default:
+		f.Outcome = notice.OutcomeDenied
+	}
+	if q, err := tx.GetQuestionnaire(ctx, rec.ID); err == nil {
+		f.Questions = q.Questions
+	} else if !errors.Is(err, ErrNotFound) {
+		return noticeFacts{}, err
+	}
+	return f, nil
+}
+
+// noticeFacts is what the composer needs plus where to send the result.
+type noticeFacts struct {
+	notice.Facts
+	Email         string
+	PostalAddress string
+}
+
+// RenderMail turns a stored email notice back into the message to send; the dispatcher calls it per attempt.
+func RenderMail(n NoticeRecord) (Mail, error) {
+	var doc notice.Document
+	if err := json.Unmarshal(n.Document, &doc); err != nil {
+		return Mail{}, fmt.Errorf("notice %d: %w", n.ID, err)
+	}
+	return Mail{To: n.Recipient, Subject: doc.Subject, Text: doc.Text(), HTML: doc.HTML(n.CreatedAt)}, nil
+}
+
+// GetNotice returns one composed notice of a dispute, for the workbench to show or print.
+func (s *Service) GetNotice(ctx context.Context, disputeID uuid.UUID, id int64) (NoticeRecord, notice.Document, error) {
+	var rec NoticeRecord
+	var doc notice.Document
+	err := s.store.WithTx(ctx, func(tx Tx) error {
+		var err error
+		if rec, err = tx.GetNotice(ctx, disputeID, id); err != nil {
+			return err
+		}
+		return json.Unmarshal(rec.Document, &doc)
+	})
+	return rec, doc, err
+}
+
 // DisputeSummary is one row of a list; NextDeadline is the open clock that runs out first, if any.
 type DisputeSummary struct {
 	ID             uuid.UUID
@@ -638,6 +798,9 @@ func (s *Service) idempotent(ctx context.Context, scope string, idem Idempotency
 		out = Result{View: view}
 		return nil
 	})
+	if err == nil && !out.Replayed {
+		s.afterCommit()
+	}
 	return out, err
 }
 
@@ -686,6 +849,15 @@ func (s *Service) view(ctx context.Context, tx Tx, rec DisputeRecord) (DisputeVi
 		TransactionID: rec.TransactionID, AccountID: rec.AccountID, DisputedAmount: rec.DisputedAmount,
 		Currency: rec.Currency, OpenedAt: rec.OpenedAt, UpdatedAt: rec.UpdatedAt,
 		AllowedEvents: allowed, Events: views, Deadlines: dviews, Ledger: lviews, Balances: bal,
+	}
+	notices, err := tx.ListNotices(ctx, rec.ID)
+	if err != nil {
+		return DisputeView{}, err
+	}
+	view.Notices = make([]NoticeView, 0, len(notices))
+	for _, n := range notices {
+		view.Notices = append(view.Notices, NoticeView{ID: n.ID, Seq: n.Seq, Kind: n.Kind, Channel: n.Channel, Recipient: n.Recipient, Subject: n.Subject,
+			CreatedAt: n.CreatedAt, SentAt: n.SentAt, Error: n.LastError})
 	}
 	switch q, err := tx.GetQuestionnaire(ctx, rec.ID); {
 	case err == nil:

@@ -170,8 +170,8 @@ const (
 )
 
 // Settle says what entering state does to an open clock of a kind. A refund clock is met by any credit and void when
-// the dispute closes without one; the acknowledgement clock is met by opening the investigation; the resolution
-// clock is met only by closing.
+// the dispute closes without one; the resolution clock is met only by closing; the acknowledgement clock is met
+// by the acknowledgement notice (the service settles it) and only voided here.
 func Settle(kind DeadlineKind, entered State) Settlement {
 	switch kind {
 	case DeadlineRefund:
@@ -182,8 +182,9 @@ func Settle(kind DeadlineKind, entered State) Settlement {
 			return Void
 		}
 	case DeadlineAcknowledge:
-		if entered != StateInitiated {
-			return Met
+		// Met by the acknowledgement notice, not by a state (see docs/adr/0017); void if the dispute closes first.
+		if entered == StateClosed {
+			return Void
 		}
 	case DeadlineResolution:
 		if entered == StateClosed {

@@ -78,6 +78,14 @@ export type Balances = Static<typeof Balances>
 const _Balances: Same<Balances, components['schemas']['Balances']> = true
 void _Balances
 
+export const Channel = Type.Union([Type.Literal('EMAIL'), Type.Literal('LETTER')], {
+  description:
+    'EMAIL goes out through the mail relay; LETTER is a printable document, ready the moment it exists.',
+})
+export type Channel = Static<typeof Channel>
+const _Channel: Same<Channel, components['schemas']['Channel']> = true
+void _Channel
+
 export const CoreReceipt = Type.Object({
   rrn: Type.String({
     description: 'Retrieval reference number (ISO 8583 DE37); empty when the tenant has no core.',
@@ -281,6 +289,35 @@ export type Questionnaire = Static<typeof Questionnaire>
 const _Questionnaire: Same<Questionnaire, components['schemas']['Questionnaire']> = true
 void _Questionnaire
 
+export const NoticeKind = Type.Union([
+  Type.Literal('ACKNOWLEDGEMENT'),
+  Type.Literal('QUESTIONNAIRE'),
+  Type.Literal('PROVISIONAL_CREDIT'),
+  Type.Literal('REFUND'),
+  Type.Literal('REVERSAL'),
+  Type.Literal('RESOLUTION'),
+])
+export type NoticeKind = Static<typeof NoticeKind>
+const _NoticeKind: Same<NoticeKind, components['schemas']['NoticeKind']> = true
+void _NoticeKind
+
+export const Notice = Type.Object({
+  id: Type.Integer({ format: 'int64' }),
+  seq: Type.Integer({ description: 'The event that caused it.' }),
+  kind: NoticeKind,
+  channel: Channel,
+  recipient: Type.String(),
+  subject: Type.String(),
+  createdAt: Type.String({ format: 'date-time' }),
+  sentAt: Type.Optional(
+    Type.String({ description: 'Absent while an email waits in the outbox.', format: 'date-time' }),
+  ),
+  error: Type.Optional(Type.String({ description: 'The last delivery failure' })),
+})
+export type Notice = Static<typeof Notice>
+const _Notice: Same<Notice, components['schemas']['Notice']> = true
+void _Notice
+
 export const Dispute = Type.Object({
   id: Type.String({ format: 'uuid' }),
   regime: Regime,
@@ -305,6 +342,9 @@ export const Dispute = Type.Object({
   }),
   balances: Balances,
   questionnaire: Type.Optional(Questionnaire),
+  notices: Type.Array(Notice, {
+    description: 'Every communication owed to the customer so far, in the order it arose.',
+  }),
 })
 export type Dispute = Static<typeof Dispute>
 const _Dispute: Same<Dispute, components['schemas']['Dispute']> = true
@@ -401,6 +441,24 @@ export const IssuedTenantKey = Type.Intersect([
 export type IssuedTenantKey = Static<typeof IssuedTenantKey>
 const _IssuedTenantKey: Same<IssuedTenantKey, components['schemas']['IssuedTenantKey']> = true
 void _IssuedTenantKey
+
+export const NoticeDocument = Type.Object({
+  id: Type.Integer({ format: 'int64' }),
+  kind: NoticeKind,
+  channel: Channel,
+  recipient: Type.String(),
+  bank: Type.String(),
+  date: Type.String({ format: 'date-time' }),
+  subject: Type.String(),
+  greeting: Type.String(),
+  paragraphs: Type.Array(Type.String()),
+  closing: Type.String(),
+  basis: Type.Optional(Type.String({ description: 'The provision the notice satisfies' })),
+  sentAt: Type.Optional(Type.String({ format: 'date-time' })),
+})
+export type NoticeDocument = Static<typeof NoticeDocument>
+const _NoticeDocument: Same<NoticeDocument, components['schemas']['NoticeDocument']> = true
+void _NoticeDocument
 
 export const Problem = Type.Object(
   {
