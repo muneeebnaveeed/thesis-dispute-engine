@@ -6,14 +6,15 @@ How to work in this repo. What the system does is in `README.md` and `docs/adr/`
 
 - `backend/`: Go 1.27 (pinned in `mise.toml`), standard-library HTTP, PostgreSQL via sqlc,
   `shopspring/decimal` for money, OpenTelemetry, golangci-lint v2.
-- `frontend/`: TypeScript, TanStack Start, shadcn/ui, Tailwind, Node with pnpm (placeholder).
+- `frontend/`: TypeScript, TanStack Start (React 19, SSR via Nitro), Tailwind v4, oxlint and oxfmt,
+  vitest; Node and pnpm pinned in `mise.toml`.
 - `docs/thesis/`: long-form design document; tooling not yet decided.
 - `deploy/`: Docker Compose for local dependencies; distroless image in `backend/Dockerfile`.
 - CI: GitHub Actions, one job per check (`.github/workflows/ci.yml`).
 
 ## Commands (run from the repo root)
 
-- `make ci`: everything CI runs (versions, generate-check, fmt, vet, lint, test, tidy). Run
+- `make ci`: everything CI runs (versions, generate-check, fmt, vet, lint, test, tidy, fe-check). Run
   before every push. `make test-integration` runs the Postgres-backed suites against
   `make db-up` (CI runs them with a service container); without `DISPUTE_TEST_DATABASE_URL`
   those tests skip. `make cover` prints the coverage table CI posts on every PR.
@@ -43,6 +44,7 @@ backend/internal/<context>/infrastructure adapters: Postgres, external systems
 backend/internal/<context>/ports/http    HTTP handlers implementing the generated interface (ports/http/oapi)
 backend/internal/platform/{config,httpserver,telemetry,postgres,errs}  shared kernel, no domain knowledge
 backend/migrations                       SQL, forward-only, embedded; applied by cmd/migrate and cmd/seed, checked by cmd/api
+frontend/                                TanStack Start app (pnpm); see frontend/README.md and frontend/CLAUDE.md
 docs/api/openapi.yaml                    the API contract; everything HTTP is generated from it
 deploy/                                  compose.yml (host networking, see below), otel.env, probe.sh, grafana/ and lgtm/ provisioning
 docs/adr, docs/thesis                    decisions; the design document
@@ -62,8 +64,8 @@ hook), `create-pr` (`scripts/create-pr`, never raw `gh pr create`), `fix-ci`
 
 ## Per-area guides
 
-Each area has its own CLAUDE.md, loaded when working under that path. `backend/CLAUDE.md`
-exists; `frontend/` and `docs/thesis/` get theirs when they gain content.
+Each area has its own CLAUDE.md, loaded when working under that path. `backend/CLAUDE.md` and
+`frontend/CLAUDE.md` exist; `docs/thesis/` gets one when it gains content.
 
 - **Commits:** `type(scope): summary`, imperative, no trailer lines. Small, bisectable.
   Merges are squash-only; the PR title and body become the commit on `main`, so they are

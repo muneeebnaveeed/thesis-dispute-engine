@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "semi": false,
+  "singleQuote": true,
+  "printWidth": 110,
+  "ignorePatterns": [
+    "dist",
+    ".nitro",
+    ".output",
+    ".tanstack",
+    "src/routeTree.gen.ts",
+    "src/api/*.gen.ts",
+    "pnpm-lock.yaml"
+  ]
+}

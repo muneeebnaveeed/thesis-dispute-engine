@@ -69,6 +69,21 @@ services:
       OTEL_LOGS_EXPORTER: ${OTEL_LOGS_EXPORTER:-}
       OTEL_METRIC_EXPORT_INTERVAL: ${OTEL_METRIC_EXPORT_INTERVAL:-}
 
+  frontend:
+    build:
+      context: ../frontend
+      network: host
+      args:
+        NODE_VERSION: ${NODE_VERSION:-24.21.0}
+        PNPM_VERSION: ${PNPM_VERSION:-12.5.1}
+    network_mode: host
+    profiles: [app, otel]
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      PORT: "3002"
+
   # Toolchain container for a fully dockerised dev loop; air watches the bind mount.
   api-dev:
     image: golang:${GO_VERSION:-1.27.1}
