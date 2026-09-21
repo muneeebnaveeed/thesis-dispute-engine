@@ -143,6 +143,18 @@ jobs:
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      # The binary connects and migrates at startup, so the smoke test needs a database.
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: dispute
+          POSTGRES_PASSWORD: dispute
+          POSTGRES_DB: dispute
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U dispute -d dispute"
+          --health-interval 5s --health-timeout 3s --health-retries 10
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
@@ -163,8 +175,8 @@ jobs:
         # involved; the container must answer /healthz within a few seconds.
         run: |
           docker run -d --network host --name api dispute-engine-api:ci
-          for i in $(seq 1 20); do
-            if curl -fsS http://localhost:8090/healthz; then echo; exit 0; fi
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8090/readyz; then echo; exit 0; fi
             sleep 0.5
           done
           echo "healthz never answered"; docker logs api; exit 1
