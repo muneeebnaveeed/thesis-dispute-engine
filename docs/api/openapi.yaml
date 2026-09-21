@@ -1,0 +1,266 @@
+openapi: 3.0.3
+info:
+  title: Dispute Engine API
+  version: 0.1.0
+  description: Issuer-side dispute lifecycle. Every mutation appends to the dispute's event log.
+servers:
+  - url: http://localhost:8090
+paths:
+  /healthz:
+    get:
+      operationId: getHealthz
+      summary: Liveness
+      tags: [system]
+      responses:
+        "200":
+          description: Process is up.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+  /readyz:
+    get:
+      operationId: getReadyz
+      summary: Readiness (database reachable)
+      tags: [system]
+      responses:
+        "200":
+          description: Ready.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503":
+          description: A dependency is unavailable.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+  /disputes:
+    post:
+      operationId: createDispute
+      summary: Open a dispute against a transaction
+      tags: [disputes]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateDisputeRequest" }
+      responses:
+        "201":
+          description: Dispute opened. Replays of the same Idempotency-Key return this same body.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Dispute" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+  /disputes/{disputeId}:
+    get:
+      operationId: getDispute
+      summary: Current state and full event log
+      tags: [disputes]
+      parameters:
+        - $ref: "#/components/parameters/DisputeId"
+      responses:
+        "200":
+          description: The dispute.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Dispute" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /disputes/{disputeId}/events:
+    post:
+      operationId: applyDisputeEvent
+      summary: Apply a lifecycle event
+      tags: [disputes]
+      parameters:
+        - $ref: "#/components/parameters/DisputeId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApplyEventRequest" }
+      responses:
+        "200":
+          description: Event applied; the dispute after the transition.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Dispute" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: The event is not allowed from the current state, or a concurrent update won.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+components:
+  parameters:
+    DisputeId:
+      name: disputeId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Client-chosen key. Same key and body replays the original response; same key with a different body is 422.
+      schema: { type: string, minLength: 1, maxLength: 128 }
+  responses:
+    BadRequest:
+      description: Malformed request.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotFound:
+      description: No such resource.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unprocessable:
+      description: Well-formed but not acceptable (idempotency key reused with a different body, or no regime for the transaction).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+  schemas:
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [ok, unavailable] }
+        checks:
+          type: object
+          additionalProperties: { type: string }
+    ErrorCode:
+      type: string
+      description: Stable machine-readable failure identifier; branch on this, never on text.
+      enum:
+        - malformed-request
+        - contract-violation
+        - not-found
+        - invalid-transition
+        - appeals-exhausted
+        - concurrent-update
+        - idempotency-key-reuse
+        - no-regime
+        - unknown-regime
+        - unavailable
+        - internal
+    Problem:
+      type: object
+      description: RFC 9457 problem details. Every field is safe to show to a user; diagnostics stay in server logs under requestId.
+      required: [type, title, status, code, retryable, requestId]
+      properties:
+        type: { type: string, description: "urn:dispute-engine:error:<code>" }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code: { $ref: "#/components/schemas/ErrorCode" }
+        retryable:
+          type: boolean
+          description: true when the same request (unavailable) or a re-evaluated one (concurrent-update) can succeed later.
+        retryAfterSeconds: { type: integer }
+        requestId: { type: string }
+        allowedEvents:
+          type: array
+          description: Present on invalid-transition; what the dispute accepts right now.
+          items: { $ref: "#/components/schemas/DisputeEvent" }
+        errors:
+          type: array
+          description: Field-level failures for contract-violation and business validation; field is a JSON pointer into the body, or query.x / header.x / path.x.
+          items: { $ref: "#/components/schemas/FieldError" }
+    FieldError:
+      type: object
+      required: [field, message]
+      properties:
+        field: { type: string, example: "/transactionId" }
+        message: { type: string }
+    Regime:
+      type: string
+      enum: [EU_SEPA_DIRECT_DEBIT, EU_PSD2_CARD, US_REG_E, US_REG_Z]
+    DisputeState:
+      type: string
+      enum:
+        - INITIATED
+        - INVESTIGATING
+        - QUESTIONNAIRE_SENT
+        - QUESTIONNAIRE_RECEIVED
+        - PROVISIONAL_CREDIT_ISSUED
+        - FAST_REFUND_ISSUED
+        - SEPA_NQA_REFUND_ISSUED
+        - CHARGEBACK_FILED
+        - CHARGEBACK_ACKNOWLEDGED
+        - EVIDENCE_SUBMITTED
+        - CHARGEBACK_WON
+        - CHARGEBACK_LOST
+        - FINAL_CREDIT_ISSUED
+        - PROVISIONAL_CREDIT_REVERSED
+        - CLOSED
+    DisputeEvent:
+      type: string
+      enum:
+        - OPEN_INVESTIGATION
+        - SEND_QUESTIONNAIRE
+        - RECEIVE_QUESTIONNAIRE
+        - ISSUE_REFUND
+        - FILE_CHARGEBACK
+        - ACKNOWLEDGE_CHARGEBACK
+        - SUBMIT_EVIDENCE
+        - WIN_CHARGEBACK
+        - LOSE_CHARGEBACK
+        - ISSUE_FINAL_CREDIT
+        - REVERSE_PROVISIONAL_CREDIT
+        - CLOSE
+        - APPEAL
+    CreateDisputeRequest:
+      type: object
+      required: [transactionId]
+      properties:
+        transactionId: { type: string, format: uuid }
+        actor: { type: string, description: "Who opened it; defaults to customer.", default: customer }
+    ApplyEventRequest:
+      type: object
+      required: [event]
+      properties:
+        event: { $ref: "#/components/schemas/DisputeEvent" }
+        actor: { type: string, default: system }
+        payload:
+          type: object
+          description: Event-specific facts, stored verbatim on the log entry.
+          additionalProperties: true
+    LoggedEvent:
+      type: object
+      required: [seq, event, fromState, toState, actor, payload, occurredAt]
+      properties:
+        seq: { type: integer }
+        event: { type: string, description: "A DisputeEvent, or OPENED for entry 1." }
+        fromState: { type: string }
+        toState: { $ref: "#/components/schemas/DisputeState" }
+        actor: { type: string }
+        payload: { type: object, additionalProperties: true }
+        traceId: { type: string }
+        occurredAt: { type: string, format: date-time }
+    Dispute:
+      type: object
+      required: [id, regime, state, appeals, version, transactionId, accountId, disputedAmount, currency, openedAt, updatedAt, allowedEvents, events]
+      properties:
+        id: { type: string, format: uuid }
+        regime: { $ref: "#/components/schemas/Regime" }
+        state: { $ref: "#/components/schemas/DisputeState" }
+        appeals: { type: integer }
+        version: { type: integer, format: int64 }
+        transactionId: { type: string, format: uuid }
+        accountId: { type: string, format: uuid }
+        disputedAmount: { type: string, description: "Decimal as a string; never a float.", example: "125.4000" }
+        currency: { type: string, minLength: 3, maxLength: 3 }
+        openedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        allowedEvents:
+          type: array
+          items: { $ref: "#/components/schemas/DisputeEvent" }
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/LoggedEvent" }

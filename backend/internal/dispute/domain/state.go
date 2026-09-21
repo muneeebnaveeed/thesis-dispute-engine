@@ -1,8 +1,7 @@
 package domain
 
 import (
-	"errors"
-	"fmt"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
 )
 
 // State is a position in the dispute lifecycle.
@@ -57,10 +56,10 @@ func AllEvents() []Event {
 	}
 }
 
-// Sentinel errors; match with errors.Is.
+// Sentinel errors; match with errors.Is. Messages are user-facing; specifics are added by wrapping.
 var (
-	ErrInvalidTransition = errors.New("domain: transition not allowed")
-	ErrAppealsExhausted  = errors.New("domain: appeals exhausted")
+	ErrInvalidTransition = errs.New(errs.Conflict, "invalid-transition", "this action is not allowed in the dispute's current state")
+	ErrAppealsExhausted  = errs.New(errs.Conflict, "appeals-exhausted", "this dispute has used all of its appeals")
 )
 
 // Dispute is the lifecycle state of a dispute.
@@ -89,7 +88,7 @@ func (d Dispute) Apply(event Event) (Dispute, error) {
 			return d, invalid(d, event)
 		}
 		if d.Appeals >= r.MaxAppeals {
-			return d, fmt.Errorf("%w: %d of %d used under %s", ErrAppealsExhausted, d.Appeals, r.MaxAppeals, d.Regime)
+			return d, errs.Wrap(ErrAppealsExhausted, "%d of %d used under %s", d.Appeals, r.MaxAppeals, d.Regime)
 		}
 		return Dispute{Regime: d.Regime, State: StateInvestigating, Appeals: d.Appeals + 1}, nil
 	}
@@ -115,7 +114,7 @@ func (d Dispute) Allowed() []Event {
 func (d Dispute) IsTerminal() bool { return d.State == StateClosed }
 
 func invalid(d Dispute, e Event) error {
-	return fmt.Errorf("%w: %s from %s under %s", ErrInvalidTransition, e, d.State, d.Regime)
+	return errs.Wrap(ErrInvalidTransition, "%s from %s under %s", e, d.State, d.Regime)
 }
 
 // next gates on Rules properties, never on the Regime value, so a new regime is only a new row in rules.

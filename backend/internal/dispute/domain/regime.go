@@ -2,8 +2,9 @@
 package domain
 
 import (
-	"fmt"
 	"time"
+
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
 )
 
 // Regime is the regulatory framework a dispute is handled under; fixed at creation.
@@ -111,7 +112,7 @@ var rules = map[Regime]Rules{
 func RulesFor(r Regime) (Rules, error) {
 	cfg, ok := rules[r]
 	if !ok {
-		return Rules{}, fmt.Errorf("domain: unknown regime %q", r)
+		return Rules{}, errs.Wrap(errs.New(errs.Invalid, "unknown-regime", "unknown regulatory regime"), "%q", r)
 	}
 	return cfg, nil
 }

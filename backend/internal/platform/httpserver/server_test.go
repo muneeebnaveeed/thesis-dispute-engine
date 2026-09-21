@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -11,45 +12,30 @@ import (
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
 )
 
 func newTestServer(t *testing.T) *Server {
 	t.Helper()
-	return New(":0", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	mux := http.NewServeMux()
+	mux.Handle("GET /ping", NameSpanByRoute(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"pong":true}`))
+	})))
+	mux.HandleFunc("GET /boom", func(http.ResponseWriter, *http.Request) { panic("boom") })
+	return New(":0", slog.New(slog.NewTextHandler(io.Discard, nil)), mux)
 }
 
-func TestHealthz(t *testing.T) {
+func TestRoutedRequestCarriesRequestID(t *testing.T) {
 	srv := newTestServer(t)
 	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", rec.Code)
+	srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/ping", nil))
+	if rec.Code != http.StatusOK || rec.Header().Get("X-Request-ID") == "" {
+		t.Fatalf("status = %d, request id = %q", rec.Code, rec.Header().Get("X-Request-ID"))
 	}
-	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
-		t.Errorf("Content-Type = %q, want application/json", ct)
-	}
-	if body := strings.TrimSpace(rec.Body.String()); body != `{"status":"ok"}` {
-		t.Errorf("body = %s, want {\"status\":\"ok\"}", body)
-	}
-	if rec.Header().Get("X-Request-ID") == "" {
-		t.Error("X-Request-ID header missing")
-	}
-}
-
-func TestHealthzRejectsWrongMethod(t *testing.T) {
-	srv := newTestServer(t)
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/healthz", nil))
-	if rec.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("status = %d, want 405", rec.Code)
-	}
-}
-
-func TestRequestIDIsHonoured(t *testing.T) {
-	srv := newTestServer(t)
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	rec = httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
 	req.Header.Set("X-Request-ID", "abc-123")
 	srv.Handler().ServeHTTP(rec, req)
 	if got := rec.Header().Get("X-Request-ID"); got != "abc-123" {
@@ -57,14 +43,19 @@ func TestRequestIDIsHonoured(t *testing.T) {
 	}
 }
 
-func TestRecoverTurnsPanicInto500(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	h := Chain(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		panic("boom")
-	}), Recover(logger), RequestID)
-
+func TestWrongMethodIs405(t *testing.T) {
+	srv := newTestServer(t)
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/ping", nil))
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want 405", rec.Code)
+	}
+}
+
+func TestPanicBecomes500(t *testing.T) {
+	srv := newTestServer(t)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/boom", nil))
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", rec.Code)
 	}
@@ -80,18 +71,14 @@ func TestChainOrder(t *testing.T) {
 			})
 		}
 	}
-	h := Chain(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		order = append(order, "handler")
-	}), mw("outer"), mw("inner"))
-
+	h := Chain(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { order = append(order, "handler") }), mw("outer"), mw("inner"))
 	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
 	if got := strings.Join(order, ","); got != "outer,inner,handler" {
-		t.Errorf("order = %s, want outer,inner,handler", got)
+		t.Errorf("order = %s", got)
 	}
 }
 
-func TestRequestsAreTraced(t *testing.T) {
-	// A recording tracer provider makes the otelhttp span visible to the test.
+func TestSpanIsNamedByRoute(t *testing.T) {
 	exporter := tracetest.NewInMemoryExporter()
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	prev := otel.GetTracerProvider()
@@ -99,13 +86,32 @@ func TestRequestsAreTraced(t *testing.T) {
 	t.Cleanup(func() { otel.SetTracerProvider(prev) })
 
 	srv := newTestServer(t)
-	srv.Handler().ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/healthz", nil))
-
+	srv.Handler().ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/ping", nil))
 	spans := exporter.GetSpans()
-	if len(spans) != 1 {
-		t.Fatalf("spans = %d, want 1", len(spans))
+	if len(spans) != 1 || spans[0].Name != "GET /ping" {
+		t.Fatalf("spans = %+v", spans)
 	}
-	if spans[0].Name != "GET /healthz" {
-		t.Errorf("span name = %q, want the route pattern", spans[0].Name)
+}
+
+func TestProblemFromClassifiesAndHidesInternals(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/x", nil)
+	ctx := req.Context()
+
+	p := ProblemFrom(ctx, "/x", errs.Wrap(errs.New(errs.Conflict, "concurrent-update", "reload and retry"), "db says %s", "23505"))
+	if p.Status != 409 || p.Code != "concurrent-update" || !p.Retryable || p.Detail != "reload and retry" {
+		t.Errorf("classified problem = %+v", p)
+	}
+	if p.Type != "urn:dispute-engine:error:concurrent-update" {
+		t.Errorf("type = %s", p.Type)
+	}
+
+	p = ProblemFrom(ctx, "/x", errors.New("pq: password authentication failed for user dispute"))
+	if p.Status != 500 || p.Code != "internal" || p.Retryable || strings.Contains(p.Detail, "password") {
+		t.Errorf("internal problem leaked or misclassified: %+v", p)
+	}
+
+	p = ProblemFrom(ctx, "/x", errs.New(errs.Unavailable, "unavailable", ""))
+	if p.Status != 503 || p.RetryAfterSeconds == nil || !p.Retryable {
+		t.Errorf("unavailable problem = %+v", p)
 	}
 }

@@ -3,14 +3,21 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
+	disputepg "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres"
+	disputehttp "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/ports/http"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/config"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/httpserver"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/postgres"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/telemetry"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/migrations"
 )
 
 func main() {
@@ -45,7 +52,32 @@ func run(logger *slog.Logger) error {
 		}
 	}()
 
-	srv := httpserver.New(cfg.Addr, logger)
+	pool, err := postgres.Connect(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	files, err := postgres.Load(migrations.FS)
+	if err != nil {
+		return err
+	}
+	ran, err := postgres.Migrate(ctx, pool, files)
+	if err != nil {
+		return fmt.Errorf("migrate: %w", err)
+	}
+	logger.Info("migrations", "applied", ran, "total", len(files))
+
+	svc, err := application.NewService(disputepg.NewStore(pool), nil)
+	if err != nil {
+		return err
+	}
+
+	mux := http.NewServeMux()
+	if err := disputehttp.Mount(mux, svc, pool.Ping); err != nil {
+		return err
+	}
+	srv := httpserver.New(cfg.Addr, logger, mux)
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()
