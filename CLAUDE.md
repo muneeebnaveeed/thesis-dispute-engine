@@ -61,7 +61,7 @@ needs it.
 ## Agent workflow
 
 Skills in `.claude/skills/`: `validate` (scoped checks, `make ci`), `commit` (message rules,
-hook), `create-pr` (`scripts/create-pr`, never raw `gh pr create`), `fix-ci`
+hook), `create-pr` (`scripts/create-pr`, never raw `gh pr create`), `tenant-ops` (`scripts/tenant`), `fix-ci`
 (`scripts/fetch-ci-logs` into `notes/pr-<n>/`), `review-comments`
 (`scripts/fetch-pr-comments`), `stack` (`scripts/stack show|restack|retarget` for stacked PRs). `make hooks` once per clone installs the pre-commit hook.
 `notes/` is gitignored scratch space for those scripts.
