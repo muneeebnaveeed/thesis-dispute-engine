@@ -37,8 +37,15 @@ const bearer: Middleware = {
   },
 }
 
-export function createBrowserApi(baseUrl: string) {
+/** onSignedOut runs when no token can be obtained (the session ended); pages send the person back through sign-in. */
+export function createBrowserApi(baseUrl: string, onSignedOut?: () => void) {
   const client = createClient<paths>({ baseUrl })
+  client.use({
+    async onRequest({ request }) {
+      if (onSignedOut && !(await token())) onSignedOut()
+      return request
+    },
+  })
   client.use(bearer)
   return client
 }

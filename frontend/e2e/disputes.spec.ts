@@ -9,7 +9,7 @@ test('an analyst opens a dispute and drives it through allowed transitions from 
 }) => {
   await page.getByLabel('Transaction ID').fill(tenants.otp.transaction)
   await page.getByRole('button', { name: 'Open' }).click()
-  await expect(page).toHaveURL(/\/disputes\/[0-9a-f-]{36}$/)
+  await expect(page).toHaveURL(/\/otp\/disputes\/[0-9a-f-]{36}$/)
   const state = page
     .getByRole('definition')
     .filter({ hasText: /^[A-Z_]+$/ })
@@ -45,10 +45,10 @@ test('structural mistakes are caught before the API and shown under the field', 
 
 test("another tenant's data does not exist for this analyst", async ({ page, request }) => {
   const foreign = await openDisputeViaApi(request, 'erste')
-  await page.goto(`/disputes/${foreign}`)
+  await page.goto(`/otp/disputes/${foreign}`)
   await expect(page.getByRole('alert')).toContainText('does not exist')
 
-  await page.goto('/')
+  await page.goto('/otp')
   await page.getByLabel('Transaction ID').fill(tenants.erste.transaction)
   await page.getByRole('button', { name: 'Open' }).click()
   await expect(page.getByRole('alert')).toContainText('does not exist')

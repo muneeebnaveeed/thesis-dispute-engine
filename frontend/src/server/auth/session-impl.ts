@@ -7,6 +7,8 @@ import { realmConfig, scopes } from './oidc'
 import * as store from './store'
 
 export const cookieName = 'de_session'
+/** Long-lived, non-secret: which tenant this browser signed in to last, so the root can skip the question. */
+export const rememberedTenantCookie = 'de_tenant'
 
 function cookieOptions(maxAge = serverEnv().sessionTtlSeconds) {
   return { httpOnly: true, sameSite: 'lax' as const, secure: serverEnv().secureCookies, path: '/', maxAge }
@@ -30,11 +32,25 @@ export function safeNext(raw: unknown): string {
 
 type Live = { id: string; session: store.Session & { identity: NonNullable<store.Session['identity']> } }
 
+// A live session, with the sliding idle rule applied: too long unused and it is gone; otherwise its last-seen mark
+// moves forward (at most once a minute, to keep writes rare).
 async function current(): Promise<Live | null> {
   const id = getCookie(cookieName)
   if (!id) return null
   const session = await store.get(id)
   if (!session?.identity) return null
+  const env = serverEnv()
+  const now = Date.now()
+  const lastSeen = session.lastSeenAt ? Date.parse(session.lastSeenAt) : now
+  if (now - lastSeen > env.sessionIdleSeconds * 1000) {
+    await store.remove(id)
+    deleteCookie(cookieName, { path: '/' })
+    return null
+  }
+  if (now - lastSeen > 60_000) {
+    session.lastSeenAt = new Date(now).toISOString()
+    await store.put(id, session, env.sessionTtlSeconds)
+  }
   return { id, session: { ...session, identity: session.identity } }
 }
 
@@ -106,16 +122,19 @@ export async function completeLogin(callbackUrl: URL): Promise<string> {
       identity: {
         tenantId,
         subject: claims.sub,
+        sid: typeof claims.sid === 'string' ? claims.sid : null,
         name: typeof claims.preferred_username === 'string' ? claims.preferred_username : null,
         email: typeof claims.email === 'string' ? claims.email : null,
         roles,
       },
       tokens: toTokens(tokens),
+      lastSeenAt: new Date().toISOString(),
     },
     env.sessionTtlSeconds,
   )
   await store.remove(pendingId)
   setCookie(cookieName, id, cookieOptions())
+  setCookie(rememberedTenantCookie, tenantSlug, { ...cookieOptions(365 * 24 * 3600), httpOnly: true })
   return pending.next
 }
 
@@ -167,12 +186,14 @@ export async function endSession(): Promise<{ url: string }> {
   deleteCookie(cookieName, { path: '/' })
   if (!live) return { url: '/' }
   await store.remove(live.id)
+  // After Keycloak ends its session, land on the tenant's own front door, not the generic root.
+  const home = `${env.appUrl}/${live.session.tenantSlug}`
   try {
     const config = await realmConfig(live.session.tenantSlug)
-    const params: Record<string, string> = { post_logout_redirect_uri: env.appUrl, client_id: env.clientId }
+    const params: Record<string, string> = { post_logout_redirect_uri: home, client_id: env.clientId }
     if (live.session.tokens?.id) params.id_token_hint = live.session.tokens.id
     return { url: client.buildEndSessionUrl(config, params).href }
   } catch {
-    return { url: '/' }
+    return { url: `/${live.session.tenantSlug}` }
   }
 }

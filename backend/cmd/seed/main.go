@@ -79,9 +79,13 @@ func run() error {
 
 	// Slugs double as Keycloak realm names (deploy/keycloak/render-realms.sh renders one realm per row here).
 	keycloak := getenv("KEYCLOAK_URL", "http://localhost:8180")
-	for _, t := range []struct{ id, name, slug string }{{tenantA, "OTP Bank", "otp"}, {tenantB, "Erste Bank", "erste"}} {
+	for _, t := range []struct{ id, name, slug, domain string }{{tenantA, "OTP Bank", "otp", "otpbank.hu"}, {tenantB, "Erste Bank", "erste", "erstebank.hu"}} {
 		issuer := keycloak + "/realms/" + t.slug
 		if err := q.UpsertTenant(ctx, sqlcgen.UpsertTenantParams{ID: uuid.MustParse(t.id), Name: t.name, Slug: t.slug, OidcIssuer: &issuer}); err != nil {
+			return err
+		}
+		// Work-email domains let the sign-in page find the tenant without a link (docs/authentication.md).
+		if _, err := q.SetTenantEmailDomains(ctx, sqlcgen.SetTenantEmailDomainsParams{ID: uuid.MustParse(t.id), EmailDomains: []string{t.domain}}); err != nil {
 			return err
 		}
 	}

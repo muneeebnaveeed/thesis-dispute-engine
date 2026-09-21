@@ -26,6 +26,8 @@ type Config struct {
 	InternalCIDRs []string
 	// RatePerMinute is each tenant's request budget; 0 disables the limiter.
 	RatePerMinute int
+	// AuthFailuresPerMinute is how many bad credentials one peer may present per minute before being refused.
+	AuthFailuresPerMinute int
 	// Production turns dev defaults into startup errors.
 	Production bool
 	LogLevel   slog.Level
@@ -36,17 +38,25 @@ func Load() (Config, error) {
 	cfg := Config{
 		Addr: getenv("DISPUTE_ADDR", ":8090"),
 		// The API runs as the least-privileged dispute_api login; only migrate and seed use the owner.
-		DatabaseURL:        getenv("DISPUTE_DATABASE_URL", "postgres://dispute_api:dispute_api@localhost:5432/dispute?sslmode=disable"),
-		MigrateDatabaseURL: getenv("DISPUTE_MIGRATE_DATABASE_URL", "postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable"),
-		ShutdownTimeout:    10 * time.Second,
-		IdempotencyTTL:     24 * time.Hour,
-		CORSOrigins:        strings.Split(getenv("DISPUTE_CORS_ORIGINS", "http://localhost:3002"), ","),
-		ServiceKey:         getenv("DISPUTE_SERVICE_KEY", "dev-service-key"),
-		InternalCIDRs:      strings.Split(getenv("DISPUTE_INTERNAL_CIDRS", "127.0.0.0/8,::1/128"), ","),
-		RatePerMinute:      600,
-		Production:         os.Getenv("DISPUTE_ENV") == "production",
+		DatabaseURL:           getenv("DISPUTE_DATABASE_URL", "postgres://dispute_api:dispute_api@localhost:5432/dispute?sslmode=disable"),
+		MigrateDatabaseURL:    getenv("DISPUTE_MIGRATE_DATABASE_URL", "postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable"),
+		ShutdownTimeout:       10 * time.Second,
+		IdempotencyTTL:        24 * time.Hour,
+		CORSOrigins:           strings.Split(getenv("DISPUTE_CORS_ORIGINS", "http://localhost:3002"), ","),
+		ServiceKey:            getenv("DISPUTE_SERVICE_KEY", "dev-service-key"),
+		InternalCIDRs:         strings.Split(getenv("DISPUTE_INTERNAL_CIDRS", "127.0.0.0/8,::1/128"), ","),
+		RatePerMinute:         600,
+		AuthFailuresPerMinute: 30,
+		Production:            os.Getenv("DISPUTE_ENV") == "production",
 	}
 
+	if raw := os.Getenv("DISPUTE_AUTH_FAILURES_PER_MINUTE"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 0 {
+			return Config{}, fmt.Errorf("config: DISPUTE_AUTH_FAILURES_PER_MINUTE must be a non-negative integer, got %q", raw)
+		}
+		cfg.AuthFailuresPerMinute = n
+	}
 	if raw := os.Getenv("DISPUTE_RATE_PER_MINUTE"); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil || n < 0 {

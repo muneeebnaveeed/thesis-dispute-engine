@@ -52,7 +52,7 @@ docs/api/openapi.yaml                    the API contract; everything HTTP is ge
 deploy/                                  compose.yml (host networking, see below), otel.env, probe.sh, grafana/ and lgtm/ provisioning
 backend/internal/websession              opaque session store behind /internal/sessions (frontend's, ADR 0011)
 docs/adr, docs/thesis                    decisions; the design document
-docs/operations.md, docs/observability.md  operator runbooks: tenant keys; where telemetry lives
+docs/authentication.md, docs/operations.md, docs/observability.md  how callers become a tenant; operator runbooks; where telemetry lives
 ```
 
 Bounded contexts so far: `dispute` (all four layers). Create a layer only when a context

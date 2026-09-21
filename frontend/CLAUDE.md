@@ -31,8 +31,11 @@ lint and format fixes. `make fe-dev` for the dev server on :3002. Inside `fronte
   (`session-impl.ts`); route files import only `session.ts`, whose exports are server functions.
   Start's import protection fails the build otherwise. Never log or return tokens to the browser
   except through `getAccessToken`.
-- Protected routes check `context.viewer` in `beforeLoad` and redirect to `/` with
-  `search: { next }`; `safeNext` decides what may be a destination.
+- The tenant is the first path segment. `src/routes/$tenant/route.tsx` owns sign-in: no viewer means
+  a redirect to that tenant's realm with the current path as `next`; `safeNext(raw, slug)` keeps
+  destinations inside the tenant. A viewer for a different tenant renders `TenantMismatch`.
+- Security headers live in `src/server/security-headers.ts` and are applied by the request
+  middleware in `src/start.ts`; the CSP is nonce-based, so never add `unsafe-inline` for scripts.
 - Show problems through `ProblemBanner`: it renders `detail`, field errors and the retry hint
   from the contract. Never branch on `title` or `detail` text; branch on `code`.
 - Business rules (which events are allowed, field errors) arrive from the API.

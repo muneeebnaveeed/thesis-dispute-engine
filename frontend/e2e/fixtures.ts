@@ -25,16 +25,21 @@ export async function openDisputeViaApi(
   return (body as { id: string }).id
 }
 
-/** Drives the real Keycloak login page for a realm. Starts from /t/<slug> unless the page is already there. */
-export async function signIn(page: Page, slug: string, next?: string) {
-  await page.goto(`/t/${slug}${next ? `?next=${encodeURIComponent(next)}` : ''}`)
-  await page.waitForURL(/realms\/[a-z]+\/protocol\/openid-connect|localhost:3002/)
+/** Fills Keycloak's login page if the browser is on it; a live realm SSO session skips it entirely. */
+export async function completeKeycloakLogin(page: Page) {
+  await page.waitForURL(/\/protocol\/openid-connect\/|localhost:3002/)
   if (page.url().includes('/protocol/openid-connect/')) {
     await page.fill('#username', analyst.username)
     await page.fill('#password', analyst.password)
     await page.click('#kc-login')
   }
-  await page.waitForURL((u) => u.origin === new URL(page.url()).origin && !u.pathname.startsWith('/t/'))
+  await page.waitForURL(/localhost:3002\//)
+}
+
+/** Visits the tenant's front door and signs in; the app never asks for the tenant. */
+export async function signIn(page: Page, slug: string, path = `/${slug}`) {
+  await page.goto(path)
+  await completeKeycloakLogin(page)
 }
 
 export const test = base

@@ -54,7 +54,8 @@
         "vitest/expect-expect": "off",
         "vitest/no-standalone-expect": "off",
         "vitest/valid-expect": "off",
-        "typescript/no-unsafe-type-assertion": "off"
+        "typescript/no-unsafe-type-assertion": "off",
+        "eslint/no-await-in-loop": "off"
       }
     }
   ]
