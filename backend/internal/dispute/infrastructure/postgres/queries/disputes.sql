@@ -135,3 +135,11 @@ UPDATE tenant_keys SET revoked_at = now() WHERE id = $1 AND tenant_id = $2 AND r
 
 -- name: GetTenantKeyForTenant :one
 SELECT id, prefix, label, created_at, last_used_at, expires_at, revoked_at FROM tenant_keys WHERE id = $1 AND tenant_id = $2;
+-- name: ListDisputes :many
+-- Keyset pagination on (opened_at, id) descending; row-level security scopes the tenant.
+SELECT id, regime, state, transaction_id, disputed_amount, currency, opened_at, updated_at
+FROM disputes
+WHERE (sqlc.narg(state)::text IS NULL OR state = sqlc.narg(state)::text)
+  AND (sqlc.narg(before_opened_at)::timestamptz IS NULL OR (opened_at, id) < (sqlc.narg(before_opened_at)::timestamptz, sqlc.narg(before_id)::uuid))
+ORDER BY opened_at DESC, id DESC
+LIMIT sqlc.arg(page_size);

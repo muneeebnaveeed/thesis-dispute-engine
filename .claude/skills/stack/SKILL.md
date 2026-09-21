@@ -19,5 +19,7 @@ A stack is a chain of branches where each PR targets the branch below it instead
 - Conflicts stop the script with the exact commands to finish by hand; never reset a branch
   to escape a rebase.
 - Merge order is bottom-up: never merge a child before its parent.
-- Merging: `gh pr merge <n> --squash --auto` and let GitHub wait for green checks; never merge
-  behind a `gh pr checks --watch` whose exit code you did not gate on.
+- Merging: `scripts/merge-when-green <n>`. It waits for the gating checks (the `ci` workflow and
+  the PR template check), ignores the informative ones (browser suite, cache cleanup) by decision,
+  and squash-merges. Never merge behind a `gh pr checks --watch` whose exit code you did not gate on,
+  and never let the browser suite hold a merge.

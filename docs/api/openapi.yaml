@@ -39,6 +39,30 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Health" }
   /disputes:
+    get:
+      operationId: listDisputes
+      summary: The tenant's disputes, newest first
+      tags: [disputes]
+      parameters:
+        - name: state
+          in: query
+          schema: { $ref: "#/components/schemas/DisputeState" }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - name: cursor
+          in: query
+          description: Opaque; from the previous page's nextCursor.
+          schema: { type: string }
+      responses:
+        "200":
+          description: One page.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DisputePage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
     post:
       operationId: createDispute
       summary: Open a dispute against a transaction
@@ -457,6 +481,26 @@ components:
         payload: { type: object, additionalProperties: true }
         traceId: { type: string }
         occurredAt: { type: string, format: date-time }
+    DisputeSummary:
+      type: object
+      required: [id, regime, state, transactionId, disputedAmount, currency, openedAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        regime: { $ref: "#/components/schemas/Regime" }
+        state: { $ref: "#/components/schemas/DisputeState" }
+        transactionId: { type: string, format: uuid }
+        disputedAmount: { type: string, description: Decimal as a string; never a float. }
+        currency: { type: string, minLength: 3, maxLength: 3 }
+        openedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    DisputePage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/DisputeSummary" }
+        nextCursor: { type: string, description: Present when there is another page. }
     Dispute:
       type: object
       required: [id, regime, state, appeals, version, transactionId, accountId, disputedAmount, currency, openedAt, updatedAt, allowedEvents, events]

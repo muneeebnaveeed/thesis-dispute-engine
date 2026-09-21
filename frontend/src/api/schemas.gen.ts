@@ -123,6 +123,28 @@ export type Dispute = Static<typeof Dispute>
 const _Dispute: Same<Dispute, components['schemas']['Dispute']> = true
 void _Dispute
 
+export const DisputeSummary = Type.Object({
+  id: Type.String({ format: 'uuid' }),
+  regime: Regime,
+  state: DisputeState,
+  transactionId: Type.String({ format: 'uuid' }),
+  disputedAmount: Type.String({ description: 'Decimal as a string; never a float.' }),
+  currency: Type.String({ minLength: 3, maxLength: 3 }),
+  openedAt: Type.String({ format: 'date-time' }),
+  updatedAt: Type.String({ format: 'date-time' }),
+})
+export type DisputeSummary = Static<typeof DisputeSummary>
+const _DisputeSummary: Same<DisputeSummary, components['schemas']['DisputeSummary']> = true
+void _DisputeSummary
+
+export const DisputePage = Type.Object({
+  items: Type.Array(DisputeSummary),
+  nextCursor: Type.Optional(Type.String({ description: 'Present when there is another page.' })),
+})
+export type DisputePage = Static<typeof DisputePage>
+const _DisputePage: Same<DisputePage, components['schemas']['DisputePage']> = true
+void _DisputePage
+
 export const ErrorCode = Type.Union(
   [
     Type.Literal('unauthenticated'),

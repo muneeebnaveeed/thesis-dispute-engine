@@ -213,6 +213,51 @@ func (s *Service) ApplyEvent(ctx context.Context, in ApplyEventInput) (Result, e
 	})
 }
 
+// DisputeSummary is one row of a list.
+type DisputeSummary struct {
+	ID             uuid.UUID
+	Regime         domain.Regime
+	State          domain.State
+	TransactionID  uuid.UUID
+	DisputedAmount decimal.Decimal
+	Currency       string
+	OpenedAt       time.Time
+	UpdatedAt      time.Time
+}
+
+// Page is one page of a list plus where the next one starts.
+type Page struct {
+	Items []DisputeSummary
+	Next  *Cursor
+}
+
+// ListDisputes pages through the tenant's disputes, newest first; the store's row-level security scopes the tenant.
+func (s *Service) ListDisputes(ctx context.Context, q ListQuery) (Page, error) {
+	if q.Limit <= 0 || q.Limit > 100 {
+		q.Limit = 25
+	}
+	var page Page
+	err := s.store.WithTx(ctx, func(tx Tx) error {
+		// Ask for one more than the page to learn whether a next page exists without a second query.
+		recs, err := tx.ListDisputes(ctx, ListQuery{State: q.State, After: q.After, Limit: q.Limit + 1})
+		if err != nil {
+			return err
+		}
+		if len(recs) > q.Limit {
+			last := recs[q.Limit-1]
+			page.Next = &Cursor{OpenedAt: last.OpenedAt, ID: last.ID}
+			recs = recs[:q.Limit]
+		}
+		page.Items = make([]DisputeSummary, 0, len(recs))
+		for _, r := range recs {
+			page.Items = append(page.Items, DisputeSummary{ID: r.ID, Regime: r.Regime, State: r.State, TransactionID: r.TransactionID,
+				DisputedAmount: r.DisputedAmount, Currency: r.Currency, OpenedAt: r.OpenedAt, UpdatedAt: r.UpdatedAt})
+		}
+		return nil
+	})
+	return page, err
+}
+
 // GetDispute returns the current state and full log.
 func (s *Service) GetDispute(ctx context.Context, id uuid.UUID) (DisputeView, error) {
 	var view DisputeView

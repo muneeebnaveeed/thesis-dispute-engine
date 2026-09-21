@@ -467,3 +467,68 @@ func TestTenantKeySelfService(t *testing.T) {
 		t.Errorf("unknown key: %d", rec.Code)
 	}
 }
+
+func TestListDisputesPagesNewestFirstWithinTheTenant(t *testing.T) {
+	a := newAPI(t, func(context.Context) error { return nil })
+	txn := a.store.AddTransaction(domain.RailCard, "EUR", "EUR", "10.00")
+	foreign := a.store.AddTransactionFor(apptest.TenantB, domain.RailCard, "EUR", "EUR", "10.00")
+	ids := make([]string, 0, 5)
+	for range 5 {
+		rec, d := a.do(http.MethodPost, "/disputes", map[string]any{"transactionId": txn.String()}, nil)
+		if rec.Code != http.StatusCreated {
+			t.Fatal(rec.Code)
+		}
+		ids = append(ids, d["id"].(string))
+	}
+	if rec, _ := a.do(http.MethodPost, "/disputes", map[string]any{"transactionId": foreign.String()}, map[string]string{"Authorization": "Bearer key-b"}); rec.Code != http.StatusCreated {
+		t.Fatal(rec.Code)
+	}
+
+	page := func(query string) (map[string]any, []string) {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/disputes"+query, nil)
+		req.Header.Set("Authorization", "Bearer key-a")
+		a.h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", query, rec.Code, rec.Body.String())
+		}
+		var body map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &body)
+		items := body["items"].([]any)
+		got := make([]string, 0, len(items))
+		for _, it := range items {
+			got = append(got, it.(map[string]any)["id"].(string))
+		}
+		return body, got
+	}
+	first, got := page("?limit=2")
+	if len(got) != 2 || first["nextCursor"] == nil {
+		t.Fatalf("first page: %v", first)
+	}
+	second, got2 := page("?limit=2&cursor=" + first["nextCursor"].(string))
+	third, got3 := page("?limit=2&cursor=" + second["nextCursor"].(string))
+	all := append(append(got, got2...), got3...)
+	if len(all) != 5 || third["nextCursor"] != nil {
+		t.Fatalf("pages: %v %v %v", got, got2, got3)
+	}
+	seen := map[string]bool{}
+	for _, id := range all {
+		if seen[id] {
+			t.Errorf("duplicate across pages: %s", id)
+		}
+		seen[id] = true
+	}
+	// Newest first: the last created id comes first; and none of the pages leak tenant B's dispute.
+	if all[0] != ids[4] {
+		t.Errorf("order: first is %s, want newest %s", all[0], ids[4])
+	}
+	if _, filtered := page("?state=CLOSED"); len(filtered) != 0 {
+		t.Errorf("state filter: %v", filtered)
+	}
+	if rec, p := a.do(http.MethodGet, "/disputes?cursor=not-a-cursor", nil, nil); rec.Code != http.StatusBadRequest || p["code"] != "contract-violation" {
+		t.Errorf("bad cursor: %d %v", rec.Code, p)
+	}
+	if rec, _ := a.do(http.MethodGet, "/disputes?limit=1000", nil, nil); rec.Code != http.StatusBadRequest {
+		t.Errorf("limit above the maximum should fail validation: %d", rec.Code)
+	}
+}

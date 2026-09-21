@@ -3,6 +3,7 @@ package apptest
 
 import (
 	"context"
+	"sort"
 	"sync"
 	"time"
 
@@ -192,4 +193,30 @@ func (t *memTx) PutIdempotent(_ context.Context, scope, key string, r applicatio
 	}
 	t.s.Idempotent[t.tenant.String()+"\x00"+scope+"\x00"+key] = r
 	return nil
+}
+
+func (t *memTx) ListDisputes(_ context.Context, q application.ListQuery) ([]application.DisputeRecord, error) {
+	var all []application.DisputeRecord
+	for _, d := range t.s.Disputes {
+		if d.TenantID != t.tenant || (q.State != nil && d.State != *q.State) {
+			continue
+		}
+		if q.After != nil && d.OpenedAt.After(q.After.OpenedAt) {
+			continue
+		}
+		if q.After != nil && d.OpenedAt.Equal(q.After.OpenedAt) && d.ID.String() >= q.After.ID.String() {
+			continue
+		}
+		all = append(all, d)
+	}
+	sort.Slice(all, func(i, j int) bool {
+		if !all[i].OpenedAt.Equal(all[j].OpenedAt) {
+			return all[i].OpenedAt.After(all[j].OpenedAt)
+		}
+		return all[i].ID.String() > all[j].ID.String()
+	})
+	if len(all) > q.Limit {
+		all = all[:q.Limit]
+	}
+	return all, nil
 }

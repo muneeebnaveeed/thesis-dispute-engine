@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Squash-merge a PR once its gating checks pass. Informative checks (the browser suite, cache cleanup) are ignored,
+# as decided: they report, they never block.
+#
+#   scripts/merge-when-green <pr-number> [--timeout-minutes 40]
+set -euo pipefail
+source "$(dirname "$0")/lib/common.sh"
+require_gh_account
+pr=${1:?pr number}
+timeout_minutes=${3:-40}
+# Tab-separated "bucket<TAB>name"; these names never gate.
+is_ignored() { case "$1" in "browser suite"|"Delete this PR's caches") return 0 ;; *) return 1 ;; esac; }
+
+deadline=$((SECONDS + timeout_minutes * 60))
+while :; do
+  rows=$(gh pr checks "$pr" --json name,bucket --jq '.[] | "\(.bucket)\t\(.name)"' 2>/dev/null || true)
+  gating=""
+  while IFS=$'\t' read -r bucket name; do
+    [[ -n "$name" ]] && ! is_ignored "$name" && gating+="$bucket"$'\t'"$name"$'\n'
+  done <<<"$rows"
+  if [[ -z "$gating" ]]; then
+    ((SECONDS < deadline)) || die "no gating checks reported on #$pr after $timeout_minutes minutes"
+    sleep 15; continue
+  fi
+  if grep -qE '^(fail|cancel)' <<<"$gating"; then
+    echo "#$pr has failing gating checks:" >&2
+    grep -E '^(fail|cancel)' <<<"$gating" | cut -f2 | sed 's/^/  /' >&2
+    exit 1
+  fi
+  if ! grep -qE '^pending' <<<"$gating"; then
+    break
+  fi
+  ((SECONDS < deadline)) || die "#$pr still pending after $timeout_minutes minutes"
+  sleep 20
+done
+gh pr merge "$pr" --squash --delete-branch=false
+echo "#$pr merged"

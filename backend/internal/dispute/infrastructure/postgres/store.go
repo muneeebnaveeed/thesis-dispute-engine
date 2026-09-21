@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
@@ -202,4 +203,26 @@ func mapErr(err error) error {
 		return errs.Wrap(application.ErrUnavailable, "postgres: %v", err)
 	}
 	return err
+}
+
+func (t *txn) ListDisputes(ctx context.Context, q application.ListQuery) ([]application.DisputeRecord, error) {
+	params := sqlcgen.ListDisputesParams{PageSize: int32Of(q.Limit)}
+	if q.State != nil {
+		st := string(*q.State)
+		params.State = &st
+	}
+	if q.After != nil {
+		params.BeforeOpenedAt = pgtype.Timestamptz{Time: q.After.OpenedAt, Valid: true}
+		params.BeforeID = pgtype.UUID{Bytes: q.After.ID, Valid: true}
+	}
+	rows, err := t.q.ListDisputes(ctx, params)
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	out := make([]application.DisputeRecord, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, application.DisputeRecord{ID: r.ID, Regime: domain.Regime(r.Regime), State: domain.State(r.State),
+			TransactionID: r.TransactionID, DisputedAmount: r.DisputedAmount, Currency: r.Currency, OpenedAt: r.OpenedAt, UpdatedAt: r.UpdatedAt})
+	}
+	return out, nil
 }

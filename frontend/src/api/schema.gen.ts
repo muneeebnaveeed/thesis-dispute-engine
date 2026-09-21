@@ -41,7 +41,8 @@ export type paths = {
       path?: never
       cookie?: never
     }
-    get?: never
+    /** The tenant's disputes, newest first */
+    get: operations['listDisputes']
     put?: never
     /** Open a dispute against a transaction */
     post: operations['createDispute']
@@ -358,6 +359,26 @@ export type components = {
       /** Format: date-time */
       occurredAt: string
     }
+    DisputeSummary: {
+      /** Format: uuid */
+      id: string
+      regime: components['schemas']['Regime']
+      state: components['schemas']['DisputeState']
+      /** Format: uuid */
+      transactionId: string
+      /** @description Decimal as a string; never a float. */
+      disputedAmount: string
+      currency: string
+      /** Format: date-time */
+      openedAt: string
+      /** Format: date-time */
+      updatedAt: string
+    }
+    DisputePage: {
+      items: components['schemas']['DisputeSummary'][]
+      /** @description Present when there is another page. */
+      nextCursor?: string
+    }
     Dispute: {
       /** Format: uuid */
       id: string
@@ -499,6 +520,34 @@ export interface operations {
           'application/json': components['schemas']['Health']
         }
       }
+    }
+  }
+  listDisputes: {
+    parameters: {
+      query?: {
+        state?: components['schemas']['DisputeState']
+        limit?: number
+        /** @description Opaque; from the previous page's nextCursor. */
+        cursor?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description One page. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DisputePage']
+        }
+      }
+      400: components['responses']['BadRequest']
+      401: components['responses']['Unauthorized']
+      429: components['responses']['TooManyRequests']
     }
   }
   createDispute: {

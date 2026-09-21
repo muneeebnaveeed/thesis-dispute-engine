@@ -33,7 +33,9 @@ export async function completeKeycloakLogin(page: Page) {
     await page.fill('#password', analyst.password)
     await page.click('#kc-login')
   }
-  await page.waitForURL(/localhost:3002\//)
+  // Back in the app means past the callback: waiting for any localhost:3002 URL would return on the callback
+  // itself and the next navigation would cut the session creation short.
+  await page.waitForURL((u) => u.host === 'localhost:3002' && !u.pathname.startsWith('/auth/'))
 }
 
 /** Visits the tenant's front door and signs in; the app never asks for the tenant. */

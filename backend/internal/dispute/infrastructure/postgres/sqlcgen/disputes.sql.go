@@ -599,6 +599,68 @@ func (q *Queries) ListDisputeEvents(ctx context.Context, disputeID uuid.UUID) ([
 	return items, nil
 }
 
+const listDisputes = `-- name: ListDisputes :many
+SELECT id, regime, state, transaction_id, disputed_amount, currency, opened_at, updated_at
+FROM disputes
+WHERE ($1::text IS NULL OR state = $1::text)
+  AND ($2::timestamptz IS NULL OR (opened_at, id) < ($2::timestamptz, $3::uuid))
+ORDER BY opened_at DESC, id DESC
+LIMIT $4
+`
+
+type ListDisputesParams struct {
+	State          *string
+	BeforeOpenedAt pgtype.Timestamptz
+	BeforeID       pgtype.UUID
+	PageSize       int32
+}
+
+type ListDisputesRow struct {
+	ID             uuid.UUID
+	Regime         string
+	State          string
+	TransactionID  uuid.UUID
+	DisputedAmount decimal.Decimal
+	Currency       string
+	OpenedAt       time.Time
+	UpdatedAt      time.Time
+}
+
+// Keyset pagination on (opened_at, id) descending; row-level security scopes the tenant.
+func (q *Queries) ListDisputes(ctx context.Context, arg ListDisputesParams) ([]ListDisputesRow, error) {
+	rows, err := q.db.Query(ctx, listDisputes,
+		arg.State,
+		arg.BeforeOpenedAt,
+		arg.BeforeID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDisputesRow{}
+	for rows.Next() {
+		var i ListDisputesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Regime,
+			&i.State,
+			&i.TransactionID,
+			&i.DisputedAmount,
+			&i.Currency,
+			&i.OpenedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTenantKeys = `-- name: ListTenantKeys :many
 SELECT id, tenant_id, prefix, label, created_at, last_used_at, expires_at, revoked_at FROM tenant_keys ORDER BY created_at
 `

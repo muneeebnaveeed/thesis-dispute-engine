@@ -3,6 +3,7 @@ package disputehttp
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -357,6 +358,64 @@ func (h *Handler) GetDispute(ctx context.Context, req oapi.GetDisputeRequestObje
 		return nil, err
 	}
 	return oapi.GetDispute200JSONResponse(toAPI(view)), nil
+}
+
+// ListDisputes pages the tenant's disputes. The cursor is base64 of "<RFC3339Nano opened_at>|<id>"; opaque to clients.
+func (h *Handler) ListDisputes(ctx context.Context, req oapi.ListDisputesRequestObject) (oapi.ListDisputesResponseObject, error) {
+	q := application.ListQuery{Limit: 25}
+	if req.Params.Limit != nil {
+		q.Limit = *req.Params.Limit
+	}
+	if req.Params.State != nil {
+		st := domain.State(*req.Params.State)
+		q.State = &st
+	}
+	if req.Params.Cursor != nil && *req.Params.Cursor != "" {
+		c, err := decodeCursor(*req.Params.Cursor)
+		if err != nil {
+			return nil, errs.New(errs.Invalid, "contract-violation", "cursor is not one this API issued").
+				WithFields(errs.FieldError{Field: "query.cursor", Message: "invalid cursor"})
+		}
+		q.After = &c
+	}
+	page, err := h.svc.ListDisputes(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	out := oapi.DisputePage{Items: make([]oapi.DisputeSummary, 0, len(page.Items))}
+	for _, d := range page.Items {
+		out.Items = append(out.Items, oapi.DisputeSummary{Id: d.ID, Regime: oapi.Regime(d.Regime), State: oapi.DisputeState(d.State),
+			TransactionId: d.TransactionID, DisputedAmount: d.DisputedAmount.StringFixed(4), Currency: d.Currency, OpenedAt: d.OpenedAt, UpdatedAt: d.UpdatedAt})
+	}
+	if page.Next != nil {
+		c := encodeCursor(*page.Next)
+		out.NextCursor = &c
+	}
+	return oapi.ListDisputes200JSONResponse(out), nil
+}
+
+func encodeCursor(c application.Cursor) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(c.OpenedAt.UTC().Format(time.RFC3339Nano) + "|" + c.ID.String()))
+}
+
+func decodeCursor(raw string) (application.Cursor, error) {
+	b, err := base64.RawURLEncoding.DecodeString(raw)
+	if err != nil {
+		return application.Cursor{}, err
+	}
+	at, id, ok := strings.Cut(string(b), "|")
+	if !ok {
+		return application.Cursor{}, errors.New("malformed cursor")
+	}
+	t, err := time.Parse(time.RFC3339Nano, at)
+	if err != nil {
+		return application.Cursor{}, err
+	}
+	u, err := uuid.Parse(id)
+	if err != nil {
+		return application.Cursor{}, err
+	}
+	return application.Cursor{OpenedAt: t, ID: u}, nil
 }
 
 // ApplyDisputeEvent runs the state machine.
