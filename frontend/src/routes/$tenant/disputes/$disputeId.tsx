@@ -7,7 +7,8 @@ import { classify, type Failure } from '#/api/failure'
 import { AppShell } from '#/components/app-shell'
 import { Deadlines } from '#/components/deadlines'
 import { EventLog } from '#/components/event-log'
-import { FailureBanner } from '#/components/failure-banner'
+import { FailureBanner, FieldError } from '#/components/failure-banner'
+import { Ledger } from '#/components/ledger'
 import { TenantMismatch } from '#/components/tenant-mismatch'
 import { getDispute, type Dispute } from '#/server/disputes'
 
@@ -31,6 +32,9 @@ function DisputePage() {
   const router = useRouter()
   const [failure, setFailure] = useState<Failure | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  // Facts an action may carry: the customer's share of a refund, and how an outstanding advance clears on close.
+  const [liability, setLiability] = useState('')
+  const [settlement, setSettlement] = useState('')
 
   if (viewer && viewer.tenantSlug !== tenant) return <TenantMismatch wanted={tenant} />
   if (outcome.problem || !outcome.value) {
@@ -42,17 +46,23 @@ function DisputePage() {
     )
   }
   const d = outcome.value
+  const canRefund = d.allowedEvents.includes('ISSUE_REFUND')
+  const canSettle = d.allowedEvents.includes('CLOSE') && Number(d.balances.suspense) > 0
+  const fields = failure?.kind === 'validation' ? failure.fields : {}
 
   // The idempotency key makes the call safe to repeat, so a short outage or budget hit is retried once for the person.
   async function apply(event: Dispute['allowedEvents'][number]) {
     setBusy(event)
     setFailure(null)
     const key = crypto.randomUUID()
+    const payload: Record<string, string> = {}
+    if (event === 'ISSUE_REFUND' && liability.trim()) payload.liability = liability.trim()
+    if (event === 'CLOSE' && settlement) payload.settlement = settlement
     const res = await call(
       () =>
         api.POST('/disputes/{disputeId}/events', {
           params: { path: { disputeId: d.id } },
-          body: { event, actor: 'analyst' },
+          body: { event, actor: 'analyst', payload },
           headers: { 'Idempotency-Key': key },
         }),
       { idempotent: true },
@@ -62,7 +72,11 @@ function DisputePage() {
       setFailure(res.failure)
       // A conflict means the state moved under us; show the truth alongside the message.
       if (res.failure.kind === 'conflict') await router.invalidate()
-    } else await router.invalidate()
+    } else {
+      setLiability('')
+      setSettlement('')
+      await router.invalidate()
+    }
   }
 
   return (
@@ -98,11 +112,51 @@ function DisputePage() {
             ))}
           </div>
         )}
-        {failure && (
+        {(canRefund || canSettle) && (
+          <div className="mt-3 flex flex-wrap gap-6 text-sm">
+            {canRefund && (
+              <label className="block">
+                Customer liability ({d.currency}, optional)
+                <input
+                  value={liability}
+                  onChange={(e) => setLiability(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  aria-invalid={fields.liability ? true : undefined}
+                  aria-describedby={fields.liability ? 'liability-error' : undefined}
+                  className={`mt-1 block w-40 rounded-md border px-2 py-1 font-mono ${fields.liability ? 'border-red-400' : 'border-neutral-300'}`}
+                />
+                <FieldError id="liability-error" message={fields.liability} />
+              </label>
+            )}
+            {canSettle && (
+              <label className="block">
+                Outstanding advance on close
+                <select
+                  value={settlement}
+                  onChange={(e) => setSettlement(e.target.value)}
+                  aria-invalid={fields.settlement ? true : undefined}
+                  className="mt-1 block rounded-md border border-neutral-300 px-2 py-1"
+                >
+                  <option value="">regime default</option>
+                  <option value="RECOVERED">recovered</option>
+                  <option value="WRITTEN_OFF">written off</option>
+                </select>
+                <FieldError id="settlement-error" message={fields.settlement} />
+              </label>
+            )}
+          </div>
+        )}
+        {failure && !(fields.liability || fields.settlement) && (
           <div className="mt-4">
             <FailureBanner failure={failure} onRetry={() => setFailure(null)} />
           </div>
         )}
+      </section>
+
+      <section className="mb-8">
+        <h2 className="mb-2 text-lg font-medium">Ledger</h2>
+        <Ledger ledger={d.ledger} balances={d.balances} currency={d.currency} />
       </section>
 
       <section>

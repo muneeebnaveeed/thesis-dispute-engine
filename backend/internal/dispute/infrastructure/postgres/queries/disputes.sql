@@ -183,3 +183,16 @@ FROM tenants WHERE id = current_tenant_id();
 UPDATE tenants
 SET settings = settings || jsonb_build_object('timezone', sqlc.arg(timezone)::text, 'holidays', to_jsonb(sqlc.arg(holidays)::text[]))
 WHERE id = sqlc.arg(id);
+
+-- name: InsertLedgerEntry :exec
+INSERT INTO ledger_entries (dispute_id, seq, kind, debit_account, credit_account, amount, currency, reference, posted_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
+
+-- name: ListLedgerEntries :many
+SELECT id, dispute_id, seq, kind, debit_account, credit_account, amount, currency, reference, posted_at
+FROM ledger_entries
+WHERE dispute_id = $1
+ORDER BY id;
+
+-- name: SuspenseByRegime :many
+SELECT tenant_id, regime, currency, balance::numeric AS balance FROM suspense_by_regime;

@@ -340,6 +340,8 @@ components:
         - not-found
         - invalid-transition
         - appeals-exhausted
+        - invalid-liability
+        - invalid-settlement
         - concurrent-update
         - idempotency-key-reuse
         - no-regime
@@ -471,8 +473,47 @@ components:
         actor: { type: string, default: system }
         payload:
           type: object
-          description: Event-specific facts, stored verbatim on the log entry.
+          description: >-
+            Event-specific facts, stored verbatim on the log entry. Two are read by the ledger: on ISSUE_REFUND,
+            `liability` is the amount the customer bears (a decimal string, capped by the regime, refused with
+            invalid-liability); on CLOSE, `settlement` says how an outstanding advance clears (RECOVERED or
+            WRITTEN_OFF; the regime's default when absent; refused with invalid-settlement).
           additionalProperties: true
+          properties:
+            liability: { type: string, example: "50.00" }
+            settlement: { $ref: "#/components/schemas/SuspenseSettlement" }
+    SuspenseSettlement:
+      type: string
+      enum: [RECOVERED, WRITTEN_OFF]
+    LedgerAccount:
+      type: string
+      description: CUSTOMER is the disputing customer's account; SUSPENSE holds what the bank advanced; RECOVERY and LOSS clear it.
+      enum: [CUSTOMER, SUSPENSE, RECOVERY, LOSS]
+    PostingKind:
+      type: string
+      enum: [PROVISIONAL_CREDIT, FAST_REFUND, NQA_REFUND, PROVISIONAL_CREDIT_REVERSAL, RECOVERY, WRITE_OFF]
+    LedgerEntry:
+      type: object
+      description: One double-entry movement the engine instructed; amount leaves the credit account and lands in the debit account.
+      required: [seq, kind, debit, credit, amount, currency, reference, postedAt]
+      properties:
+        seq: { type: integer, description: The event that caused it. }
+        kind: { $ref: "#/components/schemas/PostingKind" }
+        debit: { $ref: "#/components/schemas/LedgerAccount" }
+        credit: { $ref: "#/components/schemas/LedgerAccount" }
+        amount: { type: string, description: Decimal as a string; never a float. }
+        currency: { type: string, minLength: 3, maxLength: 3 }
+        reference: { type: string, description: Unique per posting; what the banking core is told. }
+        postedAt: { type: string, format: date-time }
+    Balances:
+      type: object
+      description: Running totals per account; customer from the customer's side (positive means credited), the rest from the bank's.
+      required: [customer, suspense, recovery, loss]
+      properties:
+        customer: { type: string }
+        suspense: { type: string }
+        recovery: { type: string }
+        loss: { type: string }
     LoggedEvent:
       type: object
       required: [seq, event, fromState, toState, actor, payload, occurredAt]
@@ -510,7 +551,7 @@ components:
         nextCursor: { type: string, description: Present when there is another page. }
     Dispute:
       type: object
-      required: [id, regime, state, appeals, version, transactionId, accountId, disputedAmount, currency, openedAt, updatedAt, allowedEvents, events, deadlines]
+      required: [id, regime, state, appeals, version, transactionId, accountId, disputedAmount, currency, openedAt, updatedAt, allowedEvents, events, deadlines, ledger, balances]
       properties:
         id: { type: string, format: uuid }
         regime: { $ref: "#/components/schemas/Regime" }
@@ -533,6 +574,11 @@ components:
           description: Every regulatory clock the regime started for this dispute, opening clocks first, then per appeal.
           type: array
           items: { $ref: "#/components/schemas/Deadline" }
+        ledger:
+          description: Every movement the engine instructed on this dispute, in posting order.
+          type: array
+          items: { $ref: "#/components/schemas/LedgerEntry" }
+        balances: { $ref: "#/components/schemas/Balances" }
     DeadlineKind:
       type: string
       enum: [REFUND, ACKNOWLEDGE, RESOLUTION]

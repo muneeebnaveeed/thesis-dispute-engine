@@ -86,6 +86,27 @@ type IdempotencyKey struct {
 	TenantID    uuid.UUID
 }
 
+type LedgerEntry struct {
+	ID            int64
+	TenantID      uuid.UUID
+	DisputeID     uuid.UUID
+	Seq           int32
+	Kind          string
+	DebitAccount  string
+	CreditAccount string
+	Amount        decimal.Decimal
+	Currency      string
+	Reference     string
+	PostedAt      time.Time
+}
+
+type SuspenseByRegime struct {
+	TenantID uuid.UUID
+	Regime   string
+	Currency string
+	Balance  int32
+}
+
 type Tenant struct {
 	ID           uuid.UUID
 	Name         string

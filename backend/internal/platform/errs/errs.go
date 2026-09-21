@@ -43,6 +43,12 @@ type Error struct {
 
 func (e *Error) Error() string { return e.Msg }
 
+// Is matches on code and kind, so a copy made by WithFields still satisfies errors.Is against its sentinel.
+func (e *Error) Is(target error) bool {
+	t, ok := target.(*Error)
+	return ok && t.Code == e.Code && t.Kind == e.Kind
+}
+
 // New returns a sentinel-style error; compare with errors.Is. Every code passes through here, which is what lets
 // the contract test compare the emitted set against the OpenAPI enum.
 func New(kind Kind, code Code, msg string) *Error {

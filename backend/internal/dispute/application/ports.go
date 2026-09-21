@@ -94,6 +94,25 @@ type Tx interface {
 	SettleDeadline(ctx context.Context, disputeID uuid.UUID, kind domain.DeadlineKind, cycle int, met bool, at time.Time) error
 	// NextDeadlines returns, per dispute that has one, the open clock that runs out first.
 	NextDeadlines(ctx context.Context, disputeIDs []uuid.UUID) (map[uuid.UUID]domain.Deadline, error)
+	AppendLedger(ctx context.Context, disputeID uuid.UUID, entries []LedgerEntry) error
+	ListLedger(ctx context.Context, disputeID uuid.UUID) ([]LedgerEntry, error)
+}
+
+// LedgerEntry is one persisted posting: the domain movement plus the event that caused it and the reference the
+// banking core is given, unique per posting so a repeated instruction cannot post twice.
+type LedgerEntry struct {
+	Seq       int
+	Posting   domain.Posting
+	Reference string
+	PostedAt  time.Time
+}
+
+// SuspenseBalance is what one tenant has advanced and not yet cleared under one regime.
+type SuspenseBalance struct {
+	TenantID uuid.UUID
+	Regime   domain.Regime
+	Currency string
+	Balance  decimal.Decimal
 }
 
 // ListQuery is a page request; After is exclusive and comes from the previous page's last record. Overdue keeps
@@ -135,6 +154,8 @@ type Store interface {
 	CountByState(ctx context.Context) ([]StateCount, error)
 	// CountOverdue feeds the overdue-deadlines gauge; it runs outside any transaction.
 	CountOverdue(ctx context.Context) ([]OverdueCount, error)
+	// SuspenseBalances feeds the suspense gauge; it runs outside any transaction.
+	SuspenseBalances(ctx context.Context) ([]SuspenseBalance, error)
 	// PurgeIdempotencyKeys deletes stored responses older than before and reports how many went; when another
 	// replica holds the sweep it returns 0 and no error.
 	PurgeIdempotencyKeys(ctx context.Context, before time.Time) (int64, error)

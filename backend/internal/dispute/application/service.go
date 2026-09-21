@@ -17,6 +17,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
@@ -32,6 +33,7 @@ type Service struct {
 	replays       metric.Int64Counter
 	timeInState   metric.Float64Histogram
 	deadlineSlack metric.Float64Histogram
+	postings      metric.Int64Counter
 }
 
 // NewService wires a Service; a nil clock means time.Now.
@@ -54,6 +56,24 @@ func NewService(store Store, now Clock) (*Service, error) {
 	}
 	deadlineSlack, err := m.Float64Histogram("dispute.deadline_slack", metric.WithDescription("Seconds between a regulatory clock being satisfied and its due time; negative means late"), metric.WithUnit("s"))
 	if err != nil {
+		return nil, err
+	}
+	postings, err := m.Int64Counter("dispute.ledger_postings", metric.WithDescription("Ledger postings written, by regime and kind"))
+	if err != nil {
+		return nil, err
+	}
+	if _, err := m.Float64ObservableGauge("dispute.suspense", metric.WithDescription("What the bank has advanced on open disputes and not yet cleared"),
+		metric.WithFloat64Callback(func(ctx context.Context, o metric.Float64Observer) error {
+			balances, err := store.SuspenseBalances(ctx)
+			if err != nil {
+				return err
+			}
+			for _, b := range balances {
+				o.Observe(b.Balance.InexactFloat64(), metric.WithAttributes(attribute.String("tenant", b.TenantID.String()),
+					attribute.String("regime", string(b.Regime)), attribute.String("currency", b.Currency)))
+			}
+			return nil
+		})); err != nil {
 		return nil, err
 	}
 	if _, err := m.Int64ObservableGauge("dispute.deadlines_overdue", metric.WithDescription("Open regulatory clocks past their due time"),
@@ -86,7 +106,7 @@ func NewService(store Store, now Clock) (*Service, error) {
 		return nil, err
 	}
 	return &Service{store: store, now: now, tracer: otel.Tracer(scopeName), transitions: transitions, replays: replays,
-		timeInState: timeInState, deadlineSlack: deadlineSlack}, nil
+		timeInState: timeInState, deadlineSlack: deadlineSlack, postings: postings}, nil
 }
 
 // DisputeView is the API representation of a dispute and its log; it is also what idempotent replays return.
@@ -105,6 +125,29 @@ type DisputeView struct {
 	AllowedEvents  []domain.Event  `json:"allowedEvents"`
 	Events         []EventView     `json:"events"`
 	Deadlines      []DeadlineView  `json:"deadlines"`
+	Ledger         []LedgerView    `json:"ledger"`
+	Balances       Balances        `json:"balances"`
+}
+
+// LedgerView is one posting as exposed by the API.
+type LedgerView struct {
+	Seq       int                `json:"seq"`
+	Kind      domain.PostingKind `json:"kind"`
+	Debit     domain.Account     `json:"debit"`
+	Credit    domain.Account     `json:"credit"`
+	Amount    decimal.Decimal    `json:"amount"`
+	Currency  string             `json:"currency"`
+	Reference string             `json:"reference"`
+	PostedAt  time.Time          `json:"postedAt"`
+}
+
+// Balances are the dispute's running totals per ledger account, from the customer's point of view for
+// CUSTOMER (positive means credited) and the bank's for the rest.
+type Balances struct {
+	Customer decimal.Decimal `json:"customer"`
+	Suspense decimal.Decimal `json:"suspense"`
+	Recovery decimal.Decimal `json:"recovery"`
+	Loss     decimal.Decimal `json:"loss"`
 }
 
 // DeadlineView is one regulatory clock as exposed by the API; Status is evaluated when the view is built.
@@ -248,6 +291,9 @@ func (s *Service) ApplyEvent(ctx context.Context, in ApplyEventInput) (Result, e
 		if err := s.settleDeadlines(ctx, tx, rec, next, now); err != nil {
 			return DisputeView{}, err
 		}
+		if err := s.post(ctx, tx, rec, next, ev.Seq, payload, now); err != nil {
+			return DisputeView{}, err
+		}
 		span.SetAttributes(attribute.String("dispute.regime", string(rec.Regime)),
 			attribute.String("dispute.from", string(rec.State)), attribute.String("dispute.to", string(next.State)))
 		attrs := metric.WithAttributes(tenantAttr(ctx), attribute.String("regime", string(rec.Regime)),
@@ -297,6 +343,64 @@ func (s *Service) settleDeadlines(ctx context.Context, tx Tx, rec DisputeRecord,
 		return tx.InsertDeadlines(ctx, rec.ID, rules.AppealDeadlines(next.Appeals, now, cal))
 	}
 	return nil
+}
+
+// eventFacts are the analyst-supplied numbers an event may carry; anything else in the payload is kept verbatim.
+type eventFacts struct {
+	Liability  *string `json:"liability"`
+	Settlement string  `json:"settlement"`
+}
+
+// post writes the ledger movements the new state causes. The liability on a refund and the settlement on a
+// close come from the event payload and are validated against the regime before anything is written.
+func (s *Service) post(ctx context.Context, tx Tx, rec DisputeRecord, next domain.Dispute, seq int, payload json.RawMessage, now time.Time) error {
+	rules, err := domain.RulesFor(rec.Regime)
+	if err != nil {
+		return err
+	}
+	var facts eventFacts
+	if err := json.Unmarshal(payload, &facts); err != nil {
+		return errs.New(errs.Invalid, "malformed-request", "the event payload is not an object").
+			WithFields(errs.FieldError{Field: "body.payload", Message: err.Error()})
+	}
+	in := domain.PostingInput{Entered: next.State, Disputed: rec.DisputedAmount, Currency: rec.Currency}
+	if facts.Liability != nil {
+		liability, err := decimal.NewFromString(*facts.Liability)
+		if err != nil {
+			return domain.ErrInvalidLiability.WithFields(errs.FieldError{Field: "body.payload.liability", Message: "must be a decimal string such as \"50.00\""})
+		}
+		if _, err := domain.CreditAmount(rules, rec.DisputedAmount, liability); err != nil {
+			return err
+		}
+		in.Liability = liability
+	}
+	if in.Settlement, err = domain.ParseSettlement(rules, facts.Settlement); err != nil {
+		return err
+	}
+	have, err := tx.ListLedger(ctx, rec.ID)
+	if err != nil {
+		return err
+	}
+	in.Outstanding = domain.SuspenseBalance(postingsOf(have))
+	movements := domain.Postings(rules, in)
+	if len(movements) == 0 {
+		return nil
+	}
+	entries := make([]LedgerEntry, 0, len(movements))
+	for _, p := range movements {
+		entries = append(entries, LedgerEntry{Seq: seq, Posting: p, PostedAt: now,
+			Reference: fmt.Sprintf("dispute:%s:%d:%s", rec.ID, seq, p.Kind)})
+		s.postings.Add(ctx, 1, metric.WithAttributes(tenantAttr(ctx), attribute.String("regime", string(rec.Regime)), attribute.String("kind", string(p.Kind))))
+	}
+	return tx.AppendLedger(ctx, rec.ID, entries)
+}
+
+func postingsOf(entries []LedgerEntry) []domain.Posting {
+	out := make([]domain.Posting, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, e.Posting)
+	}
+	return out
 }
 
 // DisputeSummary is one row of a list; NextDeadline is the open clock that runs out first, if any.
@@ -439,12 +543,40 @@ func (s *Service) view(ctx context.Context, tx Tx, rec DisputeRecord) (DisputeVi
 	for _, d := range deadlines {
 		dviews = append(dviews, deadlineView(d, now))
 	}
+	ledger, err := tx.ListLedger(ctx, rec.ID)
+	if err != nil {
+		return DisputeView{}, err
+	}
+	lviews := make([]LedgerView, 0, len(ledger))
+	var bal Balances
+	for _, e := range ledger {
+		p := e.Posting
+		lviews = append(lviews, LedgerView{Seq: e.Seq, Kind: p.Kind, Debit: p.Debit, Credit: p.Credit, Amount: p.Amount,
+			Currency: p.Currency, Reference: e.Reference, PostedAt: e.PostedAt})
+		bal.add(p.Debit, p.Amount)
+		bal.add(p.Credit, p.Amount.Neg())
+	}
 	return DisputeView{
 		ID: rec.ID, Regime: rec.Regime, State: rec.State, Appeals: rec.Appeals, Version: rec.Version,
 		TransactionID: rec.TransactionID, AccountID: rec.AccountID, DisputedAmount: rec.DisputedAmount,
 		Currency: rec.Currency, OpenedAt: rec.OpenedAt, UpdatedAt: rec.UpdatedAt,
-		AllowedEvents: allowed, Events: views, Deadlines: dviews,
+		AllowedEvents: allowed, Events: views, Deadlines: dviews, Ledger: lviews, Balances: bal,
 	}, nil
+}
+
+// add applies a debit (positive) or credit (negative) to an account; the customer's balance is shown from the
+// customer's side, so a credit to CUSTOMER raises it.
+func (b *Balances) add(a domain.Account, debit decimal.Decimal) {
+	switch a {
+	case domain.AccountCustomer:
+		b.Customer = b.Customer.Sub(debit)
+	case domain.AccountSuspense:
+		b.Suspense = b.Suspense.Add(debit)
+	case domain.AccountRecovery:
+		b.Recovery = b.Recovery.Add(debit)
+	case domain.AccountLoss:
+		b.Loss = b.Loss.Add(debit)
+	}
 }
 
 func deadlineView(d domain.Deadline, now time.Time) DeadlineView {

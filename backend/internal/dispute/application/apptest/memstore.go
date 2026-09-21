@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
@@ -32,6 +33,7 @@ type MemStore struct {
 	Events       map[uuid.UUID][]application.EventRecord
 	Idempotent   map[string]application.StoredResponse
 	Deadlines    map[uuid.UUID][]domain.Deadline
+	Ledger       map[uuid.UUID][]application.LedgerEntry
 	// Calendars holds a tenant's business-day calendar; a tenant without one gets the default.
 	Calendars map[uuid.UUID]domain.Calendar
 }
@@ -44,6 +46,7 @@ func NewMemStore() *MemStore {
 		Events:       map[uuid.UUID][]application.EventRecord{},
 		Idempotent:   map[string]application.StoredResponse{},
 		Deadlines:    map[uuid.UUID][]domain.Deadline{},
+		Ledger:       map[uuid.UUID][]application.LedgerEntry{},
 		Calendars:    map[uuid.UUID]domain.Calendar{},
 	}
 }
@@ -114,13 +117,18 @@ type snapshotT struct {
 	events     map[uuid.UUID][]application.EventRecord
 	idempotent map[string]application.StoredResponse
 	deadlines  map[uuid.UUID][]domain.Deadline
+	ledger     map[uuid.UUID][]application.LedgerEntry
 }
 
 func (m *MemStore) snapshot() snapshotT {
 	s := snapshotT{disputes: map[uuid.UUID]application.DisputeRecord{}, events: map[uuid.UUID][]application.EventRecord{},
-		idempotent: map[string]application.StoredResponse{}, deadlines: map[uuid.UUID][]domain.Deadline{}}
+		idempotent: map[string]application.StoredResponse{}, deadlines: map[uuid.UUID][]domain.Deadline{},
+		ledger: map[uuid.UUID][]application.LedgerEntry{}}
 	for k, v := range m.Deadlines {
 		s.deadlines[k] = append([]domain.Deadline(nil), v...)
+	}
+	for k, v := range m.Ledger {
+		s.ledger[k] = append([]application.LedgerEntry(nil), v...)
 	}
 	for k, v := range m.Disputes {
 		s.disputes[k] = v
@@ -135,7 +143,26 @@ func (m *MemStore) snapshot() snapshotT {
 }
 
 func (m *MemStore) restore(s snapshotT) {
-	m.Disputes, m.Events, m.Idempotent, m.Deadlines = s.disputes, s.events, s.idempotent, s.deadlines
+	m.Disputes, m.Events, m.Idempotent, m.Deadlines, m.Ledger = s.disputes, s.events, s.idempotent, s.deadlines, s.ledger
+}
+
+// SuspenseBalances implements application.Store.
+func (m *MemStore) SuspenseBalances(_ context.Context) ([]application.SuspenseBalance, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	sums := map[[3]string]decimal.Decimal{}
+	for id, entries := range m.Ledger {
+		d := m.Disputes[id]
+		for _, e := range entries {
+			k := [3]string{d.TenantID.String(), string(d.Regime), e.Posting.Currency}
+			sums[k] = sums[k].Add(domain.SuspenseBalance([]domain.Posting{e.Posting}))
+		}
+	}
+	out := make([]application.SuspenseBalance, 0, len(sums))
+	for k, b := range sums {
+		out = append(out, application.SuspenseBalance{TenantID: uuid.MustParse(k[0]), Regime: domain.Regime(k[1]), Currency: k[2], Balance: b})
+	}
+	return out, nil
 }
 
 // CountOverdue implements application.Store.
@@ -320,4 +347,26 @@ func (t *memTx) NextDeadlines(_ context.Context, ids []uuid.UUID) (map[uuid.UUID
 		}
 	}
 	return out, nil
+}
+
+func (t *memTx) AppendLedger(_ context.Context, id uuid.UUID, entries []application.LedgerEntry) error {
+	if _, err := t.GetDispute(context.Background(), id); err != nil {
+		return err
+	}
+	for _, e := range entries {
+		for _, have := range t.s.Ledger[id] {
+			if have.Reference == e.Reference {
+				return application.ErrConflict
+			}
+		}
+		t.s.Ledger[id] = append(t.s.Ledger[id], e)
+	}
+	return nil
+}
+
+func (t *memTx) ListLedger(_ context.Context, id uuid.UUID) ([]application.LedgerEntry, error) {
+	if _, err := t.GetDispute(context.Background(), id); err != nil {
+		return nil, err
+	}
+	return append([]application.LedgerEntry(nil), t.s.Ledger[id]...), nil
 }
