@@ -15,11 +15,41 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/migrations"
 )
 
-// EnvVar names the connection string integration tests use.
-const EnvVar = "DISPUTE_TEST_DATABASE_URL"
+// EnvVar names the owner connection string integration tests use; AppEnvVar the dispute_api login for privilege tests.
+const (
+	EnvVar    = "DISPUTE_TEST_DATABASE_URL"
+	AppEnvVar = "DISPUTE_TEST_APP_DATABASE_URL"
+)
 
 // Pool returns a pool whose search_path is a fresh schema with all migrations applied; the schema is dropped on cleanup.
 func Pool(t *testing.T) *pgxpool.Pool {
+	t.Helper()
+	pool, _ := PoolWithSchema(t)
+	return pool
+}
+
+// AppPool connects as the least-privileged API login to the schema an owner pool was created in; skips without AppEnvVar.
+func AppPool(t *testing.T, schema string) *pgxpool.Pool {
+	t.Helper()
+	url := os.Getenv(AppEnvVar)
+	if url == "" {
+		t.Skipf("%s not set", AppEnvVar)
+	}
+	cfg, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.ConnConfig.RuntimeParams["search_path"] = schema
+	pool, err := postgres.ConnectWithConfig(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("connect as app role: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	return pool
+}
+
+// PoolWithSchema is Pool plus the schema name, for tests that open a second connection into it.
+func PoolWithSchema(t *testing.T) (*pgxpool.Pool, string) {
 	t.Helper()
 	url := os.Getenv(EnvVar)
 	if url == "" {
@@ -61,5 +91,5 @@ func Pool(t *testing.T) *pgxpool.Pool {
 	if _, err := postgres.Migrate(ctx, pool, files); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	return pool
+	return pool, schema
 }

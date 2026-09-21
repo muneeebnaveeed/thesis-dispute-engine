@@ -26,7 +26,10 @@ its `domain` or storage.
   `errs.Wrap`; infrastructure maps driver errors onto application sentinels in `mapErr`.
 - **Persistence:** sqlc queries in `infrastructure/postgres/queries/*.sql`, `make generate`,
   never hand-written SQL in Go. Money is `decimal.Decimal`. Every write path goes through
-  `application.Store.WithTx`; the event log is append-only (docs/adr/0004).
+  `application.Store.WithTx`; the event log is append-only (docs/adr/0004). The API connects as
+  `dispute_api`, a member of the `dispute_app` group role whose grants live in the migration
+  that creates each table; `migrations/roles_test.go` fails on a table without them. Only
+  `cmd/migrate` and `cmd/seed` use the owner URL (`DISPUTE_MIGRATE_DATABASE_URL`).
 - **Regime first (docs/adr/0002):** gate on `Rules` properties (`HasProvisionalCredit()`),
   never on `if regime == X` outside the rules table. A new regime is a new row plus an entry in
   the reachability test.

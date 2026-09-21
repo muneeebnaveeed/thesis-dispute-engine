@@ -1,0 +1,70 @@
+package migrations_test
+
+import (
+	"context"
+	"errors"
+	"testing"
+
+	"github.com/jackc/pgx/v5/pgconn"
+
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/postgres/pgtest"
+)
+
+// The API role must be able to read everything and append, and nothing else; a new table without grants fails here.
+func TestAppRolePrivileges(t *testing.T) {
+	owner, schema := pgtest.PoolWithSchema(t)
+	app := pgtest.AppPool(t, schema)
+	ctx := context.Background()
+
+	rows, err := owner.Query(ctx, `SELECT tablename FROM pg_tables WHERE schemaname = $1`, schema)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tables []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			t.Fatal(err)
+		}
+		tables = append(tables, name)
+	}
+	rows.Close()
+	if len(tables) < 5 {
+		t.Fatalf("expected the schema tables, got %v", tables)
+	}
+	for _, table := range tables {
+		var ok bool
+		if err := owner.QueryRow(ctx, `SELECT has_table_privilege('dispute_app', $1, 'SELECT')`, schema+"."+table).Scan(&ok); err != nil {
+			t.Fatal(err)
+		}
+		if !ok {
+			t.Errorf("dispute_app cannot SELECT %s; add grants to the migration that created it", table)
+		}
+	}
+
+	denied := map[string]string{
+		"delete events":  `DELETE FROM dispute_events`,
+		"update events":  `UPDATE dispute_events SET actor = 'x'`,
+		"delete dispute": `DELETE FROM disputes`,
+		"truncate":       `TRUNCATE disputes`,
+		"ddl":            `CREATE TABLE smuggled (id int)`,
+		"migrations":     `INSERT INTO schema_migrations (version, name, checksum) VALUES (999, 'x', 'y')`,
+	}
+	for name, stmt := range denied {
+		_, err := app.Exec(ctx, stmt)
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) || pgErr.Code != "42501" {
+			t.Errorf("%s: want insufficient_privilege (42501), got %v", name, err)
+		}
+	}
+
+	allowed := []string{
+		`SELECT count(*) FROM disputes`,
+		`DELETE FROM idempotency_keys WHERE created_at < now() - interval '1 year'`,
+	}
+	for _, stmt := range allowed {
+		if _, err := app.Exec(ctx, stmt); err != nil {
+			t.Errorf("%s: %v", stmt, err)
+		}
+	}
+}

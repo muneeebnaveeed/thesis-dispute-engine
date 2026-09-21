@@ -21,8 +21,8 @@ Requires `mise`, Docker with Compose v2, `make`. Optional: a C compiler for `go 
 
 ```sh
 mise install          # Go, golangci-lint, air; versions in mise.toml
-make db-up            # PostgreSQL on localhost:5432
-make run              # API on http://localhost:8090  ->  curl localhost:8090/healthz
+make db-up            # PostgreSQL on localhost:5432 (plus the API's login role)
+make run              # migrate, then the API on http://localhost:8090  ->  curl localhost:8090/healthz
 make dev              # same, with live reload
 make ci               # what CI runs
 make help             # every target, including PR and stack tooling
@@ -37,7 +37,7 @@ standard `OTEL_*` variables; see `.env.example`.
 
 | Path | What |
 |---|---|
-| `backend/` | Go module: `cmd/api`, `internal/<context>/{domain,application,infrastructure,ports}`, `internal/platform`, `migrations/` |
+| `backend/` | Go module: `cmd/{api,migrate,seed}`, `internal/<context>/{domain,application,infrastructure,ports}`, `internal/platform`, `migrations/` |
 | `frontend/` | Analyst dashboard (placeholder) |
 | `docs/adr/` | Architecture decision records |
 | `docs/thesis/` | Long-form design document |

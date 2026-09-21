@@ -51,7 +51,7 @@ func run() error {
 		return err
 	}
 	ctx := context.Background()
-	pool, err := postgres.Connect(ctx, cfg.DatabaseURL)
+	pool, err := postgres.Connect(ctx, cfg.MigrateDatabaseURL)
 	if err != nil {
 		return err
 	}
