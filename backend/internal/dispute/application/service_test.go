@@ -11,6 +11,7 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application/apptest"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
 func newService(t *testing.T) (*application.Service, *apptest.MemStore) {
@@ -28,7 +29,7 @@ func TestCreateDerivesRegimeAndLogsOpened(t *testing.T) {
 	svc, store := newService(t)
 	txn := store.AddTransaction(domain.RailCard, "EUR", "EUR", "125.40")
 
-	res, err := svc.CreateDispute(context.Background(), application.CreateDisputeInput{TransactionID: txn, Actor: "customer"})
+	res, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn, Actor: "customer"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,11 +53,11 @@ func TestCreateDerivesRegimeAndLogsOpened(t *testing.T) {
 
 func TestCreateRejectsUnknownTransactionAndRegimelessRail(t *testing.T) {
 	svc, store := newService(t)
-	if _, err := svc.CreateDispute(context.Background(), application.CreateDisputeInput{TransactionID: uuid.New()}); !errors.Is(err, application.ErrNotFound) {
+	if _, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: uuid.New()}); !errors.Is(err, application.ErrNotFound) {
 		t.Errorf("unknown transaction: err = %v", err)
 	}
 	txn := store.AddTransaction(domain.RailSEPADD, "USD", "USD", "10")
-	if _, err := svc.CreateDispute(context.Background(), application.CreateDisputeInput{TransactionID: txn}); !errors.Is(err, domain.ErrNoRegime) {
+	if _, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn}); !errors.Is(err, domain.ErrNoRegime) {
 		t.Errorf("SEPA in USD: err = %v", err)
 	}
 }
@@ -64,9 +65,9 @@ func TestCreateRejectsUnknownTransactionAndRegimelessRail(t *testing.T) {
 func TestApplyAdvancesVersionAndLog(t *testing.T) {
 	svc, store := newService(t)
 	txn := store.AddTransaction(domain.RailCard, "USD", "USD", "50")
-	created, _ := svc.CreateDispute(context.Background(), application.CreateDisputeInput{TransactionID: txn})
+	created, _ := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn})
 
-	res, err := svc.ApplyEvent(context.Background(), application.ApplyEventInput{
+	res, err := svc.ApplyEvent(apptest.Ctx(), application.ApplyEventInput{
 		DisputeID: created.View.ID, Event: domain.EventOpenInvestigation, Actor: "analyst:1",
 	})
 	if err != nil {
@@ -87,13 +88,13 @@ func TestApplyAdvancesVersionAndLog(t *testing.T) {
 func TestApplyRejectsInvalidTransitionWithoutWriting(t *testing.T) {
 	svc, store := newService(t)
 	txn := store.AddTransaction(domain.RailCard, "USD", "USD", "50")
-	created, _ := svc.CreateDispute(context.Background(), application.CreateDisputeInput{TransactionID: txn})
+	created, _ := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn})
 
-	_, err := svc.ApplyEvent(context.Background(), application.ApplyEventInput{DisputeID: created.View.ID, Event: domain.EventWinChargeback})
+	_, err := svc.ApplyEvent(apptest.Ctx(), application.ApplyEventInput{DisputeID: created.View.ID, Event: domain.EventWinChargeback})
 	if !errors.Is(err, domain.ErrInvalidTransition) {
 		t.Fatalf("err = %v", err)
 	}
-	after, _ := svc.GetDispute(context.Background(), created.View.ID)
+	after, _ := svc.GetDispute(apptest.Ctx(), created.View.ID)
 	if after.Version != 1 || len(after.Events) != 1 {
 		t.Errorf("rejected event left a trace: %+v", after)
 	}
@@ -104,13 +105,13 @@ func TestIdempotentReplayAndMismatch(t *testing.T) {
 	txn := store.AddTransaction(domain.RailCard, "EUR", "EUR", "9.99")
 	body := []byte(`{"transactionId":"` + txn.String() + `"}`)
 
-	first, err := svc.CreateDispute(context.Background(), application.CreateDisputeInput{
+	first, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{
 		TransactionID: txn, Idempotency: application.Idempotency{Key: "k1", RequestBody: body},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := svc.CreateDispute(context.Background(), application.CreateDisputeInput{
+	second, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{
 		TransactionID: txn, Idempotency: application.Idempotency{Key: "k1", RequestBody: body},
 	})
 	if err != nil {
@@ -123,7 +124,7 @@ func TestIdempotentReplayAndMismatch(t *testing.T) {
 		t.Errorf("disputes = %d, want 1", len(store.Disputes))
 	}
 
-	_, err = svc.CreateDispute(context.Background(), application.CreateDisputeInput{
+	_, err = svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{
 		TransactionID: txn, Idempotency: application.Idempotency{Key: "k1", RequestBody: []byte(`{"transactionId":"other"}`)},
 	})
 	if !errors.Is(err, application.ErrIdempotencyReuse) {
@@ -137,16 +138,36 @@ func TestIdempotentReplayAndMismatch(t *testing.T) {
 func TestApplyRollsBackWhenTheLogRejectsTheEvent(t *testing.T) {
 	svc, store := newService(t)
 	txn := store.AddTransaction(domain.RailCard, "USD", "USD", "50")
-	created, _ := svc.CreateDispute(context.Background(), application.CreateDisputeInput{TransactionID: txn})
+	created, _ := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn})
 
 	// A stray entry already holds seq 2: the append fails after the state update, and both must roll back.
 	store.Events[created.View.ID] = append(store.Events[created.View.ID], application.EventRecord{Seq: 2, Event: "GHOST"})
 
-	_, err := svc.ApplyEvent(context.Background(), application.ApplyEventInput{DisputeID: created.View.ID, Event: domain.EventOpenInvestigation})
+	_, err := svc.ApplyEvent(apptest.Ctx(), application.ApplyEventInput{DisputeID: created.View.ID, Event: domain.EventOpenInvestigation})
 	if !errors.Is(err, application.ErrConflict) {
 		t.Fatalf("err = %v, want ErrConflict", err)
 	}
 	if rec := store.Disputes[created.View.ID]; rec.State != domain.StateInitiated || rec.Version != 1 {
 		t.Errorf("state update survived the rollback: %+v", rec)
+	}
+}
+
+func TestMemStoreScopesByTenant(t *testing.T) {
+	store := apptest.NewMemStore()
+	svc, _ := application.NewService(store, nil)
+	txn := store.AddTransaction(domain.RailCard, "EUR", "EUR", "10.00")
+	created, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn})
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := tenant.WithID(context.Background(), apptest.TenantB)
+	if _, err := svc.GetDispute(other, created.View.ID); !errors.Is(err, application.ErrNotFound) {
+		t.Errorf("cross-tenant read: err = %v", err)
+	}
+	if _, err := svc.CreateDispute(other, application.CreateDisputeInput{TransactionID: txn}); !errors.Is(err, application.ErrNotFound) {
+		t.Errorf("cross-tenant transaction: err = %v", err)
+	}
+	if _, err := svc.GetDispute(context.Background(), created.View.ID); !errors.Is(err, tenant.ErrMissing) {
+		t.Errorf("no tenant: err = %v", err)
 	}
 }

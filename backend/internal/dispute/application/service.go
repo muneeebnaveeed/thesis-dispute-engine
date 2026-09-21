@@ -17,6 +17,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
 const scopeName = "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
@@ -58,7 +59,8 @@ func NewService(store Store, now Clock) (*Service, error) {
 				return err
 			}
 			for _, c := range counts {
-				o.Observe(c.N, metric.WithAttributes(attribute.String("regime", string(c.Regime)), attribute.String("state", string(c.State))))
+				o.Observe(c.N, metric.WithAttributes(attribute.String("tenant", c.TenantID.String()),
+					attribute.String("regime", string(c.Regime)), attribute.String("state", string(c.State))))
 			}
 			return nil
 		})); err != nil {
@@ -161,7 +163,7 @@ func (s *Service) CreateDispute(ctx context.Context, in CreateDisputeInput) (Res
 			return DisputeView{}, err
 		}
 		span.SetAttributes(attribute.String("dispute.id", id.String()), attribute.String("dispute.regime", string(regime)))
-		s.transitions.Add(ctx, 1, metric.WithAttributes(
+		s.transitions.Add(ctx, 1, metric.WithAttributes(tenantAttr(ctx),
 			attribute.String("regime", string(regime)), attribute.String("event", "OPENED"), attribute.String("to", string(domain.StateInitiated))))
 		return s.view(ctx, tx, rec)
 	})
@@ -200,7 +202,7 @@ func (s *Service) ApplyEvent(ctx context.Context, in ApplyEventInput) (Result, e
 		}
 		span.SetAttributes(attribute.String("dispute.regime", string(rec.Regime)),
 			attribute.String("dispute.from", string(rec.State)), attribute.String("dispute.to", string(next.State)))
-		attrs := metric.WithAttributes(attribute.String("regime", string(rec.Regime)),
+		attrs := metric.WithAttributes(tenantAttr(ctx), attribute.String("regime", string(rec.Regime)),
 			attribute.String("event", string(in.Event)), attribute.String("to", string(next.State)))
 		s.transitions.Add(ctx, 1, attrs)
 		s.timeInState.Record(ctx, now.Sub(rec.UpdatedAt).Seconds(), metric.WithAttributes(
@@ -304,4 +306,10 @@ func traceIDPtr(ctx context.Context) *string {
 	}
 	id := sc.TraceID().String()
 	return &id
+}
+
+// tenantAttr labels business metrics by tenant; cardinality is the tenant count, which stays small by design (ADR 0008).
+func tenantAttr(ctx context.Context) attribute.KeyValue {
+	id, _ := tenant.IDFrom(ctx)
+	return attribute.String("tenant", id.String())
 }

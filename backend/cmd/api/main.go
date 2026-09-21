@@ -17,6 +17,7 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/httpserver"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/postgres"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/telemetry"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/migrations"
 )
 
@@ -79,7 +80,7 @@ func run(cfg config.Config, logger *slog.Logger) error {
 	if err := disputehttp.Mount(mux, svc, pool.Ping); err != nil {
 		return err
 	}
-	srv := httpserver.New(cfg.Addr, logger, mux)
+	srv := httpserver.New(cfg.Addr, logger, mux, tenant.Static(cfg.TenantID))
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()

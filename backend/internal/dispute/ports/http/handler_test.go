@@ -15,6 +15,7 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 	disputehttp "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/ports/http"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/httpserver"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
 type api struct {
@@ -34,7 +35,7 @@ func newAPI(t *testing.T, ready disputehttp.Readiness) api {
 	if err := disputehttp.Mount(mux, svc, ready); err != nil {
 		t.Fatal(err)
 	}
-	return api{t: t, h: httpserver.RequestID(mux), store: store}
+	return api{t: t, h: httpserver.RequestID(tenant.Static(apptest.TenantA)(mux)), store: store}
 }
 
 func (a api) do(method, path string, body any, headers map[string]string) (*httptest.ResponseRecorder, map[string]any) {

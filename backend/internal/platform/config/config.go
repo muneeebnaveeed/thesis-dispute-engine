@@ -7,6 +7,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // Config is the resolved service configuration.
@@ -16,7 +18,9 @@ type Config struct {
 	MigrateDatabaseURL string
 	ShutdownTimeout    time.Duration
 	IdempotencyTTL     time.Duration
-	LogLevel           slog.Level
+	// TenantID is stamped on every request until per-request authentication resolves tenants (single-tenant mode).
+	TenantID uuid.UUID
+	LogLevel slog.Level
 }
 
 // Load resolves Config from DISPUTE_* variables; defaults match deploy/compose.yml.
@@ -28,6 +32,15 @@ func Load() (Config, error) {
 		MigrateDatabaseURL: getenv("DISPUTE_MIGRATE_DATABASE_URL", "postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable"),
 		ShutdownTimeout:    10 * time.Second,
 		IdempotencyTTL:     24 * time.Hour,
+		TenantID:           uuid.MustParse("00000000-0000-8000-8000-00000000a001"),
+	}
+
+	if raw := os.Getenv("DISPUTE_TENANT_ID"); raw != "" {
+		id, err := uuid.Parse(raw)
+		if err != nil || id == uuid.Nil {
+			return Config{}, fmt.Errorf("config: DISPUTE_TENANT_ID must be a UUID, got %q", raw)
+		}
+		cfg.TenantID = id
 	}
 
 	if raw := os.Getenv("DISPUTE_IDEMPOTENCY_TTL"); raw != "" {

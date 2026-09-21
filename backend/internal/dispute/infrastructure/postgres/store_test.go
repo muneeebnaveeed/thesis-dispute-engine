@@ -12,6 +12,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application/apptest"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 	disputepg "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres/sqlcgen"
@@ -20,15 +21,24 @@ import (
 
 func seed(t *testing.T, pool *pgxpool.Pool, rail domain.Rail, currency string) uuid.UUID {
 	t.Helper()
+	return seedFor(t, pool, apptest.TenantA, rail, currency)
+}
+
+// seedFor inserts as the schema owner, which row-level security does not constrain, so tenant_id is explicit.
+func seedFor(t *testing.T, pool *pgxpool.Pool, tenantID uuid.UUID, rail domain.Rail, currency string) uuid.UUID {
+	t.Helper()
 	ctx := context.Background()
 	q := sqlcgen.New(pool)
+	if err := q.InsertTenant(ctx, sqlcgen.InsertTenantParams{ID: tenantID, Name: "test"}); err != nil {
+		t.Fatal(err)
+	}
 	account := uuid.New()
-	if err := q.InsertAccount(ctx, sqlcgen.InsertAccountParams{ID: account, HolderName: "Test Holder", Currency: currency}); err != nil {
+	if err := q.InsertAccount(ctx, sqlcgen.InsertAccountParams{ID: account, TenantID: tenantID, HolderName: "Test Holder", Currency: currency}); err != nil {
 		t.Fatal(err)
 	}
 	txn := uuid.New()
 	if err := q.InsertTransaction(ctx, sqlcgen.InsertTransactionParams{
-		ID: txn, AccountID: account, Rail: string(rail), Amount: decimal.RequireFromString("125.4"),
+		ID: txn, TenantID: tenantID, AccountID: account, Rail: string(rail), Amount: decimal.RequireFromString("125.4"),
 		Currency: currency, Merchant: "ACME", OccurredAt: time.Now().Add(-48 * time.Hour),
 	}); err != nil {
 		t.Fatal(err)
@@ -48,7 +58,7 @@ func newService(t *testing.T) (*application.Service, *pgxpool.Pool) {
 
 func TestLifecycleRoundTripThroughPostgres(t *testing.T) {
 	svc, pool := newService(t)
-	ctx := context.Background()
+	ctx := apptest.Ctx()
 	txn := seed(t, pool, domain.RailCard, "EUR")
 
 	created, err := svc.CreateDispute(ctx, application.CreateDisputeInput{TransactionID: txn, Actor: "customer"})
@@ -79,7 +89,7 @@ func TestLifecycleRoundTripThroughPostgres(t *testing.T) {
 
 func TestEventLogIsAppendOnlyAtTheDatabase(t *testing.T) {
 	svc, pool := newService(t)
-	ctx := context.Background()
+	ctx := apptest.Ctx()
 	txn := seed(t, pool, domain.RailCard, "USD")
 	created, _ := svc.CreateDispute(ctx, application.CreateDisputeInput{TransactionID: txn})
 
@@ -103,7 +113,7 @@ func TestEventLogIsAppendOnlyAtTheDatabase(t *testing.T) {
 
 func TestConcurrentEventsOnOneDisputeSerialise(t *testing.T) {
 	svc, pool := newService(t)
-	ctx := context.Background()
+	ctx := apptest.Ctx()
 	txn := seed(t, pool, domain.RailCard, "USD")
 	created, _ := svc.CreateDispute(ctx, application.CreateDisputeInput{TransactionID: txn})
 
@@ -146,7 +156,7 @@ func TestConcurrentEventsOnOneDisputeSerialise(t *testing.T) {
 
 func TestIdempotentReplayAcrossConnections(t *testing.T) {
 	svc, pool := newService(t)
-	ctx := context.Background()
+	ctx := apptest.Ctx()
 	txn := seed(t, pool, domain.RailSEPADD, "EUR")
 	body := []byte(`{"transactionId":"` + txn.String() + `"}`)
 	in := application.CreateDisputeInput{TransactionID: txn, Idempotency: application.Idempotency{Key: "k-42", RequestBody: body}}
@@ -172,7 +182,7 @@ func TestIdempotentReplayAcrossConnections(t *testing.T) {
 
 func TestRejectedTransitionLeavesNoTrace(t *testing.T) {
 	svc, pool := newService(t)
-	ctx := context.Background()
+	ctx := apptest.Ctx()
 	txn := seed(t, pool, domain.RailCreditCard, "USD")
 	created, _ := svc.CreateDispute(ctx, application.CreateDisputeInput{TransactionID: txn})
 
@@ -187,7 +197,7 @@ func TestRejectedTransitionLeavesNoTrace(t *testing.T) {
 
 func TestPurgeIdempotencyKeys(t *testing.T) {
 	svc, pool := newService(t)
-	ctx := context.Background()
+	ctx := apptest.Ctx()
 	txn := seed(t, pool, domain.RailSEPADD, "EUR")
 	body := []byte(`{"transactionId":"` + txn.String() + `"}`)
 	in := application.CreateDisputeInput{TransactionID: txn, Idempotency: application.Idempotency{Key: "k-old", RequestBody: body}}
