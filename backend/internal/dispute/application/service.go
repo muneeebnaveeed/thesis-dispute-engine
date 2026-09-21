@@ -50,6 +50,20 @@ func NewService(store Store, now Clock) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Observed on each metric export rather than maintained on every write: one GROUP BY is cheaper than never being wrong.
+	if _, err := m.Int64ObservableGauge("dispute.by_state", metric.WithDescription("Disputes currently in each state"),
+		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
+			counts, err := store.CountByState(ctx)
+			if err != nil {
+				return err
+			}
+			for _, c := range counts {
+				o.Observe(c.N, metric.WithAttributes(attribute.String("regime", string(c.Regime)), attribute.String("state", string(c.State))))
+			}
+			return nil
+		})); err != nil {
+		return nil, err
+	}
 	return &Service{store: store, now: now, tracer: otel.Tracer(scopeName), transitions: transitions, replays: replays, timeInState: timeInState}, nil
 }
 

@@ -82,9 +82,18 @@ type Tx interface {
 	PutIdempotent(ctx context.Context, scope, key string, r StoredResponse) error
 }
 
+// StateCount is how many disputes sit in one state under one regime.
+type StateCount struct {
+	Regime domain.Regime
+	State  domain.State
+	N      int64
+}
+
 // Store runs fn inside one transaction; a returned error rolls it back.
 type Store interface {
 	WithTx(ctx context.Context, fn func(Tx) error) error
+	// CountByState feeds the disputes-by-state gauge; it runs outside any transaction.
+	CountByState(ctx context.Context) ([]StateCount, error)
 }
 
 // Clock is injectable time for deterministic tests.

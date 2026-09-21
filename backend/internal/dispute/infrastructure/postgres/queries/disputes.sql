@@ -49,3 +49,8 @@ VALUES ($1, $2, $3, $4, $5);
 
 -- name: DeleteIdempotencyKeysBefore :execrows
 DELETE FROM idempotency_keys WHERE created_at < $1;
+
+-- name: CountDisputesByState :many
+SELECT regime, state, count(*)::bigint AS n
+FROM disputes
+GROUP BY regime, state;

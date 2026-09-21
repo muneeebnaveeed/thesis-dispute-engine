@@ -33,6 +33,19 @@ func (s *Store) WithTx(ctx context.Context, fn func(application.Tx) error) error
 	})
 }
 
+// CountByState implements application.Store.
+func (s *Store) CountByState(ctx context.Context) ([]application.StateCount, error) {
+	rows, err := sqlcgen.New(s.pool).CountDisputesByState(ctx)
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	out := make([]application.StateCount, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, application.StateCount{Regime: domain.Regime(r.Regime), State: domain.State(r.State), N: r.N})
+	}
+	return out, nil
+}
+
 type txn struct {
 	q *sqlcgen.Queries
 }

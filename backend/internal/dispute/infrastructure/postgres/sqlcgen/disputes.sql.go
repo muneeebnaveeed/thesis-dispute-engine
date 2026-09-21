@@ -13,6 +13,38 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+const countDisputesByState = `-- name: CountDisputesByState :many
+SELECT regime, state, count(*)::bigint AS n
+FROM disputes
+GROUP BY regime, state
+`
+
+type CountDisputesByStateRow struct {
+	Regime string
+	State  string
+	N      int64
+}
+
+func (q *Queries) CountDisputesByState(ctx context.Context) ([]CountDisputesByStateRow, error) {
+	rows, err := q.db.Query(ctx, countDisputesByState)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CountDisputesByStateRow{}
+	for rows.Next() {
+		var i CountDisputesByStateRow
+		if err := rows.Scan(&i.Regime, &i.State, &i.N); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteIdempotencyKeysBefore = `-- name: DeleteIdempotencyKeysBefore :execrows
 DELETE FROM idempotency_keys WHERE created_at < $1
 `

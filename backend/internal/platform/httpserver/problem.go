@@ -5,9 +5,24 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"sync"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
 )
+
+// problems counts error responses by code so validation and conflict rates are visible by kind, not just status.
+var problems = sync.OnceValue(func() metric.Int64Counter {
+	c, err := otel.Meter("github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/httpserver").
+		Int64Counter("http.server.problems", metric.WithDescription("Problem responses by error code"))
+	if err != nil {
+		panic(err)
+	}
+	return c
+})
 
 // Problem is the RFC 9457 body every error response uses; all of it is user-safe.
 type Problem struct {
@@ -60,6 +75,7 @@ func ProblemFrom(ctx context.Context, instance string, err error) Problem {
 		RequestID: RequestIDFrom(ctx),
 		Errors:    errs.FieldsOf(err),
 	}
+	problems().Add(ctx, 1, metric.WithAttributes(attribute.String("code", p.Code), attribute.Int("status", p.Status)))
 	switch kind {
 	case errs.Internal:
 		p.Detail = "Something went wrong on our side. Reference: " + p.RequestID
