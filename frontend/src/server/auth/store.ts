@@ -12,10 +12,12 @@ const SessionSchema = Type.Object({
   pending: Type.Optional(
     Type.Object({ state: Type.String(), verifier: Type.String(), nonce: Type.String(), next: Type.String() }),
   ),
+  lastSeenAt: Type.Optional(Type.String()),
   identity: Type.Optional(
     Type.Object({
       tenantId: Type.String(),
       subject: Type.String(),
+      sid: Type.Optional(Type.Union([Type.String(), Type.Null()])),
       name: Type.Union([Type.String(), Type.Null()]),
       email: Type.Union([Type.String(), Type.Null()]),
       roles: Type.Array(Type.String()),
@@ -46,10 +48,12 @@ function internal() {
 }
 
 export async function put(id: string, session: Session, ttlSeconds: number): Promise<void> {
+  // Subject and sid travel in the clear beside the blob so a user's or a realm session's rows can be ended.
   const body = {
     ciphertext: Buffer.from(await seal(session)).toString('base64'),
     expiresAt: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
-    ...(session.identity ? { tenantId: session.identity.tenantId } : {}),
+    ...(session.identity ? { tenantId: session.identity.tenantId, subject: session.identity.subject } : {}),
+    ...(session.identity?.sid ? { sid: session.identity.sid } : {}),
   }
   const { response } = await internal().PUT('/internal/sessions/{sessionId}', {
     params: { path: { sessionId: id } },

@@ -56,11 +56,14 @@ fake `fetch`; `src/server/disputes.ts` is the thin Start wrapper.
 
 ## Authentication
 
-Analysts sign in through their tenant's Keycloak realm at `/t/<slug>` (docs/adr/0010, 0011). The
+Analysts sign in through their tenant's Keycloak realm at `/<slug>`, the tenant's front door (docs/adr/0010,
+0011, docs/authentication.md); `/` resolves a remembered tenant or finds one from a work email. The
 Start server runs the code flow with PKCE, seals the token set with `SESSION_SECRET` and stores it
 through the API's internal session endpoints with `DISPUTE_SERVICE_KEY`; the browser gets an
-HttpOnly cookie. Protected routes send anonymous visitors to sign-in and bring them back
-afterwards (`next`). For direct calls, `src/api/browser.ts` asks the server for the session's
+HttpOnly cookie. Every route under `/<slug>` sends anonymous visitors through the realm and back
+to the page they asked for; Keycloak's back-channel logout ends sessions at `/auth/backchannel-logout`.
+`src/start.ts` sets the security headers, including a per-request CSP nonce that Start applies to
+its own scripts. For direct calls, `src/api/browser.ts` asks the server for the session's
 access token, keeps it in memory, and retries once with a fresh token on 401; refresh only ever
 happens on the server (`src/server/auth/session-impl.ts`). `make auth-up` brings Keycloak with
 the `otp` and `erste` realms; sign in as `analyst` / `analyst`.

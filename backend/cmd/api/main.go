@@ -91,6 +91,7 @@ func run(cfg config.Config, logger *slog.Logger) error {
 		httpserver.InternalOnly("/internal/", cfg.InternalCIDRs),
 		httpserver.CORS(cfg.CORSOrigins),
 		auth.Bearer(keys, auth.NewOIDC(keys)),
+		auth.NewFailureLimiter(cfg.AuthFailuresPerMinute).Middleware,
 		auth.ServiceKey(cfg.ServiceKey),
 		ratelimit.Middleware(limiter, cfg.RatePerMinute, logger),
 	)

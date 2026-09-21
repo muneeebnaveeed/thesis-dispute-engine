@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, useRouteContext, useRouter } from '@tanstack/react-router'
+import { createFileRoute, useRouteContext, useRouter } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 
 import { createBrowserApi } from '#/api/browser'
@@ -6,26 +6,31 @@ import type { Problem } from '#/api/problem'
 import { AppShell } from '#/components/app-shell'
 import { EventLog } from '#/components/event-log'
 import { ProblemBanner } from '#/components/problem-banner'
+import { TenantMismatch } from '#/components/tenant-mismatch'
 import { getDispute, type Dispute } from '#/server/disputes'
 
 // First paint comes from the server with the session's token; actions go straight from the browser to the API.
-export const Route = createFileRoute('/disputes/$disputeId')({
-  // Anonymous visitors go to sign-in and come back here afterwards (the destination rides along as ?next).
-  beforeLoad: ({ context, location }) => {
-    if (!context.viewer) throw redirect({ to: '/', search: { next: location.href } })
-  },
+export const Route = createFileRoute('/$tenant/disputes/$disputeId')({
   loader: ({ params }) => getDispute({ data: params.disputeId }),
   component: DisputePage,
 })
 
 function DisputePage() {
   const outcome = Route.useLoaderData()
-  const { config } = useRouteContext({ from: '__root__' })
-  const api = useMemo(() => createBrowserApi(config.apiUrl), [config.apiUrl])
+  const { tenant } = Route.useParams()
+  const { config, viewer } = useRouteContext({ from: '__root__' })
+  const api = useMemo(
+    () =>
+      createBrowserApi(config.apiUrl, () =>
+        window.location.assign(`/${tenant}?next=${encodeURIComponent(window.location.pathname)}`),
+      ),
+    [config.apiUrl, tenant],
+  )
   const router = useRouter()
   const [problem, setProblem] = useState<Problem | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
 
+  if (viewer && viewer.tenantSlug !== tenant) return <TenantMismatch wanted={tenant} />
   if (outcome.problem || !outcome.value) {
     return (
       <AppShell title="Dispute">{outcome.problem && <ProblemBanner problem={outcome.problem} />}</AppShell>

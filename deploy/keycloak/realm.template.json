@@ -2,12 +2,25 @@
   "realm": "__SLUG__",
   "displayName": "__NAME__",
   "enabled": true,
-  "sslRequired": "none",
+  "sslRequired": "external",
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
   "accessTokenLifespan": 300,
   "ssoSessionIdleTimeout": 1800,
   "ssoSessionMaxLifespan": 36000,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "maxDeltaTimeSeconds": 43200,
+  "quickLoginCheckMilliSeconds": 1000,
+  "minimumQuickLoginWaitSeconds": 60,
+  "eventsEnabled": true,
+  "eventsExpiration": 2592000,
+  "enabledEventTypes": ["LOGIN", "LOGIN_ERROR", "LOGOUT", "REFRESH_TOKEN_ERROR", "CODE_TO_TOKEN", "CODE_TO_TOKEN_ERROR", "UPDATE_PASSWORD", "RESET_PASSWORD"],
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": true,
   "roles": {
     "realm": [
       { "name": "analyst", "description": "Works disputes" },
@@ -78,10 +91,16 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
-      "redirectUris": ["http://localhost:3002/*"],
-      "webOrigins": ["http://localhost:3002"],
+      "redirectUris": ["__APP_URL__/*"],
+      "webOrigins": ["__APP_URL__"],
       "defaultClientScopes": ["dispute-api"],
-      "attributes": { "post.logout.redirect.uris": "http://localhost:3002/*", "pkce.code.challenge.method": "S256" }
+      "attributes": {
+        "post.logout.redirect.uris": "__APP_URL__/*",
+        "pkce.code.challenge.method": "S256",
+        "backchannel.logout.url": "__APP_URL__/auth/backchannel-logout",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "false"
+      }
     }
   ],
   "users": [
