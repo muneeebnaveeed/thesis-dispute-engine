@@ -3,6 +3,7 @@ module github.com/muneeebnaveeed/thesis-dispute-engine/backend
 go 1.27
 
 require (
+	github.com/exaring/otelpgx v0.12.0
 	github.com/getkin/kin-openapi v0.144.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx-shopspring-decimal v0.0.0-20220624020537-1d36b5a1853e

@@ -3,7 +3,9 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"github.com/exaring/otelpgx"
 	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -20,6 +22,8 @@ func Connect(ctx context.Context, url string) (*pgxpool.Pool, error) {
 
 // ConnectWithConfig is Connect for a caller-built config (tests set search_path on it).
 func ConnectWithConfig(ctx context.Context, cfg *pgxpool.Config) (*pgxpool.Pool, error) {
+	// Every statement becomes a child span of the request; values are never recorded.
+	cfg.ConnConfig.Tracer = otelpgx.NewTracer(otelpgx.WithSpanNameFunc(spanName))
 	cfg.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
 		pgxdecimal.Register(conn.TypeMap())
 		return nil
@@ -33,4 +37,17 @@ func ConnectWithConfig(ctx context.Context, cfg *pgxpool.Config) (*pgxpool.Pool,
 		return nil, fmt.Errorf("postgres: ping: %w", err)
 	}
 	return pool, nil
+}
+
+// spanName prefers sqlc's "-- name: X :one" header over the raw statement, which otelpgx would truncate to "--".
+func spanName(stmt string) string {
+	first, _, _ := strings.Cut(strings.TrimSpace(stmt), "\n")
+	if rest, ok := strings.CutPrefix(first, "-- name: "); ok {
+		name, _, _ := strings.Cut(rest, " ")
+		return name
+	}
+	if len(first) > 64 {
+		return first[:64]
+	}
+	return first
 }
