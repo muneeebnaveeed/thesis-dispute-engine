@@ -18,6 +18,7 @@ import (
 	disputepg "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres/sqlcgen"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/postgres/pgtest"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
 func seed(t *testing.T, pool *pgxpool.Pool, rail domain.Rail, currency string) uuid.UUID {
@@ -239,5 +240,56 @@ func TestPurgeIdempotencyKeys(t *testing.T) {
 	}
 	if n, err := store.PurgeIdempotencyKeys(ctx, time.Now().Add(-24*time.Hour)); err != nil || n != 0 {
 		t.Fatalf("purge under contention = %d, %v", n, err)
+	}
+}
+
+func TestListDisputesKeysetOrderUnderRLS(t *testing.T) {
+	owner, schema := pgtest.PoolWithSchema(t)
+	app := pgtest.AppPool(t, schema)
+	svc, err := application.NewService(disputepg.NewStore(app), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctxA := tenant.WithID(context.Background(), apptest.TenantA)
+	ctxB := tenant.WithID(context.Background(), apptest.TenantB)
+	txnA := seedFor(t, owner, apptest.TenantA, domain.RailCard, "EUR")
+	txnB := seedFor(t, owner, apptest.TenantB, domain.RailCard, "EUR")
+	order := make([]uuid.UUID, 0, 7)
+	for range 7 {
+		r, err := svc.CreateDispute(ctxA, application.CreateDisputeInput{TransactionID: txnA})
+		if err != nil {
+			t.Fatal(err)
+		}
+		order = append(order, r.View.ID)
+	}
+	if _, err := svc.CreateDispute(ctxB, application.CreateDisputeInput{TransactionID: txnB}); err != nil {
+		t.Fatal(err)
+	}
+	var got []uuid.UUID
+	var after *application.Cursor
+	for range 5 {
+		page, err := svc.ListDisputes(ctxA, application.ListQuery{Limit: 3, After: after})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, it := range page.Items {
+			got = append(got, it.ID)
+		}
+		if page.Next == nil {
+			break
+		}
+		after = page.Next
+	}
+	if len(got) != 7 {
+		t.Fatalf("saw %d disputes across pages, want 7 (tenant B excluded)", len(got))
+	}
+	for i := range got {
+		if got[i] != order[len(order)-1-i] {
+			t.Fatalf("order at %d: %s, want %s", i, got[i], order[len(order)-1-i])
+		}
+	}
+	pageB, _ := svc.ListDisputes(ctxB, application.ListQuery{Limit: 10})
+	if len(pageB.Items) != 1 {
+		t.Errorf("tenant B sees %d, want 1", len(pageB.Items))
 	}
 }

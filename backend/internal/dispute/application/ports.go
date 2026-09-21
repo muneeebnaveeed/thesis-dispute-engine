@@ -84,6 +84,21 @@ type Tx interface {
 	ListEvents(ctx context.Context, disputeID uuid.UUID) ([]EventRecord, error)
 	GetIdempotent(ctx context.Context, scope, key string) (StoredResponse, error)
 	PutIdempotent(ctx context.Context, scope, key string, r StoredResponse) error
+	// ListDisputes returns up to limit records newest first, after the cursor when one is given.
+	ListDisputes(ctx context.Context, q ListQuery) ([]DisputeRecord, error)
+}
+
+// ListQuery is a page request; After is exclusive and comes from the previous page's last record.
+type ListQuery struct {
+	State *domain.State
+	After *Cursor
+	Limit int
+}
+
+// Cursor is the keyset position (opened_at, id) of the last record on a page.
+type Cursor struct {
+	OpenedAt time.Time
+	ID       uuid.UUID
 }
 
 // StateCount is how many disputes sit in one state under one regime.

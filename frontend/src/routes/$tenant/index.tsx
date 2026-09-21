@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, useRouteContext } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate, useRouteContext } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import type { Problem } from '#/api/problem'
@@ -6,8 +6,27 @@ import { AppShell } from '#/components/app-shell'
 import { ProblemBanner } from '#/components/problem-banner'
 import { TenantMismatch } from '#/components/tenant-mismatch'
 import { createDispute } from '#/server/disputes'
+import { Value } from '@sinclair/typebox/value'
 
-export const Route = createFileRoute('/$tenant/')({ component: Workbench })
+import { DisputeState as DisputeStateSchema } from '#/api/schemas.gen'
+import { listDisputes, type DisputeState } from '#/server/disputes-list'
+
+type Search = { state?: DisputeState; cursor?: string }
+
+// The workbench: open a dispute, find one, and the tenant's newest disputes with a state filter and paging.
+export const Route = createFileRoute('/$tenant/')({
+  validateSearch: (s: Record<string, unknown>): Search => ({
+    ...(isState(s.state) ? { state: s.state } : {}),
+    ...(typeof s.cursor === 'string' ? { cursor: s.cursor } : {}),
+  }),
+  loaderDeps: ({ search }) => search,
+  loader: ({ deps }) => listDisputes({ data: deps }),
+  component: Workbench,
+})
+
+// The generated schema is the source of truth for the enum, so the filter can never offer a state the API lacks.
+const STATES = DisputeStateSchema.anyOf.map((l) => l.const)
+const isState = (v: unknown): v is DisputeState => typeof v === 'string' && Value.Check(DisputeStateSchema, v)
 
 const input =
   'w-full rounded-md border border-neutral-300 px-3 py-2 font-mono text-sm focus:border-neutral-500 focus:outline-none'
@@ -16,6 +35,8 @@ const button =
 
 function Workbench() {
   const { tenant } = Route.useParams()
+  const page = Route.useLoaderData()
+  const { state, cursor } = Route.useSearch()
   const { viewer } = useRouteContext({ from: '__root__' })
   const navigate = useNavigate()
   const [problem, setProblem] = useState<Problem | null>(null)
@@ -34,6 +55,101 @@ function Workbench() {
 
   return (
     <AppShell title="Disputes">
+      <section className="mb-10">
+        <div className="mb-3 flex items-baseline justify-between">
+          <h2 className="text-lg font-medium">Recent disputes</h2>
+          <form
+            className="flex items-center gap-2 text-sm"
+            onSubmit={(e) => {
+              e.preventDefault()
+              const raw = new FormData(e.currentTarget).get('state')
+              const next = isState(raw) ? raw : undefined
+              void navigate({ to: '/$tenant', params: { tenant }, search: next ? { state: next } : {} })
+            }}
+          >
+            <label htmlFor="state-filter" className="text-neutral-600">
+              State
+            </label>
+            <select
+              id="state-filter"
+              name="state"
+              defaultValue={state ?? ''}
+              className="rounded-md border border-neutral-300 px-2 py-1"
+            >
+              <option value="">any</option>
+              {STATES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="rounded-md border border-neutral-300 bg-white px-2 py-1 hover:bg-neutral-100"
+            >
+              Filter
+            </button>
+          </form>
+        </div>
+        {page.problem ? (
+          <ProblemBanner problem={page.problem} />
+        ) : page.value && page.value.items.length > 0 ? (
+          <>
+            <table className="w-full text-left text-sm">
+              <thead className="text-neutral-500">
+                <tr>
+                  <th className="py-1 pr-4 font-normal">Dispute</th>
+                  <th className="py-1 pr-4 font-normal">State</th>
+                  <th className="py-1 pr-4 font-normal">Regime</th>
+                  <th className="py-1 pr-4 font-normal">Amount</th>
+                  <th className="py-1 font-normal">Opened</th>
+                </tr>
+              </thead>
+              <tbody>
+                {page.value.items.map((d) => (
+                  <tr key={d.id} className="border-t border-neutral-200">
+                    <td className="py-1 pr-4 font-mono">
+                      <Link
+                        to="/$tenant/disputes/$disputeId"
+                        params={{ tenant, disputeId: d.id }}
+                        className="underline"
+                      >
+                        {d.id.slice(0, 8)}
+                      </Link>
+                    </td>
+                    <td className="py-1 pr-4 font-mono">{d.state}</td>
+                    <td className="py-1 pr-4 font-mono">{d.regime}</td>
+                    <td className="py-1 pr-4">
+                      {d.disputedAmount} {d.currency}
+                    </td>
+                    <td className="py-1 text-neutral-500">{d.openedAt.slice(0, 16).replace('T', ' ')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="mt-3 flex gap-3 text-sm">
+              {cursor && (
+                <Link to="/$tenant" params={{ tenant }} search={state ? { state } : {}} className="underline">
+                  Newest
+                </Link>
+              )}
+              {page.value.nextCursor && (
+                <Link
+                  to="/$tenant"
+                  params={{ tenant }}
+                  search={{ ...(state ? { state } : {}), cursor: page.value.nextCursor }}
+                  className="underline"
+                >
+                  Older
+                </Link>
+              )}
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-neutral-600">No disputes{state ? ` in ${state}` : ''} yet.</p>
+        )}
+      </section>
+
       <div className="grid gap-8 md:grid-cols-2">
         <section>
           <h2 className="mb-3 text-lg font-medium">Open a dispute</h2>

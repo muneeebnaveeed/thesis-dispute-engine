@@ -53,3 +53,28 @@ test("another tenant's data does not exist for this analyst", async ({ page, req
   await page.getByRole('button', { name: 'Open' }).click()
   await expect(page.getByRole('alert')).toContainText('does not exist')
 })
+
+test("the workbench lists the tenant's newest disputes, filters by state, and links to each", async ({
+  page,
+  request,
+}) => {
+  const id = await openDisputeViaApi(request, 'otp')
+  await openDisputeViaApi(request, 'erste')
+  await page.goto('/otp')
+  // Ids minted in the same millisecond share a visible prefix; the link's href carries the whole id.
+  const row = page.getByRole('row').filter({ has: page.locator(`a[href$="/disputes/${id}"]`) })
+  await expect(row).toBeVisible()
+  await expect(row).toContainText('INITIATED')
+
+  // Filtering to a state this dispute is not in hides it; the filter value comes from the contract's enum.
+  await page.getByLabel('State').selectOption('CLOSED')
+  await page.getByRole('button', { name: 'Filter' }).click()
+  await expect(page).toHaveURL(/state=CLOSED/)
+  await expect(row).toHaveCount(0)
+  await page.getByLabel('State').selectOption('INITIATED')
+  await page.getByRole('button', { name: 'Filter' }).click()
+  await expect(row).toBeVisible()
+
+  await row.getByRole('link').click()
+  await expect(page).toHaveURL(new RegExp(`/otp/disputes/${id}$`))
+})
