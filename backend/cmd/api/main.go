@@ -63,16 +63,17 @@ func run(cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	ran, err := postgres.Migrate(ctx, pool, files)
-	if err != nil {
-		return fmt.Errorf("migrate: %w", err)
+	// Fail fast rather than serve against a stale schema; cmd/migrate owns the schema, this process cannot.
+	if err := postgres.Check(ctx, pool, files); err != nil {
+		return fmt.Errorf("schema: %w (run cmd/migrate)", err)
 	}
-	logger.Info("migrations", "applied", ran, "total", len(files))
 
-	svc, err := application.NewService(disputepg.NewStore(pool), nil)
+	store := disputepg.NewStore(pool)
+	svc, err := application.NewService(store, nil)
 	if err != nil {
 		return err
 	}
+	go application.RunIdempotencyPurge(ctx, store, cfg.IdempotencyTTL, logger)
 
 	mux := http.NewServeMux()
 	if err := disputehttp.Mount(mux, svc, pool.Ping); err != nil {

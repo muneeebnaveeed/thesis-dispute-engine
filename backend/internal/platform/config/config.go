@@ -11,18 +11,31 @@ import (
 
 // Config is the resolved service configuration.
 type Config struct {
-	Addr            string
-	DatabaseURL     string
-	ShutdownTimeout time.Duration
-	LogLevel        slog.Level
+	Addr               string
+	DatabaseURL        string
+	MigrateDatabaseURL string
+	ShutdownTimeout    time.Duration
+	IdempotencyTTL     time.Duration
+	LogLevel           slog.Level
 }
 
 // Load resolves Config from DISPUTE_* variables; defaults match deploy/compose.yml.
 func Load() (Config, error) {
 	cfg := Config{
-		Addr:            getenv("DISPUTE_ADDR", ":8090"),
-		DatabaseURL:     getenv("DISPUTE_DATABASE_URL", "postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable"),
-		ShutdownTimeout: 10 * time.Second,
+		Addr: getenv("DISPUTE_ADDR", ":8090"),
+		// The API runs as the least-privileged dispute_api login; only migrate and seed use the owner.
+		DatabaseURL:        getenv("DISPUTE_DATABASE_URL", "postgres://dispute_api:dispute_api@localhost:5432/dispute?sslmode=disable"),
+		MigrateDatabaseURL: getenv("DISPUTE_MIGRATE_DATABASE_URL", "postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable"),
+		ShutdownTimeout:    10 * time.Second,
+		IdempotencyTTL:     24 * time.Hour,
+	}
+
+	if raw := os.Getenv("DISPUTE_IDEMPOTENCY_TTL"); raw != "" {
+		d, err := time.ParseDuration(raw)
+		if err != nil || d <= 0 {
+			return Config{}, fmt.Errorf("config: DISPUTE_IDEMPOTENCY_TTL must be a positive duration such as 24h, got %q", raw)
+		}
+		cfg.IdempotencyTTL = d
 	}
 
 	if raw := os.Getenv("DISPUTE_LOG_LEVEL"); raw != "" {

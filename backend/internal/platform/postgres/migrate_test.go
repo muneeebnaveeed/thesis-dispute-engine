@@ -47,3 +47,24 @@ func TestMigrateIsIdempotentAndDetectsDrift(t *testing.T) {
 		t.Fatalf("second run: n=%d err=%v", n, err)
 	}
 }
+
+func TestCheckReportsPendingAndModified(t *testing.T) {
+	pool := pgtest.Pool(t) // already migrated once
+	ctx := context.Background()
+
+	real, _ := postgres.Load(migrationsFS(t))
+	if err := postgres.Check(ctx, pool, real); err != nil {
+		t.Fatalf("up to date: err = %v", err)
+	}
+
+	ahead := append(append([]postgres.Migration{}, real...), postgres.Migration{Version: 9999, Name: "9999_future.sql", Checksum: "x"})
+	if err := postgres.Check(ctx, pool, ahead); !errors.Is(err, postgres.ErrMigrationsPending) {
+		t.Fatalf("binary ahead of database: err = %v", err)
+	}
+
+	modified := append([]postgres.Migration{}, real...)
+	modified[0].Checksum = "tampered"
+	if err := postgres.Check(ctx, pool, modified); !errors.Is(err, postgres.ErrMigrationModified) {
+		t.Fatalf("modified: err = %v", err)
+	}
+}

@@ -61,6 +61,40 @@ func Load(dir fs.FS) ([]Migration, error) {
 	return out, nil
 }
 
+// ErrMigrationsPending is returned by Check when the database is behind the binary.
+var ErrMigrationsPending = errors.New("postgres: migrations pending")
+
+// Check compares applied migrations with the embedded set without changing anything; safe for a role that cannot migrate.
+func Check(ctx context.Context, pool *pgxpool.Pool, migrations []Migration) error {
+	applied := map[int]string{}
+	rows, err := pool.Query(ctx, `SELECT version, checksum FROM schema_migrations`)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrMigrationsPending, err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var v int
+		var sum string
+		if err := rows.Scan(&v, &sum); err != nil {
+			return err
+		}
+		applied[v] = sum
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, m := range migrations {
+		sum, ok := applied[m.Version]
+		if !ok {
+			return fmt.Errorf("%w: %s", ErrMigrationsPending, m.Name)
+		}
+		if sum != m.Checksum {
+			return fmt.Errorf("%w: %s", ErrMigrationModified, m.Name)
+		}
+	}
+	return nil
+}
+
 // Migrate applies pending migrations in order, each in its own transaction, and returns how many ran.
 func Migrate(ctx context.Context, pool *pgxpool.Pool, migrations []Migration) (int, error) {
 	conn, err := pool.Acquire(ctx)
