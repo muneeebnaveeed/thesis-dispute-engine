@@ -5,7 +5,7 @@ SHELL := /bin/bash
 BACKEND := backend
 GO      := cd $(BACKEND) && go
 
-.PHONY: help hooks run migrate dev build fe-install fe-dev fe-check fe-fix fe-generate fe-build fe-image test test-race test-integration cover lint vet fmt fmt-fix tidy vuln versions generate generate-check db-up db-down db-logs db-seed up down docker-dev otel-up otel-down otel-reset image pr ci-logs pr-comments stack ci
+.PHONY: help hooks run migrate dev build fe-install fe-dev fe-check fe-fix fe-generate fe-build fe-image test test-race test-integration cover lint vet fmt fmt-fix tidy vuln versions generate generate-check db-up db-down db-logs db-seed up down docker-dev auth-up auth-down otel-up otel-down otel-reset image pr ci-logs pr-comments stack ci
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -43,10 +43,11 @@ cover: ## Coverage table as CI reports it (uses PostgreSQL if make db-up is runn
 	cd $(BACKEND) && go tool cover -html=coverage.out -o coverage.html
 	scripts/coverage-report $(BACKEND)/coverage.out
 
-generate: ## Regenerate sqlc queries and the OpenAPI server from docs/api/openapi.yaml
+generate: ## Regenerate sqlc queries, the OpenAPI server, and the Keycloak realm imports
 	cd $(BACKEND) && sqlc generate && go generate ./...
+	deploy/keycloak/render-realms.sh >/dev/null
 
-GENERATED := $(BACKEND)/internal/dispute/infrastructure/postgres/sqlcgen $(BACKEND)/internal/dispute/ports/http/oapi
+GENERATED := $(BACKEND)/internal/dispute/infrastructure/postgres/sqlcgen $(BACKEND)/internal/dispute/ports/http/oapi deploy/keycloak/import
 generate-check: ## Fail if generated code is out of date (compares before and after, so a dirty tree is fine)
 	@before=$$(find $(GENERATED) -type f | sort | xargs sha256sum | sha256sum); \
 	$(MAKE) --no-print-directory generate; \
@@ -93,12 +94,20 @@ up: ## PostgreSQL + the API built from backend/Dockerfile
 docker-dev: ## PostgreSQL + the API in a Go toolchain container with live reload (bind mount)
 	docker compose -f deploy/compose.yml --profile dev up --build
 
-down: ## Stop everything started by up/otel-up (keeps the DB volume)
-	docker compose -f deploy/compose.yml --profile app --profile otel down
+down: ## Stop everything started by up/otel-up/auth-up (keeps the DB volume)
+	docker compose -f deploy/compose.yml --profile app --profile otel --profile auth down
 
 otel-up: ## PostgreSQL + API + Grafana LGTM (http://localhost:3001, admin/admin) + synthetic probe; seeds the DB
 	docker compose -f deploy/compose.yml --env-file deploy/otel.env --profile otel up -d --build
 	$(MAKE) --no-print-directory db-seed
+
+auth-up: ## PostgreSQL + Keycloak (http://localhost:8180, admin/admin; one realm per tenant, analyst/analyst in each); seeds the DB
+	deploy/keycloak/render-realms.sh
+	docker compose -f deploy/compose.yml --profile auth up -d --wait
+	$(MAKE) --no-print-directory db-seed
+
+auth-down: ## Stop Keycloak (keeps its database)
+	docker compose -f deploy/compose.yml --profile auth down
 
 otel-down: ## Stop the otel stack
 	docker compose -f deploy/compose.yml --profile otel down

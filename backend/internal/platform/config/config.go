@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -16,7 +17,9 @@ type Config struct {
 	MigrateDatabaseURL string
 	ShutdownTimeout    time.Duration
 	IdempotencyTTL     time.Duration
-	LogLevel           slog.Level
+	// CORSOrigins are browser origins allowed to call the API directly with an analyst token.
+	CORSOrigins []string
+	LogLevel    slog.Level
 }
 
 // Load resolves Config from DISPUTE_* variables; defaults match deploy/compose.yml.
@@ -28,6 +31,7 @@ func Load() (Config, error) {
 		MigrateDatabaseURL: getenv("DISPUTE_MIGRATE_DATABASE_URL", "postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable"),
 		ShutdownTimeout:    10 * time.Second,
 		IdempotencyTTL:     24 * time.Hour,
+		CORSOrigins:        strings.Split(getenv("DISPUTE_CORS_ORIGINS", "http://localhost:3002"), ","),
 	}
 
 	if raw := os.Getenv("DISPUTE_IDEMPOTENCY_TTL"); raw != "" {

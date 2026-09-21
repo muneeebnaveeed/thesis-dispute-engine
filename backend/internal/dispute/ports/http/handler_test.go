@@ -38,7 +38,7 @@ func newAPI(t *testing.T, ready disputehttp.Readiness) api {
 		t.Fatal(err)
 	}
 	keys := keyResolver{"key-a": apptest.TenantA, "key-b": apptest.TenantB}
-	return api{t: t, h: httpserver.RequestID(auth.Bearer(keys)(mux)), store: store}
+	return api{t: t, h: httpserver.RequestID(auth.Bearer(keys, nil)(mux)), store: store}
 }
 
 // keyResolver stands in for the tenant_keys table; the handler tests care about the contract, not the lookup.

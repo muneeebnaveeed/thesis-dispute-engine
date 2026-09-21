@@ -68,10 +68,12 @@ type IdempotencyKey struct {
 }
 
 type Tenant struct {
-	ID        uuid.UUID
-	Name      string
-	Settings  []byte
-	CreatedAt time.Time
+	ID         uuid.UUID
+	Name       string
+	Settings   []byte
+	CreatedAt  time.Time
+	Slug       string
+	OidcIssuer *string
 }
 
 type TenantKey struct {

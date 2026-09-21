@@ -29,7 +29,8 @@ make ci               # what CI runs
 make help             # every target, including PR and stack tooling
 ```
 
-Every dispute endpoint needs a tenant key (`Authorization: Bearer ...`); the seed prints two dev
+Every dispute endpoint needs a credential: a tenant key for a customer's systems, or an analyst's
+access token from that tenant's Keycloak realm (`make auth-up`). The seed prints two dev
 keys, and `go run ./cmd/tenantkey create --tenant <uuid> --label <text>` (from `backend/`) issues real ones;
 `docs/operations.md` covers rotation, leaks and expiry.
 

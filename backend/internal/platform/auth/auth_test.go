@@ -29,7 +29,7 @@ func TestBearer(t *testing.T) {
 	want := uuid.New()
 	var gotTenant uuid.UUID
 	var gotErr error
-	h := Bearer(fakeResolver{"good-key": want})(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+	h := Bearer(fakeResolver{"good-key": want}, nil)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		gotTenant, _ = tenant.IDFrom(r.Context())
 		gotErr = Required(r.Context())
 	}))

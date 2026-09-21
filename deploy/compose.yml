@@ -105,6 +105,33 @@ services:
       DISPUTE_ADDR: ":8090"
       DISPUTE_DATABASE_URL: postgres://dispute_api:dispute_api@localhost:5432/dispute?sslmode=disable
 
+  # Identity for analysts: one realm per tenant, imported from deploy/keycloak/import on start. UI on 8180.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.4
+    network_mode: host
+    profiles: [auth]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["start-dev", "--http-port=8180", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://localhost:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      KC_HOSTNAME: http://localhost:8180
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./keycloak/import:/opt/keycloak/data/import:ro
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\n\r\n' >&3 && grep -q '\"UP\"' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
   # Grafana + Loki + Tempo + Mimir + an OTel Collector in one image; OTLP on 4317/4318, UI on 3001 (admin/admin).
   lgtm:
     image: grafana/otel-lgtm:0.33.1

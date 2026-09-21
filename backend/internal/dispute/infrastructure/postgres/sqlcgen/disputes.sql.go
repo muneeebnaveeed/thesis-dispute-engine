@@ -177,6 +177,22 @@ func (q *Queries) GetIdempotencyKey(ctx context.Context, arg GetIdempotencyKeyPa
 	return i, err
 }
 
+const getTenantByIssuer = `-- name: GetTenantByIssuer :one
+SELECT id, slug FROM tenants WHERE oidc_issuer = $1
+`
+
+type GetTenantByIssuerRow struct {
+	ID   uuid.UUID
+	Slug string
+}
+
+func (q *Queries) GetTenantByIssuer(ctx context.Context, oidcIssuer *string) (GetTenantByIssuerRow, error) {
+	row := q.db.QueryRow(ctx, getTenantByIssuer, oidcIssuer)
+	var i GetTenantByIssuerRow
+	err := row.Scan(&i.ID, &i.Slug)
+	return i, err
+}
+
 const getTenantByTenantKeyHash = `-- name: GetTenantByTenantKeyHash :one
 SELECT id, tenant_id FROM tenant_keys
 WHERE key_hash = $1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())
@@ -345,21 +361,6 @@ func (q *Queries) InsertIdempotencyKey(ctx context.Context, arg InsertIdempotenc
 	return err
 }
 
-const insertTenant = `-- name: InsertTenant :exec
-INSERT INTO tenants (id, name) VALUES ($1, $2)
-ON CONFLICT (id) DO NOTHING
-`
-
-type InsertTenantParams struct {
-	ID   uuid.UUID
-	Name string
-}
-
-func (q *Queries) InsertTenant(ctx context.Context, arg InsertTenantParams) error {
-	_, err := q.db.Exec(ctx, insertTenant, arg.ID, arg.Name)
-	return err
-}
-
 const insertTenantKey = `-- name: InsertTenantKey :exec
 INSERT INTO tenant_keys (id, tenant_id, key_hash, prefix, label, expires_at) VALUES ($1, $2, $3, $4, $5, $6)
 `
@@ -513,6 +514,42 @@ func (q *Queries) ListTenantKeys(ctx context.Context) ([]ListTenantKeysRow, erro
 	return items, nil
 }
 
+const listTenants = `-- name: ListTenants :many
+SELECT id, name, slug, oidc_issuer FROM tenants ORDER BY name
+`
+
+type ListTenantsRow struct {
+	ID         uuid.UUID
+	Name       string
+	Slug       string
+	OidcIssuer *string
+}
+
+func (q *Queries) ListTenants(ctx context.Context) ([]ListTenantsRow, error) {
+	rows, err := q.db.Query(ctx, listTenants)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTenantsRow{}
+	for rows.Next() {
+		var i ListTenantsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Slug,
+			&i.OidcIssuer,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const purgeIdempotencyKeys = `-- name: PurgeIdempotencyKeys :one
 SELECT purge_idempotency_keys($1)::bigint AS n
 `
@@ -571,4 +608,26 @@ func (q *Queries) UpdateDisputeState(ctx context.Context, arg UpdateDisputeState
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const upsertTenant = `-- name: UpsertTenant :exec
+INSERT INTO tenants (id, name, slug, oidc_issuer) VALUES ($1, $2, $3, $4)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, slug = EXCLUDED.slug, oidc_issuer = EXCLUDED.oidc_issuer
+`
+
+type UpsertTenantParams struct {
+	ID         uuid.UUID
+	Name       string
+	Slug       string
+	OidcIssuer *string
+}
+
+func (q *Queries) UpsertTenant(ctx context.Context, arg UpsertTenantParams) error {
+	_, err := q.db.Exec(ctx, upsertTenant,
+		arg.ID,
+		arg.Name,
+		arg.Slug,
+		arg.OidcIssuer,
+	)
+	return err
 }

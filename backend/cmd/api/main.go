@@ -80,7 +80,8 @@ func run(cfg config.Config, logger *slog.Logger) error {
 	if err := disputehttp.Mount(mux, svc, pool.Ping); err != nil {
 		return err
 	}
-	srv := httpserver.New(cfg.Addr, logger, mux, auth.Bearer(disputepg.NewKeyStore(pool)))
+	keys := disputepg.NewKeyStore(pool)
+	srv := httpserver.New(cfg.Addr, logger, mux, httpserver.CORS(cfg.CORSOrigins), auth.Bearer(keys, auth.NewOIDC(keys)))
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()

@@ -1,5 +1,5 @@
-// Package auth resolves the caller's tenant from a bearer tenant key. Human sign-in (OIDC) will add a second
-// resolver later; everything below this layer only sees the tenant in the context.
+// Package auth resolves the caller's tenant from a bearer credential: a tenant key for a customer's systems, or an
+// OIDC access token from the tenant's Keycloak realm for its analysts. Everything below sees only the tenant.
 package auth
 
 import (
@@ -43,20 +43,43 @@ func Prefix(key string) string {
 }
 
 type ctxKey struct{}
+type principalKey struct{}
 
-// Bearer resolves the key if one is presented and records the outcome; it never rejects by itself, because the
-// OpenAPI spec decides which operations need a tenant (see Required) and health endpoints do not.
-func Bearer(resolver Resolver) httpserver.Middleware {
+// PrincipalFrom returns the signed-in analyst, if the request carried an OIDC token rather than a tenant key.
+func PrincipalFrom(ctx context.Context) (Principal, bool) {
+	p, ok := ctx.Value(principalKey{}).(Principal)
+	return p, ok
+}
+
+// Bearer resolves the credential if one is presented and records the outcome; it never rejects by itself, because the
+// OpenAPI spec decides which operations need a tenant (see Required) and health endpoints do not. A nil oidc means
+// analyst tokens are not accepted.
+func Bearer(keys Resolver, oidc *OIDC) httpserver.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			key, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-			key = strings.TrimSpace(key)
-			if !ok || key == "" {
+			cred, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+			cred = strings.TrimSpace(cred)
+			if !ok || cred == "" {
 				next.ServeHTTP(w, r.WithContext(context.WithValue(ctx, ctxKey{}, ErrUnauthenticated)))
 				return
 			}
-			id, err := resolver.TenantForKeyHash(ctx, HashKey(key))
+			var id uuid.UUID
+			var err error
+			kind := "key"
+			if LooksLikeJWT(cred) {
+				kind = "oidc"
+				var p Principal
+				if oidc == nil {
+					err = ErrUnauthenticated
+				} else if p, err = oidc.Verify(ctx, cred); err == nil {
+					id = p.Tenant
+					ctx = context.WithValue(ctx, principalKey{}, p)
+					trace.SpanFromContext(ctx).SetAttributes(attribute.String("enduser.id", p.Subject))
+				}
+			} else {
+				id, err = keys.TenantForKeyHash(ctx, HashKey(cred))
+			}
 			if err != nil {
 				if errs.KindOf(err) == errs.NotFound {
 					err = ErrUnauthenticated
@@ -64,8 +87,9 @@ func Bearer(resolver Resolver) httpserver.Middleware {
 				next.ServeHTTP(w, r.WithContext(context.WithValue(ctx, ctxKey{}, err)))
 				return
 			}
-			trace.SpanFromContext(ctx).SetAttributes(attribute.String("tenant.id", id.String()))
+			trace.SpanFromContext(ctx).SetAttributes(attribute.String("tenant.id", id.String()), attribute.String("auth.kind", kind))
 			httpserver.Annotate(ctx, "tenant", id.String())
+			httpserver.Annotate(ctx, "auth", kind)
 			next.ServeHTTP(w, r.WithContext(tenant.WithID(ctx, id)))
 		})
 	}

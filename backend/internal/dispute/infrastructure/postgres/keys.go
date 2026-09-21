@@ -46,3 +46,12 @@ func (k *KeyStore) touch(ctx context.Context, id uuid.UUID) {
 		_ = sqlcgen.New(k.pool).TouchTenantKey(bg, id)
 	}()
 }
+
+// TenantForIssuer implements auth.IssuerResolver: one Keycloak realm per tenant, recorded on the tenant row.
+func (k *KeyStore) TenantForIssuer(ctx context.Context, issuer string) (uuid.UUID, error) {
+	row, err := sqlcgen.New(k.pool).GetTenantByIssuer(ctx, &issuer)
+	if err != nil {
+		return uuid.Nil, mapErr(err)
+	}
+	return row.ID, nil
+}
