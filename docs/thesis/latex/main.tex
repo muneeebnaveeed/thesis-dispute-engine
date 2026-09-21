@@ -1,0 +1,60 @@
+% Thesis main file. Faculty formal requirements (inf.unideb.hu/node/486): Times New Roman 12 pt, 1.5 spacing,
+% margins left 3 cm, right 2 cm, top 3 cm, bottom 3 cm, automatic table of contents, numbered figures and tables.
+% Build: latexmk -pdf main.tex (or make thesis from the repository root). Overleaf: import this directory.
+\documentclass[12pt,a4paper,oneside]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext,newtxmath}            % Times-compatible text and maths
+\usepackage[left=3cm,right=2cm,top=3cm,bottom=3cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage[english]{babel}
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+\usepackage[style=numeric,sorting=none,maxbibnames=6]{biblatex}
+\addbibresource{references.bib}
+\usepackage{csquotes}
+
+% Code listings are figures (supervisor's rule): typeset small, numbered through the figure counter.
+\lstset{basicstyle=\ttfamily\small,breaklines=true,frame=single,columns=fullflexible,keepspaces=true,
+  showstringspaces=false,tabsize=2}
+\renewcommand{\lstlistingname}{Figure}
+\makeatletter\AtBeginDocument{\let\c@lstlisting\c@figure}\makeatother
+
+% Identifiers are set like code, uniformly, through one macro; the final pass only touches this.
+\newcommand{\code}[1]{\texttt{#1}}
+
+\title{Automated Fraud Dispute Resolution Engine}
+\author{Muneeb Naveed}
+\date{2027}
+
+\begin{document}
+
+% The faculty title page is a fixed template; it replaces this placeholder before submission.
+\input{chapters/00-titlepage}
+
+\tableofcontents
+\clearpage
+
+\input{chapters/01-introduction}
+\input{chapters/02-background}
+\input{chapters/03-requirements}
+\input{chapters/04-design}
+\input{chapters/05-implementation}
+\input{chapters/06-evaluation}
+\input{chapters/07-conclusion}
+
+\printbibliography[title={Bibliography}]
+
+\appendix
+\input{chapters/A-appendix}
+\input{chapters/B-ai-declaration}
+\input{chapters/C-acknowledgements}
+
+\end{document}

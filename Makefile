@@ -5,7 +5,7 @@ SHELL := /bin/bash
 BACKEND := backend
 GO      := cd $(BACKEND) && go
 
-.PHONY: help hooks run migrate dev build fe-install fe-dev fe-check fe-fix fe-generate fe-build fe-image e2e eval test test-race test-integration cover lint vet fmt fmt-fix tidy vuln versions generate generate-check db-up db-down db-logs db-seed up down docker-dev auth-up auth-down otel-up otel-down otel-reset image pr ci-logs pr-comments stack ci
+.PHONY: help hooks run migrate dev build fe-install fe-dev fe-check fe-fix fe-generate fe-build fe-image e2e eval thesis test test-race test-integration cover lint vet fmt fmt-fix tidy vuln versions generate generate-check db-up db-down db-logs db-seed up down docker-dev auth-up auth-down otel-up otel-down otel-reset image pr ci-logs pr-comments stack ci
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -147,6 +147,9 @@ e2e: ## Browser suite against the full local stack (starts Postgres, API and Key
 
 fe-image: ## Build the frontend container image
 	docker build --network host -t dispute-engine-frontend:dev --build-arg NODE_VERSION=$$(sed -n 's/^node = "\(.*\)"$$/\1/p' mise.toml) --build-arg PNPM_VERSION=$$(sed -n 's/^pnpm = "\(.*\)"$$/\1/p' mise.toml) $(FRONTEND)
+
+thesis: ## Build docs/thesis/latex/main.tex to docs/thesis/latex/build/main.pdf (TeX Live in Docker; Overleaf builds the same sources)
+	docker run --rm --network host -v "$(CURDIR)/docs/thesis/latex:/work" -w /work texlive/texlive:latest latexmk -pdf -interaction=nonstopmode main.tex >/dev/null && echo "docs/thesis/latex/build/main.pdf"
 
 eval: ## Thesis evaluation run into docs/thesis/data/<date>/ (needs make otel-up); EVAL_RPS, EVAL_SECONDS, EVAL_KEY
 	scripts/eval
