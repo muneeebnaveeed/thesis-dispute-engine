@@ -18,8 +18,8 @@ How to work in this repo. What the system does is in `README.md` and `docs/adr/`
   the dev machine has no C compiler, CI has one.
 - `make run`: API natively on :8090. `make dev`: same with live reload (air).
 - `make db-up`: PostgreSQL in Docker. `make up`: Postgres + the API image. `make docker-dev`:
-  Postgres + the API in a Go toolchain container with live reload. `make otel-up`: plus Jaeger,
-  UI at http://localhost:16686 (query API under `/api/v3/`).
+  Postgres + the API in a Go toolchain container with live reload. `make otel-up`: plus Grafana LGTM
+  (Grafana at http://localhost:3000, admin/admin; traces in Tempo, metrics in Mimir, logs in Loki).
 - `make image`: build `backend/Dockerfile` locally.
 
 Toolchain is pinned in `mise.toml` (Go, golangci-lint, air); `go.mod` carries `govulncheck`
@@ -71,4 +71,3 @@ exists; `frontend/` and `docs/thesis/` get theirs when they gain content.
   let CI run the race detector.
 - **`gh` accounts:** the dev machine has several; the scripts refuse to run unless the active
   account owns the repo (`gh auth switch --user muneeebnaveeed`).
-- **Jaeger v2** ignores metrics; `deploy/otel.env` sets `OTEL_METRICS_EXPORTER=none`.

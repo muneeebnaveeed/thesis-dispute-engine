@@ -22,14 +22,15 @@ standard `OTEL_*` environment variables (`contrib/exporters/autoexport`), never 
 - `otelhttp` wraps the whole HTTP stack; matched routes rename the server span to their
   pattern (`GET /disputes/{id}`) and tag `http.route`, so span cardinality is bounded by the
   routing table.
-- Request logs carry `trace_id` and `span_id`, so a log line and its trace are one search apart.
-- Local viewing is Jaeger v2 via `make otel-up`; production points the same variables at
-  whatever backend is in use.
+- `slog` records fan out to stdout and, through the `otelslog` bridge, to the OTLP log
+  exporter with trace context attached; request logs also carry `trace_id` and `span_id`.
+- Local viewing is Grafana LGTM (Tempo, Mimir, Loki) via `make otel-up`; production points the
+  same variables at whatever backend is in use.
 
 ## Consequences
 
 - Easier: any OTLP backend, zero code change; every future package gets a tracer with one
   line; real traces of a dispute lifecycle are available for evaluation.
 - Harder: a dependency footprint (otel SDK, exporters) in an otherwise lean module; contributors
-  must keep span names bounded and put variable parts in attributes. Metrics have no local
-  sink yet (Jaeger is traces-only); add a collector or Prometheus when a metric matters.
+  must keep span names bounded and put variable parts in attributes. The local stack is a single
+  all-in-one image, not a production topology.
