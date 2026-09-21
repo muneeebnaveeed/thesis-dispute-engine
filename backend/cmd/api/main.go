@@ -21,21 +21,22 @@ import (
 )
 
 func main() {
-	// Records go to stdout and, once Setup installs a provider, to OTLP with trace context attached.
-	logger := slog.New(telemetry.Handler(slog.NewJSONHandler(os.Stdout, nil)))
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("fatal", "err", err)
+		os.Exit(1)
+	}
+	// Records are redacted, then go to stdout and, once Setup installs a provider, to OTLP with trace context.
+	logger := slog.New(telemetry.Redact(telemetry.Handler(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: cfg.LogLevel}))))
 	slog.SetDefault(logger)
 
-	if err := run(logger); err != nil {
+	if err := run(cfg, logger); err != nil {
 		logger.Error("fatal", "err", err)
 		os.Exit(1)
 	}
 }
 
-func run(logger *slog.Logger) error {
-	cfg, err := config.Load()
-	if err != nil {
-		return err
-	}
+func run(cfg config.Config, logger *slog.Logger) error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
