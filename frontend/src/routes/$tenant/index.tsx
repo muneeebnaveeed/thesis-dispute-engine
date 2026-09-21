@@ -11,7 +11,7 @@ import { serverFields, validateForm } from '#/forms/validate-form'
 import { createDispute } from '#/server/disputes'
 import { Value } from '@sinclair/typebox/value'
 
-import { DisputeState as DisputeStateSchema } from '#/api/schemas.gen'
+import { DisputeReason as DisputeReasonSchema, DisputeState as DisputeStateSchema } from '#/api/schemas.gen'
 import { listDisputes, type DisputeState } from '#/server/disputes-list'
 
 type Search = { state?: DisputeState; cursor?: string; overdue?: boolean }
@@ -30,6 +30,7 @@ export const Route = createFileRoute('/$tenant/')({
 
 // The generated schema is the source of truth for the enum, so the filter can never offer a state the API lacks.
 const STATES = DisputeStateSchema.anyOf.map((l) => l.const)
+const REASONS = DisputeReasonSchema.anyOf.map((l) => l.const)
 const isState = (v: unknown): v is DisputeState => typeof v === 'string' && Value.Check(DisputeStateSchema, v)
 
 const input =
@@ -214,6 +215,17 @@ function Workbench() {
               />
             </label>
             <FieldError id="transactionId-error" message={fields.transactionId} />
+            <label className="block text-sm">
+              Reason
+              <select name="reason" defaultValue="UNAUTHORISED" className={input}>
+                {REASONS.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <FieldError id="reason-error" message={fields.reason} />
             <button type="submit" className={button} disabled={busy}>
               Open
             </button>

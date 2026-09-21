@@ -14,11 +14,11 @@ JOIN accounts a ON a.id = t.account_id
 WHERE t.id = $1;
 
 -- name: InsertDispute :exec
-INSERT INTO disputes (id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10);
+INSERT INTO disputes (id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at, reason)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10, $11);
 
 -- name: GetDispute :one
-SELECT id, tenant_id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at
+SELECT id, tenant_id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at, reason
 FROM disputes
 WHERE id = $1;
 
@@ -137,7 +137,7 @@ UPDATE tenant_keys SET revoked_at = now() WHERE id = $1 AND tenant_id = $2 AND r
 SELECT id, prefix, label, created_at, last_used_at, expires_at, revoked_at FROM tenant_keys WHERE id = $1 AND tenant_id = $2;
 -- name: ListDisputes :many
 -- Keyset pagination on (opened_at, id) descending; row-level security scopes the tenant.
-SELECT id, regime, state, transaction_id, disputed_amount, currency, opened_at, updated_at
+SELECT id, regime, state, transaction_id, disputed_amount, currency, opened_at, updated_at, reason
 FROM disputes
 WHERE (sqlc.narg(state)::text IS NULL OR state = sqlc.narg(state)::text)
   AND (NOT sqlc.arg(overdue)::boolean OR EXISTS (
@@ -205,3 +205,15 @@ FROM tenants WHERE id = current_tenant_id();
 
 -- name: SetTenantCore :execrows
 UPDATE tenants SET settings = settings || jsonb_build_object('core', sqlc.arg(core)::jsonb) WHERE id = sqlc.arg(id);
+
+-- name: UpsertQuestionnaire :exec
+-- Sending again (after an appeal, say) asks afresh: the questions are replaced and any answers cleared.
+INSERT INTO questionnaires (dispute_id, reason, questions, sent_at) VALUES ($1, $2, $3, $4)
+ON CONFLICT (dispute_id) DO UPDATE SET reason = EXCLUDED.reason, questions = EXCLUDED.questions, sent_at = EXCLUDED.sent_at,
+  answers = NULL, received_at = NULL;
+
+-- name: AnswerQuestionnaire :execrows
+UPDATE questionnaires SET answers = $2, received_at = $3 WHERE dispute_id = $1 AND received_at IS NULL;
+
+-- name: GetQuestionnaire :one
+SELECT dispute_id, reason, questions, answers, sent_at, received_at FROM questionnaires WHERE dispute_id = $1;

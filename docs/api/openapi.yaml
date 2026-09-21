@@ -350,6 +350,8 @@ components:
         - invalid-liability
         - invalid-settlement
         - core-declined
+        - unknown-reason
+        - invalid-answers
         - concurrent-update
         - idempotency-key-reuse
         - no-regime
@@ -472,7 +474,13 @@ components:
       required: [transactionId]
       properties:
         transactionId: { type: string, format: uuid }
+        reason:
+          description: Why the customer disputes it; selects the questionnaire. Defaults to UNAUTHORISED.
+          $ref: "#/components/schemas/DisputeReason"
         actor: { type: string, description: "Who opened it; defaults to customer.", default: customer }
+    DisputeReason:
+      type: string
+      enum: [UNAUTHORISED, NOT_RECEIVED, DUPLICATE, AMOUNT_DIFFERS]
     ApplyEventRequest:
       type: object
       required: [event]
@@ -485,11 +493,16 @@ components:
             Event-specific facts, stored verbatim on the log entry. Two are read by the ledger: on ISSUE_REFUND,
             `liability` is the amount the customer bears (a decimal string, capped by the regime, refused with
             invalid-liability); on CLOSE, `settlement` says how an outstanding advance clears (RECOVERED or
-            WRITTEN_OFF; the regime's default when absent; refused with invalid-settlement).
+            WRITTEN_OFF; the regime's default when absent; refused with invalid-settlement); on
+            RECEIVE_QUESTIONNAIRE, `answers` maps question ids to answers and is validated against the questions
+            that were sent (refused with invalid-answers, one error per question).
           additionalProperties: true
           properties:
             liability: { type: string, example: "50.00" }
             settlement: { $ref: "#/components/schemas/SuspenseSettlement" }
+            answers:
+              type: object
+              additionalProperties: { type: string }
     SuspenseSettlement:
       type: string
       enum: [RECOVERED, WRITTEN_OFF]
@@ -546,10 +559,11 @@ components:
         occurredAt: { type: string, format: date-time }
     DisputeSummary:
       type: object
-      required: [id, regime, state, transactionId, disputedAmount, currency, openedAt, updatedAt]
+      required: [id, regime, reason, state, transactionId, disputedAmount, currency, openedAt, updatedAt]
       properties:
         id: { type: string, format: uuid }
         regime: { $ref: "#/components/schemas/Regime" }
+        reason: { $ref: "#/components/schemas/DisputeReason" }
         state: { $ref: "#/components/schemas/DisputeState" }
         transactionId: { type: string, format: uuid }
         disputedAmount: { type: string, description: Decimal as a string; never a float. }
@@ -569,10 +583,11 @@ components:
         nextCursor: { type: string, description: Present when there is another page. }
     Dispute:
       type: object
-      required: [id, regime, state, appeals, version, transactionId, accountId, disputedAmount, currency, openedAt, updatedAt, allowedEvents, events, deadlines, ledger, balances]
+      required: [id, regime, reason, state, appeals, version, transactionId, accountId, disputedAmount, currency, openedAt, updatedAt, allowedEvents, events, deadlines, ledger, balances]
       properties:
         id: { type: string, format: uuid }
         regime: { $ref: "#/components/schemas/Regime" }
+        reason: { $ref: "#/components/schemas/DisputeReason" }
         state: { $ref: "#/components/schemas/DisputeState" }
         appeals: { type: integer }
         version: { type: integer, format: int64 }
@@ -597,6 +612,39 @@ components:
           type: array
           items: { $ref: "#/components/schemas/LedgerEntry" }
         balances: { $ref: "#/components/schemas/Balances" }
+        questionnaire:
+          description: Present once SEND_QUESTIONNAIRE has been applied.
+          $ref: "#/components/schemas/Questionnaire"
+    AnswerType:
+      type: string
+      description: How an answer is validated; every answer travels as a string ("yes"/"no", YYYY-MM-DD, free text, decimal).
+      enum: [YES_NO, DATE, TEXT, AMOUNT]
+    Question:
+      type: object
+      required: [id, text, type, required]
+      properties:
+        id: { type: string }
+        text: { type: string }
+        type: { $ref: "#/components/schemas/AnswerType" }
+        required: { type: boolean }
+    Questionnaire:
+      type: object
+      required: [reason, questions, inconsistencies, sentAt]
+      properties:
+        reason: { $ref: "#/components/schemas/DisputeReason" }
+        questions:
+          type: array
+          description: The questions as they were asked; a later change to the set never affects a sent questionnaire.
+          items: { $ref: "#/components/schemas/Question" }
+        answers:
+          type: object
+          additionalProperties: { type: string }
+        inconsistencies:
+          type: array
+          description: Contradictions found between the answers; empty until received or when none.
+          items: { type: string }
+        sentAt: { type: string, format: date-time }
+        receivedAt: { type: string, format: date-time }
     DeadlineKind:
       type: string
       enum: [REFUND, ACKNOWLEDGE, RESOLUTION]

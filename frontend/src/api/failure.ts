@@ -71,6 +71,8 @@ export function fromProblem(p: Problem): Failure {
       return { kind: 'unavailable', problem: p, retryAfterSeconds: p.retryAfterSeconds ?? 5 }
     case 'no-regime':
     case 'unknown-regime':
+    case 'unknown-reason':
+    case 'invalid-answers':
       return { kind: 'validation', problem: p, fields: fieldErrors(p) }
     // The ledger's refusals name the payload fact they are about, so the form can point at the input.
     case 'invalid-liability':

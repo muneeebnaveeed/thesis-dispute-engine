@@ -9,6 +9,7 @@ import { Deadlines } from '#/components/deadlines'
 import { EventLog } from '#/components/event-log'
 import { FailureBanner, FieldError } from '#/components/failure-banner'
 import { Ledger } from '#/components/ledger'
+import { QuestionnairePanel } from '#/components/questionnaire'
 import { TenantMismatch } from '#/components/tenant-mismatch'
 import { getDispute, type Dispute } from '#/server/disputes'
 
@@ -48,14 +49,20 @@ function DisputePage() {
   const d = outcome.value
   const canRefund = d.allowedEvents.includes('ISSUE_REFUND')
   const canSettle = d.allowedEvents.includes('CLOSE') && Number(d.balances.suspense) > 0
-  const fields = failure?.kind === 'validation' ? failure.fields : {}
+  // Every fact an action carries lives under payload; the inputs are named without that prefix.
+  const fields: Record<string, string> = Object.fromEntries(
+    Object.entries(failure?.kind === 'validation' ? failure.fields : {}).map(([k, v]) => [
+      k.replace(/^payload\./, ''),
+      v,
+    ]),
+  )
 
   // The idempotency key makes the call safe to repeat, so a short outage or budget hit is retried once for the person.
-  async function apply(event: Dispute['allowedEvents'][number]) {
+  async function apply(event: Dispute['allowedEvents'][number], extra: Record<string, unknown> = {}) {
     setBusy(event)
     setFailure(null)
     const key = crypto.randomUUID()
-    const payload: Record<string, string> = {}
+    const payload: Record<string, unknown> = { ...extra }
     if (event === 'ISSUE_REFUND' && liability.trim()) payload.liability = liability.trim()
     if (event === 'CLOSE' && settlement) payload.settlement = settlement
     const res = await call(
@@ -84,6 +91,7 @@ function DisputePage() {
       <dl className="mb-6 grid grid-cols-2 gap-x-6 gap-y-2 text-sm md:grid-cols-4">
         <Field label="State" value={d.state} mono />
         <Field label="Regime" value={d.regime} mono />
+        <Field label="Reason" value={d.reason} mono />
         <Field label="Amount" value={`${d.disputedAmount} ${d.currency}`} />
         <Field label="Appeals used" value={String(d.appeals)} />
       </dl>
@@ -93,23 +101,38 @@ function DisputePage() {
         <Deadlines deadlines={d.deadlines} />
       </section>
 
+      {d.questionnaire && (
+        <section className="mb-8">
+          <h2 className="mb-2 text-lg font-medium">Questionnaire</h2>
+          <QuestionnairePanel
+            questionnaire={d.questionnaire}
+            canReceive={d.allowedEvents.includes('RECEIVE_QUESTIONNAIRE')}
+            fields={fields}
+            busy={busy !== null}
+            onReceive={(answers) => void apply('RECEIVE_QUESTIONNAIRE', { answers })}
+          />
+        </section>
+      )}
+
       <section className="mb-8">
         <h2 className="mb-2 text-lg font-medium">Actions</h2>
         {d.allowedEvents.length === 0 ? (
           <p className="text-sm text-neutral-600">This dispute is closed; nothing more can happen to it.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {d.allowedEvents.map((ev) => (
-              <button
-                key={ev}
-                type="button"
-                disabled={busy !== null}
-                onClick={() => void apply(ev)}
-                className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 font-mono text-sm hover:bg-neutral-100 disabled:opacity-50"
-              >
-                {busy === ev ? '...' : ev}
-              </button>
-            ))}
+            {d.allowedEvents
+              .filter((ev) => ev !== 'RECEIVE_QUESTIONNAIRE')
+              .map((ev) => (
+                <button
+                  key={ev}
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() => void apply(ev)}
+                  className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 font-mono text-sm hover:bg-neutral-100 disabled:opacity-50"
+                >
+                  {busy === ev ? '...' : ev}
+                </button>
+              ))}
           </div>
         )}
         {(canRefund || canSettle) && (
@@ -147,11 +170,16 @@ function DisputePage() {
             )}
           </div>
         )}
-        {failure && !(fields.liability || fields.settlement) && (
-          <div className="mt-4">
-            <FailureBanner failure={failure} onRetry={() => setFailure(null)} />
-          </div>
-        )}
+        {failure &&
+          !(
+            fields.liability ||
+            fields.settlement ||
+            Object.keys(fields).some((k) => k.startsWith('answers.'))
+          ) && (
+            <div className="mt-4">
+              <FailureBanner failure={failure} onRetry={() => setFailure(null)} />
+            </div>
+          )}
       </section>
 
       <section className="mb-8">

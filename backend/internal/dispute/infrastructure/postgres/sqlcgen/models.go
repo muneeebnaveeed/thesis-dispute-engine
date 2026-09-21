@@ -40,6 +40,7 @@ type Dispute struct {
 	OpenedAt       time.Time
 	UpdatedAt      time.Time
 	TenantID       uuid.UUID
+	Reason         string
 }
 
 type DisputeDeadline struct {
@@ -101,6 +102,16 @@ type LedgerEntry struct {
 	CoreRrn          *string
 	CoreResponseCode *string
 	CoreLatencyMs    *int32
+}
+
+type Questionnaire struct {
+	TenantID   uuid.UUID
+	DisputeID  uuid.UUID
+	Reason     string
+	Questions  []byte
+	Answers    []byte
+	SentAt     time.Time
+	ReceivedAt pgtype.Timestamptz
 }
 
 type SuspenseByRegime struct {

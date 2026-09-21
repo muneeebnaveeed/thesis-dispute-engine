@@ -3,7 +3,9 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"net"
 	"strings"
@@ -125,7 +127,7 @@ func (t *txn) InsertDispute(ctx context.Context, d application.DisputeRecord) er
 	return mapErr(t.q.InsertDispute(ctx, sqlcgen.InsertDisputeParams{
 		ID: d.ID, Regime: string(d.Regime), State: string(d.State), Appeals: int32Of(d.Appeals), Version: d.Version,
 		TransactionID: d.TransactionID, AccountID: d.AccountID, DisputedAmount: d.DisputedAmount,
-		Currency: d.Currency, OpenedAt: d.OpenedAt,
+		Currency: d.Currency, OpenedAt: d.OpenedAt, Reason: string(d.Reason),
 	}))
 }
 
@@ -138,6 +140,7 @@ func (t *txn) GetDispute(ctx context.Context, id uuid.UUID) (application.Dispute
 		ID: row.ID, TenantID: row.TenantID, Regime: domain.Regime(row.Regime), State: domain.State(row.State), Appeals: int(row.Appeals),
 		Version: row.Version, TransactionID: row.TransactionID, AccountID: row.AccountID,
 		DisputedAmount: row.DisputedAmount, Currency: row.Currency, OpenedAt: row.OpenedAt, UpdatedAt: row.UpdatedAt,
+		Reason: domain.Reason(row.Reason),
 	}, nil
 }
 
@@ -248,7 +251,8 @@ func (t *txn) ListDisputes(ctx context.Context, q application.ListQuery) ([]appl
 	out := make([]application.DisputeRecord, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, application.DisputeRecord{ID: r.ID, Regime: domain.Regime(r.Regime), State: domain.State(r.State),
-			TransactionID: r.TransactionID, DisputedAmount: r.DisputedAmount, Currency: r.Currency, OpenedAt: r.OpenedAt, UpdatedAt: r.UpdatedAt})
+			TransactionID: r.TransactionID, DisputedAmount: r.DisputedAmount, Currency: r.Currency, OpenedAt: r.OpenedAt, UpdatedAt: r.UpdatedAt,
+			Reason: domain.Reason(r.Reason)})
 	}
 	return out, nil
 }
@@ -363,4 +367,46 @@ func (t *txn) TenantCore(ctx context.Context) (application.CoreConfig, error) {
 		return application.CoreConfig{}, mapErr(err)
 	}
 	return application.CoreConfig{Kind: row.Kind, Settings: row.Settings}, nil
+}
+
+func (t *txn) SendQuestionnaire(ctx context.Context, disputeID uuid.UUID, q application.Questionnaire) error {
+	questions, err := json.Marshal(q.Questions)
+	if err != nil {
+		return err
+	}
+	return mapErr(t.q.UpsertQuestionnaire(ctx, sqlcgen.UpsertQuestionnaireParams{DisputeID: disputeID, Reason: string(q.Reason), Questions: questions, SentAt: q.SentAt}))
+}
+
+func (t *txn) AnswerQuestionnaire(ctx context.Context, disputeID uuid.UUID, answers map[string]string, at time.Time) error {
+	raw, err := json.Marshal(answers)
+	if err != nil {
+		return err
+	}
+	n, err := t.q.AnswerQuestionnaire(ctx, sqlcgen.AnswerQuestionnaireParams{DisputeID: disputeID, Answers: raw, ReceivedAt: pgtype.Timestamptz{Time: at, Valid: true}})
+	if err != nil {
+		return mapErr(err)
+	}
+	if n == 0 {
+		return errs.Wrap(application.ErrNotFound, "no unanswered questionnaire on dispute %s", disputeID)
+	}
+	return nil
+}
+
+func (t *txn) GetQuestionnaire(ctx context.Context, disputeID uuid.UUID) (application.Questionnaire, error) {
+	row, err := t.q.GetQuestionnaire(ctx, disputeID)
+	if err != nil {
+		return application.Questionnaire{}, mapErr(err)
+	}
+	q := application.Questionnaire{Reason: domain.Reason(row.Reason), SentAt: row.SentAt}
+	if err := json.Unmarshal(row.Questions, &q.Questions); err != nil {
+		return application.Questionnaire{}, fmt.Errorf("postgres: questionnaire questions: %w", err)
+	}
+	if row.ReceivedAt.Valid {
+		at := row.ReceivedAt.Time
+		q.ReceivedAt = &at
+		if err := json.Unmarshal(row.Answers, &q.Answers); err != nil {
+			return application.Questionnaire{}, fmt.Errorf("postgres: questionnaire answers: %w", err)
+		}
+	}
+	return q, nil
 }

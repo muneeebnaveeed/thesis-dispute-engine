@@ -141,8 +141,24 @@ func TestCreateApplyGetRoundTrip(t *testing.T) {
 	if rec.Code != 200 || got["state"] != "INVESTIGATING" || len(got["events"].([]any)) != 2 {
 		t.Errorf("get: %d %v", rec.Code, got)
 	}
-	if got["deadlines"] == nil || len(got["deadlines"].([]any)) != 2 || got["ledger"] == nil || got["balances"] == nil {
-		t.Errorf("clocks, ledger and balances must be on every dispute: %v", got)
+	if got["deadlines"] == nil || len(got["deadlines"].([]any)) != 2 || got["ledger"] == nil || got["balances"] == nil || got["reason"] != "UNAUTHORISED" {
+		t.Errorf("clocks, ledger, balances and reason must be on every dispute: %v", got)
+	}
+
+	// The questionnaire follows the reason; answers are validated per question with 422 invalid-answers.
+	rec, sent := a.do(http.MethodPost, "/disputes/"+id+"/events", map[string]any{"event": "SEND_QUESTIONNAIRE"}, nil)
+	if rec.Code != 200 || sent["questionnaire"] == nil || len(sent["questionnaire"].(map[string]any)["questions"].([]any)) != 7 {
+		t.Fatalf("send questionnaire: %d %v", rec.Code, sent["questionnaire"])
+	}
+	rec, refused := a.do(http.MethodPost, "/disputes/"+id+"/events", map[string]any{"event": "RECEIVE_QUESTIONNAIRE", "payload": map[string]any{"answers": map[string]any{"noticed_on": "never"}}}, nil)
+	if rec.Code != 422 || refused["code"] != "invalid-answers" || len(refused["errors"].([]any)) != 6 {
+		t.Fatalf("bad answers: %d %v", rec.Code, refused)
+	}
+	answers := map[string]any{"recognise_merchant": "no", "card_in_possession": "yes", "shared_credentials": "no",
+		"prior_disputes_merchant": "no", "noticed_on": "2026-09-20", "police_report": "no"}
+	rec, received := a.do(http.MethodPost, "/disputes/"+id+"/events", map[string]any{"event": "RECEIVE_QUESTIONNAIRE", "payload": map[string]any{"answers": answers}}, nil)
+	if rec.Code != 200 || received["state"] != "QUESTIONNAIRE_RECEIVED" || received["questionnaire"].(map[string]any)["receivedAt"] == nil {
+		t.Fatalf("answers: %d %v", rec.Code, received)
 	}
 
 	// A refund reaches the ledger with the core's answer; the write-off on close is internal and carries none.

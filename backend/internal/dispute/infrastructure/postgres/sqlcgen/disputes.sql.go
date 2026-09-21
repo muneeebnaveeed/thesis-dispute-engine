@@ -14,6 +14,24 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+const answerQuestionnaire = `-- name: AnswerQuestionnaire :execrows
+UPDATE questionnaires SET answers = $2, received_at = $3 WHERE dispute_id = $1 AND received_at IS NULL
+`
+
+type AnswerQuestionnaireParams struct {
+	DisputeID  uuid.UUID
+	Answers    []byte
+	ReceivedAt pgtype.Timestamptz
+}
+
+func (q *Queries) AnswerQuestionnaire(ctx context.Context, arg AnswerQuestionnaireParams) (int64, error) {
+	result, err := q.db.Exec(ctx, answerQuestionnaire, arg.DisputeID, arg.Answers, arg.ReceivedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const bumpTenantRateWindow = `-- name: BumpTenantRateWindow :one
 INSERT INTO tenant_rate_windows (tenant_id, window_start, count) VALUES ($1, $2, 1)
 ON CONFLICT (tenant_id, window_start) DO UPDATE SET count = tenant_rate_windows.count + 1
@@ -203,7 +221,7 @@ func (q *Queries) FindTenantKeysByPrefix(ctx context.Context, prefix string) ([]
 }
 
 const getDispute = `-- name: GetDispute :one
-SELECT id, tenant_id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at
+SELECT id, tenant_id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at, reason
 FROM disputes
 WHERE id = $1
 `
@@ -221,6 +239,7 @@ type GetDisputeRow struct {
 	Currency       string
 	OpenedAt       time.Time
 	UpdatedAt      time.Time
+	Reason         string
 }
 
 func (q *Queries) GetDispute(ctx context.Context, id uuid.UUID) (GetDisputeRow, error) {
@@ -239,6 +258,7 @@ func (q *Queries) GetDispute(ctx context.Context, id uuid.UUID) (GetDisputeRow, 
 		&i.Currency,
 		&i.OpenedAt,
 		&i.UpdatedAt,
+		&i.Reason,
 	)
 	return i, err
 }
@@ -273,6 +293,33 @@ func (q *Queries) GetIdempotencyKey(ctx context.Context, arg GetIdempotencyKeyPa
 		&i.StatusCode,
 		&i.Response,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getQuestionnaire = `-- name: GetQuestionnaire :one
+SELECT dispute_id, reason, questions, answers, sent_at, received_at FROM questionnaires WHERE dispute_id = $1
+`
+
+type GetQuestionnaireRow struct {
+	DisputeID  uuid.UUID
+	Reason     string
+	Questions  []byte
+	Answers    []byte
+	SentAt     time.Time
+	ReceivedAt pgtype.Timestamptz
+}
+
+func (q *Queries) GetQuestionnaire(ctx context.Context, disputeID uuid.UUID) (GetQuestionnaireRow, error) {
+	row := q.db.QueryRow(ctx, getQuestionnaire, disputeID)
+	var i GetQuestionnaireRow
+	err := row.Scan(
+		&i.DisputeID,
+		&i.Reason,
+		&i.Questions,
+		&i.Answers,
+		&i.SentAt,
+		&i.ReceivedAt,
 	)
 	return i, err
 }
@@ -486,8 +533,8 @@ func (q *Queries) InsertDeadline(ctx context.Context, arg InsertDeadlineParams) 
 }
 
 const insertDispute = `-- name: InsertDispute :exec
-INSERT INTO disputes (id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
+INSERT INTO disputes (id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at, reason)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10, $11)
 `
 
 type InsertDisputeParams struct {
@@ -501,6 +548,7 @@ type InsertDisputeParams struct {
 	DisputedAmount decimal.Decimal
 	Currency       string
 	OpenedAt       time.Time
+	Reason         string
 }
 
 func (q *Queries) InsertDispute(ctx context.Context, arg InsertDisputeParams) error {
@@ -515,6 +563,7 @@ func (q *Queries) InsertDispute(ctx context.Context, arg InsertDisputeParams) er
 		arg.DisputedAmount,
 		arg.Currency,
 		arg.OpenedAt,
+		arg.Reason,
 	)
 	return err
 }
@@ -776,7 +825,7 @@ func (q *Queries) ListDisputeEvents(ctx context.Context, disputeID uuid.UUID) ([
 }
 
 const listDisputes = `-- name: ListDisputes :many
-SELECT id, regime, state, transaction_id, disputed_amount, currency, opened_at, updated_at
+SELECT id, regime, state, transaction_id, disputed_amount, currency, opened_at, updated_at, reason
 FROM disputes
 WHERE ($1::text IS NULL OR state = $1::text)
   AND (NOT $2::boolean OR EXISTS (
@@ -805,6 +854,7 @@ type ListDisputesRow struct {
 	Currency       string
 	OpenedAt       time.Time
 	UpdatedAt      time.Time
+	Reason         string
 }
 
 // Keyset pagination on (opened_at, id) descending; row-level security scopes the tenant.
@@ -833,6 +883,7 @@ func (q *Queries) ListDisputes(ctx context.Context, arg ListDisputesParams) ([]L
 			&i.Currency,
 			&i.OpenedAt,
 			&i.UpdatedAt,
+			&i.Reason,
 		); err != nil {
 			return nil, err
 		}
@@ -1376,6 +1427,30 @@ func (q *Queries) UpdateDisputeState(ctx context.Context, arg UpdateDisputeState
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const upsertQuestionnaire = `-- name: UpsertQuestionnaire :exec
+INSERT INTO questionnaires (dispute_id, reason, questions, sent_at) VALUES ($1, $2, $3, $4)
+ON CONFLICT (dispute_id) DO UPDATE SET reason = EXCLUDED.reason, questions = EXCLUDED.questions, sent_at = EXCLUDED.sent_at,
+  answers = NULL, received_at = NULL
+`
+
+type UpsertQuestionnaireParams struct {
+	DisputeID uuid.UUID
+	Reason    string
+	Questions []byte
+	SentAt    time.Time
+}
+
+// Sending again (after an appeal, say) asks afresh: the questions are replaced and any answers cleared.
+func (q *Queries) UpsertQuestionnaire(ctx context.Context, arg UpsertQuestionnaireParams) error {
+	_, err := q.db.Exec(ctx, upsertQuestionnaire,
+		arg.DisputeID,
+		arg.Reason,
+		arg.Questions,
+		arg.SentAt,
+	)
+	return err
 }
 
 const upsertTenant = `-- name: UpsertTenant :exec
