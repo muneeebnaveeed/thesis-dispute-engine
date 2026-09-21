@@ -60,7 +60,42 @@ go run ./cmd/tenant enable  --slug otp
 go run ./cmd/tenant list
 ```
 
-`scripts/tenant` wraps these together with the Keycloak realm and the first keys; see the onboarding section there.
+`scripts/tenant` wraps these together with the Keycloak realm and the first keys.
+
+## Onboarding a tenant
+
+```sh
+scripts/tenant onboard --slug otp --name "OTP Bank" --domains otpbank.hu
+```
+
+In order: the tenant row (id, slug, issuer, email domains), the realm rendered from the template and created
+in Keycloak (brute-force detection, login events, back-channel logout and the frontend client come with it),
+and two tenant keys labelled primary and standby, printed once. The summary gives the front door,
+`$APP_URL/<slug>`, which is all an analyst ever needs. Deliver the keys over the customer's secret channel.
+Re-running is safe: an existing realm is left alone and only new keys are added (pass `--no-keys` to skip them).
+
+## Analysts
+
+```sh
+scripts/tenant user add    --slug otp --username jane --email jane@otpbank.hu --name "Jane Kovacs" --roles analyst,tenant-admin
+scripts/tenant user list   --slug otp
+scripts/tenant user remove --slug otp --username jane
+```
+
+`add` creates the account with a temporary password (printed once) that must be changed at first sign-in;
+until then direct token grants are refused ("account is not fully set up"), which is correct. `remove`
+disables the account, has Keycloak log the user out (which reaches us through back-channel logout) and ends
+any remaining session directly. Nothing is deleted, so the audit trail keeps the name.
+
+## Offboarding a tenant
+
+```sh
+scripts/tenant offboard --slug otp        # asks for confirmation; --yes to skip
+```
+
+Disables the tenant row (every key and analyst token stops resolving on the next request), revokes every live
+key, ends every analyst session, and disables the realm. Data is retained for the retention obligation;
+`cmd/tenant enable` plus re-enabling the realm in Keycloak reverses it.
 
 ## Production settings the API insists on
 

@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+# Tenant and analyst lifecycle, end to end: the tenant row (cmd/tenant), its Keycloak realm, its first keys
+# (cmd/tenantkey), its analysts, and their sessions (the API's internal endpoint).
+#
+#   scripts/tenant onboard  --slug <slug> --name "<name>" [--domains a.com,b.com] [--id <uuid>] [--no-keys]
+#   scripts/tenant offboard --slug <slug> [--yes]
+#   scripts/tenant user add    --slug <slug> --username <u> --email <e> [--name "First Last"] [--roles analyst,tenant-admin]
+#   scripts/tenant user remove --slug <slug> --username <u>
+#   scripts/tenant user list   --slug <slug>
+#
+# Environment: DISPUTE_MIGRATE_DATABASE_URL (schema owner, for cmd/*), KEYCLOAK_URL, KEYCLOAK_ADMIN_USER,
+# KEYCLOAK_ADMIN_PASSWORD, DISPUTE_API_URL, DISPUTE_SERVICE_KEY, APP_URL, KEYCLOAK_FRONTEND_SECRET.
+set -euo pipefail
+source "$(dirname "$0")/lib/common.sh"
+source "$(dirname "$0")/lib/keycloak.sh"
+root=$(repo_root)
+: "${DISPUTE_API_URL:=http://localhost:8090}"
+: "${DISPUTE_SERVICE_KEY:=dev-service-key}"
+: "${APP_URL:=http://localhost:3002}"
+
+gocmd() { (cd "$root/backend" && go run "./cmd/$1" "${@:2}"); }
+
+tenant_id_for() {
+  gocmd tenant list | awk -v s="$1" '$2 == s {print $1}'
+}
+
+realm_exists() { [[ "$(kc_status GET "/realms/$1")" == 200 ]]; }
+
+end_sessions() { # end_sessions <query>
+  curl -fsS -X DELETE "$DISPUTE_API_URL/internal/sessions?$1" -H "X-Service-Key: $DISPUTE_SERVICE_KEY" | json_get 'd["deleted"]'
+}
+
+cmd_onboard() {
+  local slug="" name="" domains="" id="" keys=1
+  while (($#)); do
+    case "$1" in
+      --slug) slug=$2; shift 2 ;;
+      --name) name=$2; shift 2 ;;
+      --domains) domains=$2; shift 2 ;;
+      --id) id=$2; shift 2 ;;
+      --no-keys) keys=0; shift ;;
+      *) die "unknown flag $1" ;;
+    esac
+  done
+  [[ -n "$slug" && -n "$name" ]] || die "onboard needs --slug and --name"
+
+  info "tenant row"
+  local args=(upsert --slug "$slug" --name "$name" --domains "$domains")
+  [[ -n "$id" ]] && args+=(--id "$id")
+  gocmd tenant "${args[@]}"
+  id=$(tenant_id_for "$slug")
+
+  info "realm"
+  "$root/deploy/keycloak/render-realms.sh" "$slug" "$name" "$id" >/dev/null
+  KC_TOKEN=$(kc_token); export KC_TOKEN
+  if realm_exists "$slug"; then
+    echo "realm $slug already exists; leaving it as is"
+  else
+    kc POST /realms --data-binary "@$root/deploy/keycloak/import/$slug.json" >/dev/null
+    echo "realm $slug created from the template"
+  fi
+
+  if ((keys)); then
+    info "tenant keys (shown once)"
+    for label in "primary" "standby"; do
+      gocmd tenantkey create --tenant "$id" --label "$label" | sed "s/^/  [$label] /"
+    done
+  fi
+
+  info "done"
+  cat <<SUMMARY
+  tenant:     $name ($slug, $id)
+  front door: $APP_URL/$slug
+  next steps: add analysts with 'scripts/tenant user add --slug $slug ...', deliver the keys over the customer's
+              secret channel, and have them bookmark the front door.
+SUMMARY
+}
+
+cmd_offboard() {
+  local slug="" yes=0
+  while (($#)); do
+    case "$1" in
+      --slug) slug=$2; shift 2 ;;
+      --yes) yes=1; shift ;;
+      *) die "unknown flag $1" ;;
+    esac
+  done
+  [[ -n "$slug" ]] || die "offboard needs --slug"
+  local id; id=$(tenant_id_for "$slug")
+  [[ -n "$id" ]] || die "no tenant $slug"
+  if ((!yes)); then
+    read -r -p "Disable tenant $slug ($id), revoke every key, end every session and disable its realm? Data is kept. [y/N] " a
+    [[ "$a" == y || "$a" == Y ]] || die "aborted"
+  fi
+
+  info "disable tenant (keys and tokens stop resolving now)"
+  gocmd tenant disable --slug "$slug"
+
+  info "revoke live keys"
+  gocmd tenantkey list | awk -v t="$id" '$2 == t && $NF == "live" {print $1}' | while read -r kid; do
+    gocmd tenantkey revoke --id "$kid"
+  done
+
+  info "end analyst sessions"
+  echo "  ended $(end_sessions "tenantId=$id") session(s)"
+
+  info "disable realm"
+  KC_TOKEN=$(kc_token); export KC_TOKEN
+  if realm_exists "$slug"; then
+    kc PUT "/realms/$slug" -d '{"enabled": false}' >/dev/null && echo "  realm $slug disabled"
+  else
+    echo "  no realm $slug in Keycloak"
+  fi
+  info "done; the tenant's data is retained and 'scripts/tenant onboard' or 'cmd/tenant enable' can bring it back"
+}
+
+user_id_for() { # user_id_for <slug> <username>
+  kc GET "/realms/$1/users?username=$2&exact=true" | json_get 'd[0]["id"] if d else ""'
+}
+
+cmd_user() {
+  local sub=${1:-}; shift || true
+  local slug="" username="" email="" name="" roles="analyst"
+  while (($#)); do
+    case "$1" in
+      --slug) slug=$2; shift 2 ;;
+      --username) username=$2; shift 2 ;;
+      --email) email=$2; shift 2 ;;
+      --name) name=$2; shift 2 ;;
+      --roles) roles=$2; shift 2 ;;
+      *) die "unknown flag $1" ;;
+    esac
+  done
+  [[ -n "$slug" ]] || die "user $sub needs --slug"
+  KC_TOKEN=$(kc_token); export KC_TOKEN
+  realm_exists "$slug" || die "no realm $slug"
+  case "$sub" in
+    add)
+      [[ -n "$username" && -n "$email" ]] || die "user add needs --username and --email"
+      local first=${name%% *} last=${name#* }
+      [[ "$name" == *" "* ]] || { first=$name; last=""; }
+      local password; password=$(python3 -c 'import secrets;print(secrets.token_urlsafe(12))')
+      local body
+      body=$(python3 - "$username" "$email" "$first" "$last" "$password" <<'PY'
+import json,sys
+u,e,f,l,p=sys.argv[1:]
+print(json.dumps({"username":u,"email":e,"firstName":f,"lastName":l,"enabled":True,"emailVerified":True,
+  "requiredActions":["UPDATE_PASSWORD"],"credentials":[{"type":"password","value":p,"temporary":True}]}))
+PY
+)
+      local status; status=$(kc_status POST "/realms/$slug/users" -d "$body")
+      [[ "$status" == 201 ]] || die "Keycloak refused the user (HTTP $status); does $username or $email already exist?"
+      local uid; uid=$(user_id_for "$slug" "$username")
+      IFS=',' read -ra wanted <<<"$roles"
+      local mappings="["
+      for r in "${wanted[@]}"; do
+        local rep; rep=$(kc GET "/realms/$slug/roles/$r") || die "no role $r in realm $slug"
+        mappings+="$rep,"
+      done
+      mappings="${mappings%,}]"
+      kc POST "/realms/$slug/users/$uid/role-mappings/realm" -d "$mappings" >/dev/null
+      cat <<OUT
+created $username in realm $slug (id $uid) with roles $roles
+temporary password (shown once, must be changed at first sign-in): $password
+front door: $APP_URL/$slug
+OUT
+      ;;
+    remove)
+      [[ -n "$username" ]] || die "user remove needs --username"
+      local uid; uid=$(user_id_for "$slug" "$username")
+      [[ -n "$uid" ]] || die "no user $username in realm $slug"
+      kc PUT "/realms/$slug/users/$uid" -d '{"enabled": false}' >/dev/null
+      # Keycloak's logout drives back-channel logout to the frontend; the direct delete covers a frontend that missed it.
+      kc POST "/realms/$slug/users/$uid/logout" >/dev/null || true
+      local tid; tid=$(tenant_id_for "$slug")
+      echo "disabled $username (id $uid); ended $(end_sessions "tenantId=$tid&subject=$uid") remaining session(s)"
+      ;;
+    list)
+      kc GET "/realms/$slug/users?max=200" | python3 -c '
+import sys,json
+for u in json.load(sys.stdin):
+    print("%-36s  %-16s %-30s %s" % (u["id"], u.get("username",""), u.get("email",""), "enabled" if u.get("enabled") else "disabled"))'
+      ;;
+    *) die "usage: scripts/tenant user add|remove|list ..." ;;
+  esac
+}
+
+case "${1:-}" in
+  onboard) shift; cmd_onboard "$@" ;;
+  offboard) shift; cmd_offboard "$@" ;;
+  user) shift; cmd_user "$@" ;;
+  -h|--help|"") sed -n '2,12p' "$0" ;;
+  *) die "unknown command $1" ;;
+esac
