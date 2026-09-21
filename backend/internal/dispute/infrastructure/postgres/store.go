@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"math"
+	"net"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -152,8 +154,21 @@ func mapErr(err error) error {
 		return application.ErrNotFound
 	}
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-		return errs.Wrap(application.ErrConflict, "unique violation on %s", pgErr.ConstraintName)
+	if errors.As(err, &pgErr) {
+		switch {
+		case pgErr.Code == "23505":
+			return errs.Wrap(application.ErrConflict, "unique violation on %s", pgErr.ConstraintName)
+		case pgErr.Code == "40001" || pgErr.Code == "40P01":
+			return errs.Wrap(application.ErrConflict, "postgres %s", pgErr.Code)
+		// SQLSTATE classes 08 (connection), 53 (resources), 57 (operator intervention) clear up without a code change.
+		case strings.HasPrefix(pgErr.Code, "08"), strings.HasPrefix(pgErr.Code, "53"), strings.HasPrefix(pgErr.Code, "57"):
+			return errs.Wrap(application.ErrUnavailable, "postgres %s", pgErr.Code)
+		}
+		return err
+	}
+	var netErr net.Error
+	if errors.Is(err, context.DeadlineExceeded) || pgconn.Timeout(err) || pgconn.SafeToRetry(err) || errors.As(err, &netErr) {
+		return errs.Wrap(application.ErrUnavailable, "postgres: %v", err)
 	}
 	return err
 }

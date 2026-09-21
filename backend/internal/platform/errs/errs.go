@@ -4,6 +4,8 @@ package errs
 import (
 	"errors"
 	"fmt"
+	"slices"
+	"sync"
 )
 
 // Kind is the class of failure; it decides status, logging and retryability.
@@ -40,9 +42,31 @@ type Error struct {
 
 func (e *Error) Error() string { return e.Msg }
 
-// New returns a sentinel-style error; compare with errors.Is.
+// New returns a sentinel-style error; compare with errors.Is. Every code passes through here, which is what lets
+// the contract test compare the emitted set against the OpenAPI enum.
 func New(kind Kind, code Code, msg string) *Error {
+	registry.Lock()
+	registry.codes[code] = append(registry.codes[code], kind)
+	registry.Unlock()
 	return &Error{Kind: kind, Code: code, Msg: msg}
+}
+
+var registry = struct {
+	sync.Mutex
+	codes map[Code][]Kind
+}{codes: map[Code][]Kind{internalCode: {Internal}}}
+
+const internalCode Code = "internal"
+
+// Codes lists every code constructed so far, sorted, with the kinds it was constructed with.
+func Codes() map[Code][]Kind {
+	registry.Lock()
+	defer registry.Unlock()
+	out := make(map[Code][]Kind, len(registry.codes))
+	for c, kinds := range registry.codes {
+		out[c] = slices.Clone(kinds)
+	}
+	return out
 }
 
 // Wrap adds context for logs while keeping kind, code and the user-facing Msg reachable.
@@ -65,7 +89,7 @@ func CodeOf(err error) Code {
 	if errors.As(err, &e) {
 		return e.Code
 	}
-	return "internal"
+	return internalCode
 }
 
 // WithFields copies e with field-level detail attached.

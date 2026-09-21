@@ -17,6 +17,7 @@ var (
 	ErrNotFound         = errs.New(errs.NotFound, "not-found", "the requested resource does not exist")
 	ErrConflict         = errs.New(errs.Conflict, "concurrent-update", "the dispute changed while this request was in flight; reload and try again")
 	ErrIdempotencyReuse = errs.New(errs.Unprocessable, "idempotency-key-reuse", "this Idempotency-Key was already used with a different request")
+	ErrUnavailable      = errs.New(errs.Unavailable, "unavailable", "a dependency is temporarily unavailable")
 )
 
 // DisputeRecord is the persisted state of a dispute.
