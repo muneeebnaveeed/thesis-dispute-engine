@@ -18,13 +18,17 @@
     "fmt": "oxfmt --check",
     "fmt:fix": "oxfmt",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "generate": "node scripts/generate-api.ts && oxfmt src/api",
+    "generate:check": "pnpm generate && git diff --exit-code -- src/api"
   },
   "dependencies": {
+    "@sinclair/typebox": "^0.34.52",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-router": "^1.132.0",
     "@tanstack/react-start": "^1.132.0",
     "nitro": "3.0.260610-beta",
+    "openapi-fetch": "^0.17.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tailwindcss": "^4.1.18"
@@ -41,12 +45,14 @@
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.0.1",
     "jsdom": "^26.0.0",
+    "openapi-typescript": "^7.13.0",
     "oxfmt": "^0.30.0",
     "oxlint": "^1.30.0",
     "oxlint-tsgolint": "^0.20.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.0",
-    "vitest": "^4.0.0"
+    "vitest": "^4.0.0",
+    "yaml": "^2.9.1"
   },
   "engines": {
     "node": ">=24",

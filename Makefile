@@ -5,7 +5,7 @@ SHELL := /bin/bash
 BACKEND := backend
 GO      := cd $(BACKEND) && go
 
-.PHONY: help hooks run migrate dev build fe-install fe-dev fe-check fe-fix fe-build fe-image test test-race test-integration cover lint vet fmt fmt-fix tidy vuln versions generate generate-check db-up db-down db-logs db-seed up down docker-dev otel-up otel-down otel-reset image pr ci-logs pr-comments stack ci
+.PHONY: help hooks run migrate dev build fe-install fe-dev fe-check fe-fix fe-generate fe-build fe-image test test-race test-integration cover lint vet fmt fmt-fix tidy vuln versions generate generate-check db-up db-down db-logs db-seed up down docker-dev otel-up otel-down otel-reset image pr ci-logs pr-comments stack ci
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -119,10 +119,13 @@ fe-dev: ## Frontend dev server on http://localhost:3002 (expects the API on :809
 	$(PNPM) dev
 
 fe-check: ## Frontend typecheck, lint, format check and tests (what CI runs)
-	$(PNPM) generate-routes && $(PNPM) typecheck && $(PNPM) lint && $(PNPM) fmt && $(PNPM) test
+	$(PNPM) generate-routes && $(PNPM) generate:check && $(PNPM) typecheck && $(PNPM) lint && $(PNPM) fmt && $(PNPM) test
 
 fe-fix: ## Apply frontend lint and format fixes
 	$(PNPM) lint:fix && $(PNPM) fmt:fix
+
+fe-generate: ## Regenerate the frontend API types and schemas from docs/api/openapi.yaml; commit the output
+	$(PNPM) generate
 
 fe-build: ## Production build into frontend/.output
 	$(PNPM) generate-routes && $(PNPM) build

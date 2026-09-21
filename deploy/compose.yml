@@ -83,6 +83,9 @@ services:
         condition: service_started
     environment:
       PORT: "3002"
+      DISPUTE_API_URL: http://localhost:8090
+      # Server-side only; the browser never sees it. Replaced by analyst sign-in once Keycloak lands.
+      DISPUTE_TENANT_KEY: ${FRONTEND_TENANT_KEY:-tk_dev_tenant_a}
 
   # Toolchain container for a fully dockerised dev loop; air watches the bind mount.
   api-dev:
