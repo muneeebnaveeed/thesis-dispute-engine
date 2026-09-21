@@ -210,6 +210,7 @@ export type components = {
       | 'appeals-exhausted'
       | 'invalid-liability'
       | 'invalid-settlement'
+      | 'core-declined'
       | 'concurrent-update'
       | 'idempotency-key-reuse'
       | 'no-regime'
@@ -380,6 +381,16 @@ export type components = {
       reference: string
       /** Format: date-time */
       postedAt: string
+      /** @description The banking core's answer; present for postings that moved the customer's money. */
+      core?: components['schemas']['CoreReceipt']
+    }
+    CoreReceipt: {
+      /** @description Retrieval reference number (ISO 8583 DE37); empty when the tenant has no core. */
+      rrn: string
+      /** @description ISO 8583 DE39; 00 approved */
+      responseCode: string
+      /** Format: int64 */
+      latencyMs: number
     }
     /** @description Running totals per account; customer from the customer's side (positive means credited), the rest from the bank's. */
     Balances: {
@@ -526,7 +537,7 @@ export type components = {
         'application/problem+json': components['schemas']['Problem']
       }
     }
-    /** @description Well-formed but not acceptable (idempotency key reused with a different body, or no regime for the transaction). */
+    /** @description Well-formed but not acceptable (idempotency key reused with a different body, no regime for the transaction, a liability or settlement the regime refuses, or a posting the banking core declined). */
     Unprocessable: {
       headers: {
         [name: string]: unknown
@@ -724,6 +735,15 @@ export interface operations {
       }
       422: components['responses']['Unprocessable']
       429: components['responses']['TooManyRequests']
+      /** @description The tenant's banking core gave no answer in time; nothing was written. Repeat the request with the same Idempotency-Key: the core sees the same posting reference and will not move the money twice. */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json': components['schemas']['Problem']
+        }
+      }
     }
   }
   listTenantKeys: {

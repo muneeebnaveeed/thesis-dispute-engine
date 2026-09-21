@@ -96,6 +96,8 @@ type Tx interface {
 	NextDeadlines(ctx context.Context, disputeIDs []uuid.UUID) (map[uuid.UUID]domain.Deadline, error)
 	AppendLedger(ctx context.Context, disputeID uuid.UUID, entries []LedgerEntry) error
 	ListLedger(ctx context.Context, disputeID uuid.UUID) ([]LedgerEntry, error)
+	// TenantCore is the current tenant's banking-core configuration; a zero value means book entries only.
+	TenantCore(ctx context.Context) (CoreConfig, error)
 }
 
 // LedgerEntry is one persisted posting: the domain movement plus the event that caused it and the reference the
@@ -105,6 +107,7 @@ type LedgerEntry struct {
 	Posting   domain.Posting
 	Reference string
 	PostedAt  time.Time
+	Core      *CoreReceipt // what the core answered, for postings that moved the customer's money
 }
 
 // SuspenseBalance is what one tenant has advanced and not yet cleared under one regime.

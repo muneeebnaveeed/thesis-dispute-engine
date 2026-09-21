@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/mockcore"
 	disputepg "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres"
 	disputehttp "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/ports/http"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/auth"
@@ -72,7 +73,9 @@ func run(cfg config.Config, logger *slog.Logger) error {
 	}
 
 	store := disputepg.NewStore(pool)
-	svc, err := application.NewService(store, nil)
+	// Tenants choose their core by kind in tenants.settings.core; only the simulated one exists in this build.
+	cores := application.CoreRouter{Adapters: map[string]application.BankingCore{mockcore.Kind: mockcore.New(logger)}}
+	svc, err := application.NewService(store, nil, application.WithCore(cores), application.WithCoreTimeout(cfg.CoreTimeout))
 	if err != nil {
 		return err
 	}

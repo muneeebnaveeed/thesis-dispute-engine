@@ -141,6 +141,55 @@ func TestCreateApplyGetRoundTrip(t *testing.T) {
 	if rec.Code != 200 || got["state"] != "INVESTIGATING" || len(got["events"].([]any)) != 2 {
 		t.Errorf("get: %d %v", rec.Code, got)
 	}
+	if got["deadlines"] == nil || len(got["deadlines"].([]any)) != 2 || got["ledger"] == nil || got["balances"] == nil {
+		t.Errorf("clocks, ledger and balances must be on every dispute: %v", got)
+	}
+
+	// A refund reaches the ledger with the core's answer; the write-off on close is internal and carries none.
+	rec, refunded := a.do(http.MethodPost, "/disputes/"+id+"/events", map[string]any{"event": "ISSUE_REFUND", "payload": map[string]any{"liability": "2.10"}}, nil)
+	if rec.Code != 200 {
+		t.Fatalf("refund: %d %s", rec.Code, rec.Body.String())
+	}
+	ledger := refunded["ledger"].([]any)
+	credit := ledger[0].(map[string]any)
+	if credit["kind"] != "FAST_REFUND" || credit["amount"] != "40.0000" || credit["debit"] != "SUSPENSE" || credit["credit"] != "CUSTOMER" {
+		t.Errorf("credit = %v", credit)
+	}
+	if core, ok := credit["core"].(map[string]any); !ok || core["responseCode"] != "00" {
+		t.Errorf("credit core receipt = %v", credit["core"])
+	}
+	if refunded["balances"].(map[string]any)["suspense"] != "40.0000" {
+		t.Errorf("balances = %v", refunded["balances"])
+	}
+	rec, closed := a.do(http.MethodPost, "/disputes/"+id+"/events", map[string]any{"event": "CLOSE"}, nil)
+	if rec.Code != 200 {
+		t.Fatalf("close: %d %s", rec.Code, rec.Body.String())
+	}
+	off := closed["ledger"].([]any)[1].(map[string]any)
+	if off["kind"] != "WRITE_OFF" || off["core"] != nil || closed["balances"].(map[string]any)["suspense"] != "0.0000" {
+		t.Errorf("after close: %v %v", off, closed["balances"])
+	}
+
+	// The ledger's refusals are 422s naming the payload field.
+	rec, problem := a.do(http.MethodPost, "/disputes/"+txnDispute(t, a)+"/events", map[string]any{"event": "ISSUE_REFUND", "payload": map[string]any{"liability": "99"}}, nil)
+	if rec.Code != 422 || problem["code"] != "invalid-liability" {
+		t.Fatalf("over-cap liability: %d %v", rec.Code, problem)
+	}
+	if errs := problem["errors"].([]any); len(errs) != 1 || errs[0].(map[string]any)["field"] != "body.payload.liability" {
+		t.Errorf("field errors = %v", problem["errors"])
+	}
+}
+
+// txnDispute opens a fresh dispute in INVESTIGATING and returns its id.
+func txnDispute(t *testing.T, a api) string {
+	t.Helper()
+	txn := a.store.AddTransaction(domain.RailCard, "EUR", "EUR", "42.10")
+	_, created := a.do(http.MethodPost, "/disputes", map[string]any{"transactionId": txn.String()}, nil)
+	id := created["id"].(string)
+	if rec, _ := a.do(http.MethodPost, "/disputes/"+id+"/events", map[string]any{"event": "OPEN_INVESTIGATION"}, nil); rec.Code != 200 {
+		t.Fatalf("open investigation: %d", rec.Code)
+	}
+	return id
 }
 
 func TestInvalidTransitionIs409WithAllowedEvents(t *testing.T) {

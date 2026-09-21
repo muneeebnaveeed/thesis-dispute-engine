@@ -30,6 +30,7 @@ export function Ledger({ ledger, balances, currency }: Pick<Dispute, 'ledger' | 
               <th className="py-1 pr-4 font-normal">Debit</th>
               <th className="py-1 pr-4 font-normal">Credit</th>
               <th className="py-1 pr-4 text-right font-normal">Amount</th>
+              <th className="py-1 pr-4 font-normal">Core</th>
               <th className="py-1 font-normal">Reference</th>
             </tr>
           </thead>
@@ -42,6 +43,12 @@ export function Ledger({ ledger, balances, currency }: Pick<Dispute, 'ledger' | 
                 <td className="py-1 pr-4 font-mono">{e.credit}</td>
                 <td className="py-1 pr-4 text-right font-mono">
                   {e.amount} {e.currency}
+                </td>
+                <td
+                  className="py-1 pr-4 font-mono text-xs text-neutral-500"
+                  title={e.core ? `response ${e.core.responseCode}` : undefined}
+                >
+                  {e.core ? e.core.rrn || 'booked' : 'internal'}
                 </td>
                 <td className="py-1 font-mono text-xs text-neutral-500">{e.reference}</td>
               </tr>

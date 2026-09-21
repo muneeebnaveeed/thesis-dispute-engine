@@ -36,6 +36,8 @@ type MemStore struct {
 	Ledger       map[uuid.UUID][]application.LedgerEntry
 	// Calendars holds a tenant's business-day calendar; a tenant without one gets the default.
 	Calendars map[uuid.UUID]domain.Calendar
+	// Cores holds a tenant's banking-core configuration; a tenant without one books postings without a core.
+	Cores map[uuid.UUID]application.CoreConfig
 }
 
 // NewMemStore returns an empty store.
@@ -48,6 +50,7 @@ func NewMemStore() *MemStore {
 		Deadlines:    map[uuid.UUID][]domain.Deadline{},
 		Ledger:       map[uuid.UUID][]application.LedgerEntry{},
 		Calendars:    map[uuid.UUID]domain.Calendar{},
+		Cores:        map[uuid.UUID]application.CoreConfig{},
 	}
 }
 
@@ -369,4 +372,8 @@ func (t *memTx) ListLedger(_ context.Context, id uuid.UUID) ([]application.Ledge
 		return nil, err
 	}
 	return append([]application.LedgerEntry(nil), t.s.Ledger[id]...), nil
+}
+
+func (t *memTx) TenantCore(_ context.Context) (application.CoreConfig, error) {
+	return t.s.Cores[t.tenant], nil
 }

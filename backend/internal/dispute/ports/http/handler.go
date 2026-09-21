@@ -566,8 +566,12 @@ func toAPI(v application.DisputeView) oapi.Dispute {
 	}
 	ledger := make([]oapi.LedgerEntry, 0, len(v.Ledger))
 	for _, l := range v.Ledger {
-		ledger = append(ledger, oapi.LedgerEntry{Seq: l.Seq, Kind: oapi.PostingKind(l.Kind), Debit: oapi.LedgerAccount(l.Debit),
-			Credit: oapi.LedgerAccount(l.Credit), Amount: l.Amount.StringFixed(4), Currency: l.Currency, Reference: l.Reference, PostedAt: l.PostedAt})
+		entry := oapi.LedgerEntry{Seq: l.Seq, Kind: oapi.PostingKind(l.Kind), Debit: oapi.LedgerAccount(l.Debit),
+			Credit: oapi.LedgerAccount(l.Credit), Amount: l.Amount.StringFixed(4), Currency: l.Currency, Reference: l.Reference, PostedAt: l.PostedAt}
+		if l.Core != nil {
+			entry.Core = &oapi.CoreReceipt{Rrn: l.Core.RRN, ResponseCode: l.Core.ResponseCode, LatencyMs: l.Core.LatencyMs}
+		}
+		ledger = append(ledger, entry)
 	}
 	return oapi.Dispute{
 		Id: v.ID, Regime: oapi.Regime(v.Regime), State: oapi.DisputeState(v.State), Appeals: v.Appeals,

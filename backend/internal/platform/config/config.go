@@ -18,6 +18,8 @@ type Config struct {
 	MigrateDatabaseURL string
 	ShutdownTimeout    time.Duration
 	IdempotencyTTL     time.Duration
+	// CoreTimeout bounds one instruction to a tenant's banking core; past it the transition rolls back as unavailable.
+	CoreTimeout time.Duration
 	// CORSOrigins are browser origins allowed to call the API directly with an analyst token.
 	CORSOrigins []string
 	// ServiceKey guards /internal/*, used only by the frontend server; empty disables those routes' authentication.
@@ -42,6 +44,7 @@ func Load() (Config, error) {
 		MigrateDatabaseURL:    getenv("DISPUTE_MIGRATE_DATABASE_URL", "postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable"),
 		ShutdownTimeout:       10 * time.Second,
 		IdempotencyTTL:        24 * time.Hour,
+		CoreTimeout:           5 * time.Second,
 		CORSOrigins:           strings.Split(getenv("DISPUTE_CORS_ORIGINS", "http://localhost:3002"), ","),
 		ServiceKey:            getenv("DISPUTE_SERVICE_KEY", "dev-service-key"),
 		InternalCIDRs:         strings.Split(getenv("DISPUTE_INTERNAL_CIDRS", "127.0.0.0/8,::1/128"), ","),
@@ -84,6 +87,14 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("config: DISPUTE_IDEMPOTENCY_TTL must be a positive duration such as 24h, got %q", raw)
 		}
 		cfg.IdempotencyTTL = d
+	}
+
+	if raw := os.Getenv("DISPUTE_CORE_TIMEOUT"); raw != "" {
+		d, err := time.ParseDuration(raw)
+		if err != nil || d <= 0 {
+			return Config{}, fmt.Errorf("config: DISPUTE_CORE_TIMEOUT must be a positive duration such as 5s, got %q", raw)
+		}
+		cfg.CoreTimeout = d
 	}
 
 	if raw := os.Getenv("DISPUTE_LOG_LEVEL"); raw != "" {

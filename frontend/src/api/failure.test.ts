@@ -91,3 +91,16 @@ test('ledger refusals point at the fact in the payload', () => {
   const fields = f.kind === 'validation' ? f.fields : {}
   expect(fields.liability).toMatch(/cap/)
 })
+
+test('a core decline is its own kind, with the core answer in the title', () => {
+  const f = fromProblem({
+    ...base,
+    status: 422,
+    code: 'core-declined',
+    title: 'the banking core declined the posting',
+    detail: 'the banking core declined the posting: exceeds amount limit (61)',
+  })
+  expect(f.kind).toBe('declined')
+  expect(describe(f).title).toMatch(/61/)
+  expect(isRetryable(f)).toBe(false)
+})

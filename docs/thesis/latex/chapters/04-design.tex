@@ -80,9 +80,47 @@ of the same rows, and a histogram of the slack at the moment each clock is satis
 the derivation shows is idempotent replay: a repeated request returns the response as first
 stored, so its statuses are as of the first request, which is what a replay promises anyway.
 
+% Distils ADR 0015.
 \section{The banking core adapter}
 \label{sec:design-core}
-% To write: ADR 0015. Stub so the ledger section's reference resolves.
+
+The ledger says what should move; a bank's core system moves it. Every tenant has its own, and
+the proposal asked for a simulated one modelled on ISO 8583 field semantics. The simulator is the
+least interesting part of the design. What matters is the port between the engine and whatever
+core a tenant has: what is sent, what comes back, when the call is made, and what happens when
+the answer is no, or never arrives.
+
+An \emph{instruction} is one movement on the customer's account: the posting's reference, the
+account, the amount and currency, whether it is a credit or a debit, and the dispute and original
+transaction for the core's own records. A \emph{receipt} is the answer in the vocabulary a card
+switch already uses: a retrieval reference number (field 37), a two-character response code
+(field 39), whether the instruction was approved, and whether the core recognised the reference as
+one it had already carried out (response code 94, duplicate transmission). Only postings that
+touch the customer's account cross this port; suspense, recovery and loss are the bank's own books
+and never leave the engine. Each tenant names its core in its settings and a router picks the
+adapter by that name, so two tenants on one deployment can be two different banks; the two seed
+tenants are configured differently on purpose, one refusing credits above a limit and one
+answering slowly. The simulator that stands behind the port in this build speaks in the same
+fields a real one would (message types 0200 and 0210, processing code 20 for a credit and 01 for a
+debit, the amount in minor units, a system trace number, the reference number derived from the
+posting reference, the numeric currency code), remembers what it has seen, and can be told per
+tenant to decline, to refuse debits on named accounts, to be slow or to be down
+(\code{infrastructure/mockcore}).
+
+The decision that shapes everything else is \emph{when} to call. The engine calls the core inside
+the transition's own database transaction, with a bounded timeout, and treats the answer as part
+of the transition. A decline rolls the transition back: the response is a 422 problem carrying the
+core's response code, and the dispute has no new event and no new posting. Silence rolls it back
+too, as a 503 the client is told to repeat with the same idempotency key. Because the transition
+was never written, the repeat computes the same event sequence and therefore the same posting
+reference; a core that did move the money before its answer was lost recognises the reference
+and answers duplicate instead of paying twice, and the engine records that receipt as the
+approval it is. The alternative, an outbox with a reconciliation job, buys the engine freedom from
+the core's latency at the price of a window in which the dispute says the customer was refunded
+and the core disagrees. For a system whose one job is to be right about that, the lock is the
+cheaper price. Its cost is real: a slow core slows that dispute, though no other, and the test
+\code{TestARetryAfterSilenceIsADuplicateNotADoublePayment} is the promise that the retry story
+holds.
 
 % Distils ADR 0014.
 \section{The ledger}

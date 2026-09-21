@@ -315,11 +315,16 @@ func deadlineOf(kind string, cycle int32, started, due time.Time, met, voided pg
 
 func (t *txn) AppendLedger(ctx context.Context, disputeID uuid.UUID, entries []application.LedgerEntry) error {
 	for _, e := range entries {
-		if err := t.q.InsertLedgerEntry(ctx, sqlcgen.InsertLedgerEntryParams{
+		params := sqlcgen.InsertLedgerEntryParams{
 			DisputeID: disputeID, Seq: int32Of(e.Seq), Kind: string(e.Posting.Kind),
 			DebitAccount: string(e.Posting.Debit), CreditAccount: string(e.Posting.Credit),
 			Amount: e.Posting.Amount, Currency: e.Posting.Currency, Reference: e.Reference, PostedAt: e.PostedAt,
-		}); err != nil {
+		}
+		if e.Core != nil {
+			rrn, code, ms := e.Core.RRN, e.Core.ResponseCode, int32Of(int(e.Core.Latency.Milliseconds()))
+			params.CoreRrn, params.CoreResponseCode, params.CoreLatencyMs = &rrn, &code, &ms
+		}
+		if err := t.q.InsertLedgerEntry(ctx, params); err != nil {
 			return mapErr(err)
 		}
 	}
@@ -333,11 +338,29 @@ func (t *txn) ListLedger(ctx context.Context, disputeID uuid.UUID) ([]applicatio
 	}
 	out := make([]application.LedgerEntry, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, application.LedgerEntry{
+		e := application.LedgerEntry{
 			Seq: int(r.Seq), Reference: r.Reference, PostedAt: r.PostedAt,
 			Posting: domain.Posting{Kind: domain.PostingKind(r.Kind), Debit: domain.Account(r.DebitAccount),
 				Credit: domain.Account(r.CreditAccount), Amount: r.Amount, Currency: r.Currency},
-		})
+		}
+		if r.CoreResponseCode != nil {
+			e.Core = &application.CoreReceipt{ResponseCode: *r.CoreResponseCode, Approved: true, ProcessedAt: r.PostedAt}
+			if r.CoreRrn != nil {
+				e.Core.RRN = *r.CoreRrn
+			}
+			if r.CoreLatencyMs != nil {
+				e.Core.Latency = time.Duration(*r.CoreLatencyMs) * time.Millisecond
+			}
+		}
+		out = append(out, e)
 	}
 	return out, nil
+}
+
+func (t *txn) TenantCore(ctx context.Context) (application.CoreConfig, error) {
+	row, err := t.q.GetTenantCore(ctx)
+	if err != nil {
+		return application.CoreConfig{}, mapErr(err)
+	}
+	return application.CoreConfig{Kind: row.Kind, Settings: row.Settings}, nil
 }
