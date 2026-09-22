@@ -22,7 +22,19 @@ const KIND: Record<Notice['kind'], string> = {
 }
 
 /** Sent Emails: every communication on the dispute, newest first, with the selected one shown as the customer read it. */
-export function SentEmails({ notices, api, disputeId }: { notices: Notice[]; api: Api; disputeId: string }) {
+export function SentEmails({
+  notices,
+  api,
+  disputeId,
+  onResend,
+  busy = false,
+}: {
+  notices: Notice[]
+  api: Api
+  disputeId: string
+  onResend?: (noticeId: number) => void
+  busy?: boolean
+}) {
   const rows = notices.toSorted((a, b) => b.id - a.id)
   // The newest notice is shown until the analyst picks another, so a just-sent email opens selected.
   const [picked, setSelected] = useState<number | null>(null)
@@ -38,7 +50,10 @@ export function SentEmails({ notices, api, disputeId }: { notices: Notice[]; api
             <th className="py-1 pr-4 font-normal">Notice</th>
             <th className="py-1 pr-4 font-normal">Channel</th>
             <th className="py-1 pr-4 font-normal">By</th>
-            <th className="py-1 font-normal">Status</th>
+            <th className="py-1 pr-4 font-normal">Status</th>
+            <th className="py-1 font-normal">
+              <span className="sr-only">Actions</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -51,13 +66,29 @@ export function SentEmails({ notices, api, disputeId }: { notices: Notice[]; api
             >
               <td className="py-1 pr-4">
                 <button type="button" className="text-left" onClick={() => setSelected(n.id)}>
+                  {n.resendOf !== undefined && <span className="text-neutral-500">Resent: </span>}
                   {KIND[n.kind]}
                 </button>
               </td>
               <td className="py-1 pr-4 font-mono text-xs">{n.channel}</td>
               <td className="py-1 pr-4 text-neutral-600">{n.actor ?? 'engine'}</td>
-              <td className="py-1">
+              <td className="py-1 pr-4">
                 <Status notice={n} />
+              </td>
+              <td className="py-1">
+                {onResend && n.channel === 'EMAIL' && n.sentAt && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className="text-xs underline disabled:opacity-50"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onResend(n.id)
+                    }}
+                  >
+                    Resend
+                  </button>
+                )}
               </td>
             </tr>
           ))}

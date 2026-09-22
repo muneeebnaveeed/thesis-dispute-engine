@@ -429,6 +429,30 @@ func (h *Handler) ComposeEmail(ctx context.Context, req oapi.ComposeEmailRequest
 	return oapi.ComposeEmail201JSONResponse(toAPI(view)), nil
 }
 
+// ResendNotice queues an email again as the signed-in analyst.
+func (h *Handler) ResendNotice(ctx context.Context, req oapi.ResendNoticeRequestObject) (oapi.ResendNoticeResponseObject, error) {
+	principal, ok := auth.PrincipalFrom(ctx)
+	if !ok {
+		return nil, auth.ErrForbidden.WithDetail("emails to customers are sent by analysts, not by tenant keys")
+	}
+	actor := principal.Email
+	if actor == "" {
+		actor = principal.Subject
+	}
+	view, err := h.svc.Resend(ctx, application.ResendInput{DisputeID: req.DisputeId, NoticeID: req.NoticeId, Actor: actor})
+	if err != nil {
+		p := h.problem(ctx, fmt.Sprintf("/disputes/%s/notices/%d/resend", req.DisputeId, req.NoticeId), err, req.DisputeId)
+		switch p.Status {
+		case http.StatusNotFound:
+			return oapi.ResendNotice404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: oapi.NotFoundApplicationProblemPlusJSONResponse(p)}, nil
+		case http.StatusConflict:
+			return oapi.ResendNotice409ApplicationProblemPlusJSONResponse(p), nil
+		}
+		return nil, err
+	}
+	return oapi.ResendNotice201JSONResponse(toAPI(view)), nil
+}
+
 // GetNotice returns one composed communication of a dispute.
 func (h *Handler) GetNotice(ctx context.Context, req oapi.GetNoticeRequestObject) (oapi.GetNoticeResponseObject, error) {
 	rec, doc, err := h.svc.GetNotice(ctx, req.DisputeId, req.NoticeId)
@@ -681,6 +705,7 @@ func toAPI(v application.DisputeView) oapi.Dispute {
 			actor := n.Actor
 			nv.Actor = &actor
 		}
+		nv.ResendOf = n.ResendOf
 		out.Notices = append(out.Notices, nv)
 	}
 	if r := v.Risk; r != nil {

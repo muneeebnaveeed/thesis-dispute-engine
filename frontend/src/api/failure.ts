@@ -56,6 +56,7 @@ export function fromProblem(p: Problem): Failure {
     case 'appeals-exhausted':
     case 'concurrent-update':
     case 'idempotency-key-reuse':
+    case 'not-resendable':
       return { kind: 'conflict', problem: p, allowedEvents: p.allowedEvents ?? [] }
     case 'not-found':
       return { kind: 'not-found', problem: p }

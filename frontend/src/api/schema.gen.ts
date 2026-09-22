@@ -126,6 +126,26 @@ export type paths = {
     patch?: never
     trace?: never
   }
+  '/disputes/{disputeId}/notices/{noticeId}/resend': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Send an email again
+     * @description Queues a new email with the original's words to the customer's current address, chained to the original and authored by the analyst. Only an email that has been sent can be resent (not-resendable otherwise); an email still in the outbox is retried by the engine on its own. Analysts only.
+     */
+    post: operations['resendNotice']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/disputes/{disputeId}/notices/{noticeId}': {
     parameters: {
       query?: never
@@ -276,6 +296,7 @@ export type components = {
       | 'risk-hold'
       | 'invalid-fields'
       | 'unknown-template'
+      | 'not-resendable'
       | 'concurrent-update'
       | 'idempotency-key-reuse'
       | 'no-regime'
@@ -617,6 +638,11 @@ export type components = {
       error?: string
       /** @description The analyst who composed it; absent for the engine's own notices. */
       actor?: string
+      /**
+       * Format: int64
+       * @description The notice this one repeats
+       */
+      resendOf?: number
     }
     /**
      * @description TEXT and TEXTAREA are free text; NUMBER a whole number; DATE YYYY-MM-DD; SELECT one option key; MULTISELECT comma-separated option keys.
@@ -1050,6 +1076,42 @@ export interface operations {
       403: components['responses']['Forbidden']
       404: components['responses']['NotFound']
       422: components['responses']['Unprocessable']
+      429: components['responses']['TooManyRequests']
+    }
+  }
+  resendNotice: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        disputeId: string
+        noticeId: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Queued; the dispute with its communications. */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Dispute']
+        }
+      }
+      401: components['responses']['Unauthorized']
+      403: components['responses']['Forbidden']
+      404: components['responses']['NotFound']
+      /** @description The notice is a letter or was never sent. */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json': components['schemas']['Problem']
+        }
+      }
       429: components['responses']['TooManyRequests']
     }
   }

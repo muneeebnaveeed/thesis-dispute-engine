@@ -31,6 +31,10 @@ needs the template engine's rules for facts, and the server never trusts the bro
   automatic notices, with the analyst recorded as the actor and a letter added where the template
   is a letter and the regime requires writing. Tenant keys cannot compose: machines do not write to
   customers.
+- A resend is a new notice chained to the original (`resend_of`), with the original's words, the
+  customer's current address and the analyst as author; only an email that was sent can be resent,
+  because an email still in the outbox is the engine's to retry. A retry and a resend are
+  therefore different records, as they should be for an auditor.
 - The workbench gets a communications panel per dispute with two tabs, Create Email (template,
   form, live preview side by side) and Sent Emails (every notice, automatic and analyst-written,
   with the selected one shown as composed).
@@ -42,5 +46,4 @@ needs the template engine's rules for facts, and the server never trusts the bro
   with its author; the two-tab shape is what analysts already know from comparable tools.
 - Harder: the substitution language is deliberately tiny (no loops, no conditionals beyond
   presence), and both halves must stay in step, which the unit tests on each side pin; templates
-  are one language and shared by every tenant; attachments are not supported; a sent email cannot
-  be recalled, only followed by another.
+  are one language and shared by every tenant; a sent email cannot be recalled, only followed by another or resent.

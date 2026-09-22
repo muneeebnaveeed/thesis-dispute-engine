@@ -103,6 +103,7 @@ type NoticeRecord struct {
 	Attempts  int
 	LastError *string
 	Actor     string // the analyst who composed it; empty for the engine's own notices
+	ResendOf  *int64 // the notice this one repeats, for a resend
 }
 
 // StoredResponse is a prior answer kept for idempotent replay.

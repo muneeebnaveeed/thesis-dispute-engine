@@ -10,6 +10,7 @@ import (
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/notice"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
 )
 
 // EmailTemplates are the analyst's choices for one dispute: each template with the facts already in its words
@@ -111,4 +112,54 @@ func (s *Service) ComposeEmail(ctx context.Context, in ComposeEmailInput) (Dispu
 func factValues(f notice.Facts) notice.FactValues {
 	return notice.FactValues{Customer: f.Customer, Bank: f.Bank, Amount: f.Amount.StringFixed(2) + " " + f.Currency,
 		Merchant: f.Merchant, Dispute: f.DisputeID, Today: f.Now}
+}
+
+// ResendInput names the notice to send again and who asked.
+type ResendInput struct {
+	DisputeID uuid.UUID
+	NoticeID  int64
+	Actor     string
+}
+
+// ErrNotResendable means the notice is a letter, or an email that never went out (the outbox is still trying).
+var ErrNotResendable = errs.New(errs.Conflict, "not-resendable", "only an email that has been sent can be sent again")
+
+// Resend queues a new email with the original's words, to the customer's current address, chained to the
+// original and authored by the analyst; the original keeps its own history.
+func (s *Service) Resend(ctx context.Context, in ResendInput) (DisputeView, error) {
+	var view DisputeView
+	err := s.store.WithTx(ctx, func(tx Tx) error {
+		rec, err := tx.GetDispute(ctx, in.DisputeID)
+		if err != nil {
+			return err
+		}
+		orig, err := tx.GetNotice(ctx, rec.ID, in.NoticeID)
+		if err != nil {
+			return err
+		}
+		if orig.Channel != domain.ChannelEmail || orig.SentAt == nil {
+			return ErrNotResendable
+		}
+		account, err := tx.GetAccount(ctx, rec.AccountID)
+		if err != nil {
+			return err
+		}
+		if account.Email == "" {
+			return ErrNotResendable.WithDetail("the account has no email address")
+		}
+		now := s.now()
+		id := orig.ID
+		n := NoticeRecord{DisputeID: rec.ID, Seq: orig.Seq, Kind: orig.Kind, Channel: domain.ChannelEmail, Recipient: account.Email,
+			Subject: orig.Subject, Document: orig.Document, CreatedAt: now, Actor: in.Actor, ResendOf: &id}
+		if _, err := tx.InsertNotice(ctx, n); err != nil {
+			return err
+		}
+		s.composed.Add(ctx, 1, metric.WithAttributes(tenantAttr(ctx), attribute.String("template", "resend")))
+		view, err = s.view(ctx, tx, rec)
+		return err
+	})
+	if err == nil {
+		s.afterCommit()
+	}
+	return view, err
 }
