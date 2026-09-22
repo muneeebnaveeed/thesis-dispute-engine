@@ -1,10 +1,11 @@
 import { Link } from '@tanstack/react-router'
 
 import type { Dispute } from '#/api/views'
+import { Badge } from '#/components/ui/badge'
 
 type Notice = Dispute['notices'][number]
 
-const KIND: Record<Notice['kind'], string> = {
+export const NOTICE_KIND_LABEL: Record<Notice['kind'], string> = {
   ACKNOWLEDGEMENT: 'Acknowledgement',
   QUESTIONNAIRE: 'Questionnaire',
   PROVISIONAL_CREDIT: 'Provisional credit notice',
@@ -17,7 +18,6 @@ const KIND: Record<Notice['kind'], string> = {
   CUSTOM: 'Custom message',
 }
 
-/** Every communication owed to the customer: what, how, to whom, and whether it has gone. */
 export const Notices = ({
   notices,
   tenant,
@@ -42,21 +42,21 @@ export const Notices = ({
         </tr>
       </thead>
       <tbody>
-        {notices.map((n) => (
-          <tr key={n.id} className="border-t border-neutral-200">
-            <td className="py-1 pr-4">{KIND[n.kind]}</td>
-            <td className="py-1 pr-4 font-mono text-xs">{n.channel}</td>
-            <td className="py-1 pr-4 text-neutral-600">{n.recipient}</td>
+        {notices.map((notice) => (
+          <tr key={notice.id} className="border-t border-neutral-200">
+            <td className="py-1 pr-4">{NOTICE_KIND_LABEL[notice.kind]}</td>
+            <td className="py-1 pr-4 font-mono text-xs">{notice.channel}</td>
+            <td className="py-1 pr-4 text-neutral-600">{notice.recipient}</td>
             <td className="py-1 pr-4">
-              <Status notice={n} />
+              <NoticeStatusBadge notice={notice} />
             </td>
             <td className="py-1">
               <Link
                 to="/$tenant/disputes/$disputeId/notices/$noticeId"
-                params={{ tenant, disputeId, noticeId: String(n.id) }}
+                params={{ tenant, disputeId, noticeId: String(notice.id) }}
                 className="underline"
               >
-                {n.channel === 'LETTER' ? 'Open letter' : 'Read'}
+                {notice.channel === 'LETTER' ? 'Open letter' : 'Read'}
               </Link>
             </td>
           </tr>
@@ -66,20 +66,20 @@ export const Notices = ({
   )
 }
 
-const Status = ({ notice: n }: { notice: Notice }) => {
-  if (n.sentAt)
+export const NoticeStatusBadge = ({ notice }: { notice: Notice }) => {
+  if (notice.sentAt)
     return (
-      <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-900">
-        {n.channel === 'LETTER' ? 'ready to print' : `sent ${n.sentAt.slice(0, 16).replace('T', ' ')}`}
-      </span>
+      <Badge tone="good">
+        {notice.channel === 'LETTER'
+          ? 'ready to print'
+          : `sent ${notice.sentAt.slice(0, 16).replace('T', ' ')}`}
+      </Badge>
     )
-  if (n.error)
+  if (notice.error)
     return (
-      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900" title={n.error}>
+      <Badge tone="warn" title={notice.error}>
         retrying
-      </span>
+      </Badge>
     )
-  return (
-    <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs font-medium text-neutral-800">queued</span>
-  )
+  return <Badge tone="neutral">queued</Badge>
 }

@@ -1,86 +1,95 @@
 import { useMemo, useState } from 'react'
 
-import { preview, segments, type EmailTemplate, type TemplateField } from '#/lib/email/render'
 import { FieldError } from '#/components/layout/failure-banner'
+import { Button } from '#/components/ui/button'
+import { inputVariants, invalidProps } from '#/components/ui/field'
+import {
+  emailLineSegments,
+  renderEmailPreview,
+  type EmailTemplate,
+  type TemplateField,
+} from '#/lib/email/render'
 
-const input =
-  'mt-1 block w-full rounded-md border px-2 py-1 text-sm focus:border-neutral-500 focus:outline-none'
+type EmailFacts = { customer: string; bank: string; today: string }
+export type AttachmentDraft = { id: string; filename: string; size: number }
+const NO_ATTACHMENT_DRAFTS: AttachmentDraft[] = []
+const MAX_ATTACHMENTS = 3
 
-type Facts = { customer: string; bank: string; today: string }
-export type Draft = { id: string; filename: string; size: number }
-const NO_DRAFTS: Draft[] = []
-
-/**
- * Create Email: pick a template, fill its fields, watch the message form on the right. The preview is the same
- * substitution the server performs on send, so what the analyst sees is what the customer gets.
- */
 export const EmailComposer = ({
   templates,
   facts,
-  fields: errors,
+  fields: fieldErrors,
   busy,
   onSend,
-  drafts = NO_DRAFTS,
+  attachmentDrafts = NO_ATTACHMENT_DRAFTS,
   onUpload,
-  onRemoveDraft,
+  onRemoveAttachmentDraft,
 }: {
   templates: EmailTemplate[]
-  facts: Facts
+  facts: EmailFacts
   fields: Record<string, string>
   busy: boolean
-  onSend: (template: EmailTemplate['kind'], inputs: Record<string, string>) => void
-  /** Files already uploaded for this email; sent along with it. */
-  drafts?: Draft[]
+  onSend: (templateKind: EmailTemplate['kind'], analystInputs: Record<string, string>) => void
+  attachmentDrafts?: AttachmentDraft[]
   onUpload?: (file: File) => void
-  onRemoveDraft?: (id: string) => void
+  onRemoveAttachmentDraft?: (draftId: string) => void
 }) => {
-  const [kind, setKind] = useState<EmailTemplate['kind']>(templates[0]?.kind ?? 'CUSTOM')
-  const [inputs, setInputs] = useState<Record<string, string>>({})
-  const template = templates.find((t) => t.kind === kind) ?? templates[0]
+  const [selectedKind, setSelectedKind] = useState<EmailTemplate['kind']>(templates[0]?.kind ?? 'CUSTOM')
+  const [analystInputs, setAnalystInputs] = useState<Record<string, string>>({})
+  const selectedTemplate = templates.find((template) => template.kind === selectedKind) ?? templates[0]
   const today = useMemo(() => new Date(`${facts.today}T00:00:00Z`), [facts.today])
-  const shown = useMemo(() => (template ? preview(template, inputs, today) : null), [template, inputs, today])
-  if (!template || !shown) return <p className="text-sm text-neutral-600">No templates are available.</p>
-  const errorFor = (id: string) => errors[`fields.${id}`] ?? errors[id]
-  const set = (id: string, v: string) => setInputs((cur) => ({ ...cur, [id]: v }))
+  const renderedEmail = useMemo(
+    () => (selectedTemplate ? renderEmailPreview(selectedTemplate, analystInputs, today) : null),
+    [selectedTemplate, analystInputs, today],
+  )
+  if (!selectedTemplate || !renderedEmail) {
+    return <p className="text-sm text-neutral-600">No templates are available.</p>
+  }
+  const fieldErrorFor = (fieldId: string) => fieldErrors[`fields.${fieldId}`] ?? fieldErrors[fieldId]
+  const setAnalystInput = (fieldId: string, value: string) =>
+    setAnalystInputs((current) => ({ ...current, [fieldId]: value }))
+  const filledInputs = () =>
+    Object.fromEntries(Object.entries(analystInputs).filter(([, value]) => value.trim() !== ''))
 
   return (
     <div className="grid gap-8 lg:grid-cols-2">
       <form
         className="space-y-4 text-sm"
-        onSubmit={(e) => {
-          e.preventDefault()
-          onSend(template.kind, Object.fromEntries(Object.entries(inputs).filter(([, v]) => v.trim() !== '')))
+        onSubmit={(event) => {
+          event.preventDefault()
+          onSend(selectedTemplate.kind, filledInputs())
         }}
       >
         <label className="block">
           Email template
           <select
-            value={template.kind}
-            onChange={(e) => {
-              const next = templates.find((t) => t.kind === e.target.value)
-              if (next) setKind(next.kind)
-              setInputs({})
+            value={selectedTemplate.kind}
+            onChange={(event) => {
+              const nextTemplate = templates.find((template) => template.kind === event.target.value)
+              if (nextTemplate) setSelectedKind(nextTemplate.kind)
+              setAnalystInputs({})
             }}
-            className={`${input} border-neutral-300`}
+            className={inputVariants()}
           >
-            {templates.map((t) => (
-              <option key={t.kind} value={t.kind}>
-                {t.label}
+            {templates.map((template) => (
+              <option key={template.kind} value={template.kind}>
+                {template.label}
               </option>
             ))}
           </select>
           <span className="mt-1 block text-xs text-neutral-500">
-            {template.description}
-            {template.letter && ' Also goes out as a letter where the regime requires written notices.'}
+            {selectedTemplate.description}
+            {selectedTemplate.letter &&
+              ' Also goes out as a letter where the regime requires written notices.'}
           </span>
         </label>
-        {template.fields.map((f) => (
-          <FieldInput
-            key={f.id}
-            field={f}
-            value={inputs[f.id] ?? ''}
-            error={errorFor(f.id)}
-            onChange={(v) => set(f.id, v)}
+        {selectedTemplate.fields.map((field) => (
+          <TemplateFieldInput
+            key={field.id}
+            field={field}
+            value={analystInputs[field.id] ?? ''}
+            error={fieldErrorFor(field.id)}
+            onChange={(value) => setAnalystInput(field.id, value)}
           />
         ))}
         {onUpload && (
@@ -91,29 +100,30 @@ export const EmailComposer = ({
               <input
                 type="file"
                 accept="application/pdf,image/png,image/jpeg"
-                disabled={busy || drafts.length >= 3}
+                disabled={busy || attachmentDrafts.length >= MAX_ATTACHMENTS}
                 className="mt-1 block text-sm"
-                onChange={(e) => {
-                  const f = e.target.files?.[0]
-                  if (f) onUpload(f)
-                  e.target.value = ''
+                onChange={(event) => {
+                  const chosenFile = event.target.files?.[0]
+                  if (chosenFile) onUpload(chosenFile)
+                  event.target.value = ''
                 }}
               />
             </label>
-            {drafts.length > 0 && (
+            {attachmentDrafts.length > 0 && (
               <ul className="mt-2 flex flex-wrap gap-2" aria-label="Attached files">
-                {drafts.map((d) => (
+                {attachmentDrafts.map((draft) => (
                   <li
-                    key={d.id}
+                    key={draft.id}
                     className="flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-0.5 text-xs"
                   >
-                    {d.filename} <span className="text-neutral-500">({Math.ceil(d.size / 1024)} KB)</span>
-                    {onRemoveDraft && (
+                    {draft.filename}{' '}
+                    <span className="text-neutral-500">({Math.ceil(draft.size / 1024)} KB)</span>
+                    {onRemoveAttachmentDraft && (
                       <button
                         type="button"
-                        aria-label={`Remove ${d.filename}`}
+                        aria-label={`Remove ${draft.filename}`}
                         className="ml-1 text-neutral-500 hover:text-neutral-900"
-                        onClick={() => onRemoveDraft(d.id)}
+                        onClick={() => onRemoveAttachmentDraft(draft.id)}
                       >
                         x
                       </button>
@@ -122,16 +132,12 @@ export const EmailComposer = ({
                 ))}
               </ul>
             )}
-            <FieldError id="field-attachments-error" message={errors.attachments} />
+            <FieldError id="field-attachments-error" message={fieldErrors.attachments} />
           </div>
         )}
-        <button
-          type="submit"
-          disabled={busy}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50"
-        >
+        <Button type="submit" disabled={busy}>
           {busy ? 'Sending...' : 'Send email'}
-        </button>
+        </Button>
       </form>
 
       <section
@@ -149,23 +155,22 @@ export const EmailComposer = ({
           })}
         </p>
         <h3 className="mb-4 text-[14pt] font-semibold">
-          <Marked line={shown.subject} />
+          <EmailLineWithUnfilledMarked renderedLine={renderedEmail.subject} />
         </h3>
         <p className="mb-4">Dear {facts.customer},</p>
-        {shown.paragraphs.map((p, i) => (
-          // Paragraphs are positional prose; nothing else identifies them.
-          // eslint-disable-next-line react/no-array-index-key
-          <p key={i} className="mb-4 whitespace-pre-line">
-            <Marked line={p} />
+        {renderedEmail.paragraphs.map((paragraph, paragraphIndex) => (
+          // eslint-disable-next-line react/no-array-index-key -- paragraphs are positional prose
+          <p key={paragraphIndex} className="mb-4 whitespace-pre-line">
+            <EmailLineWithUnfilledMarked renderedLine={paragraph} />
           </p>
         ))}
         <p className="whitespace-pre-line">
           Yours sincerely,{'\n'}
           {facts.bank} disputes team
         </p>
-        {drafts.length > 0 && (
+        {attachmentDrafts.length > 0 && (
           <p className="mt-6 text-sm text-neutral-600">
-            Attached: {drafts.map((d) => d.filename).join(', ')}
+            Attached: {attachmentDrafts.map((draft) => draft.filename).join(', ')}
           </p>
         )}
       </section>
@@ -173,31 +178,27 @@ export const EmailComposer = ({
   )
 }
 
-/** Unfilled placeholders are shown as a highlighted field name, so a missing input is visible in the message itself. */
-const Marked = ({ line }: { line: string }) => {
-  return (
-    <>
-      {segments(line).map((s, i) =>
-        s.missing ? (
-          <mark
-            // Segments are positional runs of one line; index plus text is their identity.
-            // eslint-disable-next-line react/no-array-index-key
-            key={`${i}-${s.text}`}
-            className="rounded bg-amber-100 px-1 font-sans text-xs text-amber-900"
-            data-missing={s.text}
-          >
-            {s.text}
-          </mark>
-        ) : (
-          s.text
-        ),
-      )}
-    </>
-  )
-}
+const EmailLineWithUnfilledMarked = ({ renderedLine }: { renderedLine: string }) => (
+  <>
+    {emailLineSegments(renderedLine).map((segment, segmentIndex) =>
+      segment.unfilledPlaceholder ? (
+        <mark
+          // eslint-disable-next-line react/no-array-index-key -- segments are positional runs of one line
+          key={`${segmentIndex}-${segment.text}`}
+          className="rounded bg-amber-100 px-1 font-sans text-xs text-amber-900"
+          data-missing={segment.text}
+        >
+          {segment.text}
+        </mark>
+      ) : (
+        segment.text
+      ),
+    )}
+  </>
+)
 
-const FieldInput = ({
-  field: f,
+const TemplateFieldInput = ({
+  field,
   value,
   error,
   onChange,
@@ -205,96 +206,103 @@ const FieldInput = ({
   field: TemplateField
   value: string
   error: string | undefined
-  onChange: (v: string) => void
+  onChange: (value: string) => void
 }) => {
-  const cls = `${input} ${error ? 'border-red-400' : 'border-neutral-300'}`
-  const common = {
-    'aria-invalid': error ? true : undefined,
-    'aria-describedby': error ? `field-${f.id}-error` : undefined,
-  }
-  const label = (
+  const inputClass = inputVariants({ invalid: Boolean(error) })
+  const a11y = invalidProps(`field-${field.id}`, error)
+  const fieldLabel = (
     <>
-      {f.label}
-      {f.required && <span className="text-neutral-400"> (required)</span>}
+      {field.label}
+      {field.required && <span className="text-neutral-400"> (required)</span>}
     </>
   )
-  if (f.type === 'MULTISELECT') {
-    const chosen = new Set(value.split(',').filter(Boolean))
+  if (field.type === 'MULTISELECT') {
+    const chosenOptionKeys = new Set(value.split(',').filter(Boolean))
     return (
-      <fieldset aria-describedby={common['aria-describedby']}>
-        <legend className="mb-1">{label}</legend>
+      <fieldset aria-describedby={a11y['aria-describedby']}>
+        <legend className="mb-1">{fieldLabel}</legend>
         <div className="space-y-1">
-          {f.options?.map((o) => (
-            <label key={o.key} className="flex items-start gap-2">
+          {field.options?.map((option) => (
+            <label key={option.key} className="flex items-start gap-2">
               <input
                 type="checkbox"
                 className="mt-1"
-                checked={chosen.has(o.key)}
-                onChange={(e) => {
-                  const next = new Set(chosen)
-                  if (e.target.checked) next.add(o.key)
-                  else next.delete(o.key)
-                  onChange([...next].join(','))
+                checked={chosenOptionKeys.has(option.key)}
+                onChange={(event) => {
+                  const nextChosen = new Set(chosenOptionKeys)
+                  if (event.target.checked) nextChosen.add(option.key)
+                  else nextChosen.delete(option.key)
+                  onChange([...nextChosen].join(','))
                 }}
               />
               <span>
-                {o.label}
-                <span className="block text-xs text-neutral-500">{o.text}</span>
+                {option.label}
+                <span className="block text-xs text-neutral-500">{option.text}</span>
               </span>
             </label>
           ))}
         </div>
-        <FieldError id={`field-${f.id}-error`} message={error} />
+        <FieldError id={`field-${field.id}-error`} message={error} />
       </fieldset>
     )
   }
   return (
     <label className="block">
-      {label}
-      {f.type === 'SELECT' && (
-        <select {...common} value={value} onChange={(e) => onChange(e.target.value)} className={cls}>
+      {fieldLabel}
+      {field.type === 'SELECT' && (
+        <select
+          {...a11y}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className={inputClass}
+        >
           <option value="">choose</option>
-          {f.options?.map((o) => (
-            <option key={o.key} value={o.key}>
-              {o.label}
+          {field.options?.map((option) => (
+            <option key={option.key} value={option.key}>
+              {option.label}
             </option>
           ))}
         </select>
       )}
-      {f.type === 'TEXTAREA' && (
+      {field.type === 'TEXTAREA' && (
         <textarea
-          {...common}
+          {...a11y}
           value={value}
           rows={3}
-          onChange={(e) => onChange(e.target.value)}
-          className={cls}
+          onChange={(event) => onChange(event.target.value)}
+          className={inputClass}
         />
       )}
-      {f.type === 'TEXT' && (
-        <input {...common} value={value} onChange={(e) => onChange(e.target.value)} className={cls} />
-      )}
-      {f.type === 'NUMBER' && (
+      {field.type === 'TEXT' && (
         <input
-          {...common}
+          {...a11y}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className={inputClass}
+        />
+      )}
+      {field.type === 'NUMBER' && (
+        <input
+          {...a11y}
           type="number"
           value={value}
-          placeholder={f.default}
-          min={f.min}
-          max={f.max}
-          onChange={(e) => onChange(e.target.value)}
-          className={cls}
+          placeholder={field.default}
+          min={field.min}
+          max={field.max}
+          onChange={(event) => onChange(event.target.value)}
+          className={inputClass}
         />
       )}
-      {f.type === 'DATE' && (
+      {field.type === 'DATE' && (
         <input
-          {...common}
+          {...a11y}
           type="date"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className={cls}
+          onChange={(event) => onChange(event.target.value)}
+          className={inputClass}
         />
       )}
-      <FieldError id={`field-${f.id}-error`} message={error} />
+      <FieldError id={`field-${field.id}-error`} message={error} />
     </label>
   )
 }

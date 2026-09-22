@@ -1,16 +1,17 @@
 import { render, screen } from '@testing-library/react'
 
-import { Deadlines, remaining } from './deadlines'
+import { Deadlines, daysRemaining } from './deadlines'
 
-const day = 86_400_000
+const DAY = 86_400_000
+const HOUR = 3_600_000
 const now = Date.UTC(2026, 8, 21, 12)
 
-test('remaining speaks in whole days either side of due', () => {
-  expect(remaining(new Date(now + 3 * day).toISOString(), now)).toBe('3 days left')
-  expect(remaining(new Date(now + 6 * 3_600_000).toISOString(), now)).toBe('due today')
-  expect(remaining(new Date(now - 2 * 3_600_000).toISOString(), now)).toBe('1 day over')
-  expect(remaining(new Date(now - 1 * day).toISOString(), now)).toBe('1 day over')
-  expect(remaining(new Date(now - 5 * day).toISOString(), now)).toBe('5 days over')
+test('daysRemaining speaks in whole days either side of due', () => {
+  expect(daysRemaining(new Date(now + 3 * DAY).toISOString(), now)).toBe('3 days left')
+  expect(daysRemaining(new Date(now + 6 * HOUR).toISOString(), now)).toBe('due today')
+  expect(daysRemaining(new Date(now - 2 * HOUR).toISOString(), now)).toBe('1 day over')
+  expect(daysRemaining(new Date(now - 1 * DAY).toISOString(), now)).toBe('1 day over')
+  expect(daysRemaining(new Date(now - 5 * DAY).toISOString(), now)).toBe('5 days over')
 })
 
 test('each clock shows its purpose, status and legal basis', () => {

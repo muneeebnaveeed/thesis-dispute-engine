@@ -4,21 +4,20 @@ import { join } from 'node:path'
 import { Value } from '@sinclair/typebox/value'
 
 import { EmailTemplate as EmailTemplateSchema } from '#/api/schemas.gen'
-import { preview } from './render'
+import { renderEmailPreview } from './render'
 import type { EmailTemplate } from './render'
 
-// The browser-side renderer against the real template files: the same inputs as the Go golden tests, so the two
-// halves of the template language can be compared by eye. Update with: pnpm vitest run -u
-const dir = join(__dirname, '../../../../backend/internal/dispute/notice/templates')
-const templates: EmailTemplate[] = readdirSync(dir)
-  .filter((f) => f.endsWith('.json'))
-  .map((f) => {
-    const raw: unknown = JSON.parse(readFileSync(join(dir, f), 'utf8'))
-    if (!Value.Check(EmailTemplateSchema, raw))
+// the same inputs as the Go golden tests, so the two halves of the template language can be compared by eye
+const templatesDir = join(__dirname, '../../../../backend/internal/dispute/notice/templates')
+const templates: EmailTemplate[] = readdirSync(templatesDir)
+  .filter((filename) => filename.endsWith('.json'))
+  .map((filename) => {
+    const parsed: unknown = JSON.parse(readFileSync(join(templatesDir, filename), 'utf8'))
+    if (!Value.Check(EmailTemplateSchema, parsed))
       throw new Error(
-        `${f} is not an EmailTemplate: ${JSON.stringify([...Value.Errors(EmailTemplateSchema, raw)].slice(0, 2))}`,
+        `${filename} is not an EmailTemplate: ${JSON.stringify([...Value.Errors(EmailTemplateSchema, parsed)].slice(0, 2))}`,
       )
-    return raw
+    return parsed
   })
 
 const facts: Record<string, string> = {
@@ -46,20 +45,31 @@ const inputs: Record<string, Record<string, string>> = {
   },
 }
 
-// The server substitutes facts before the browser sees a template; do the same here.
-const withFacts = (t: EmailTemplate): EmailTemplate => {
-  const sub = (s: string) =>
-    s.replace(/\{\{(customer|bank|amount|merchant|dispute|today)\}\}/g, (m, k: string) => facts[k] ?? m)
-  return { ...t, subject: sub(t.subject), paragraphs: t.paragraphs.map(sub) }
+// the server substitutes facts before the browser sees a template
+const withFactsSubstituted = (template: EmailTemplate): EmailTemplate => {
+  const substituteFacts = (line: string) =>
+    line.replace(
+      /\{\{(customer|bank|amount|merchant|dispute|today)\}\}/g,
+      (match, factName: string) => facts[factName] ?? match,
+    )
+  return {
+    ...template,
+    subject: substituteFacts(template.subject),
+    paragraphs: template.paragraphs.map(substituteFacts),
+  }
 }
+const today = new Date(`${facts.today}T00:00:00Z`)
 
-test.each(templates.map((t) => [t.kind, t] as const))('%s renders as the analyst previews it', (kind, t) => {
-  expect(preview(withFacts(t), inputs[kind] ?? {}, new Date(`${facts.today}T00:00:00Z`))).toMatchSnapshot()
-})
+test.each(templates.map((template) => [template.kind, template] as const))(
+  '%s renders as the analyst previews it',
+  (kind, template) => {
+    expect(renderEmailPreview(withFactsSubstituted(template), inputs[kind] ?? {}, today)).toMatchSnapshot()
+  },
+)
 
-test.each(templates.map((t) => [t.kind, t] as const))(
+test.each(templates.map((template) => [template.kind, template] as const))(
   '%s with nothing filled shows every placeholder',
-  (_kind, t) => {
-    expect(preview(withFacts(t), {}, new Date(`${facts.today}T00:00:00Z`))).toMatchSnapshot()
+  (_kind, template) => {
+    expect(renderEmailPreview(withFactsSubstituted(template), {}, today)).toMatchSnapshot()
   },
 )

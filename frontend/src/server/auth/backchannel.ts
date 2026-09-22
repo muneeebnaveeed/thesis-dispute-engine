@@ -7,88 +7,82 @@ import { realmConfig } from './oidc'
 
 const jwksByIssuer = new Map<string, ReturnType<typeof createRemoteJWKSet>>()
 
-/** Which sessions a logout token names: the realm session, or every session of the subject at that tenant. */
 export type LogoutTarget = { sid: string } | { issuer: string; subject: string }
 
-type Deps = { jwks: (issuer: string, slug: string) => Promise<JWTVerifyGetKey> }
+type KeySource = { jwks: (issuer: string, slug: string) => Promise<JWTVerifyGetKey> }
 
-// OpenID Connect Back-Channel Logout 1.0: an id_token-like JWT with the logout event, sid and/or sub, no nonce.
-// The issuer must be one of our realms: the slug is read from the token, the expected issuer is rebuilt from
-// configuration, and the two must agree before any key is fetched.
+// the slug comes from the token but the issuer is rebuilt from configuration; both must agree before any key is fetched
 export const verifyLogoutToken = async (
-  raw: string,
-  deps: Deps = { jwks: jwksFor },
+  logoutToken: string,
+  keys: KeySource = { jwks: jwksFor },
 ): Promise<LogoutTarget | null> => {
   let claimedIssuer: string
   try {
-    const iss = decodeJwt(raw).iss
-    if (typeof iss !== 'string') return null
-    claimedIssuer = iss
+    const claimedIss = decodeJwt(logoutToken).iss
+    if (typeof claimedIss !== 'string') return null
+    claimedIssuer = claimedIss
   } catch {
     return null
   }
   const slug = claimedIssuer.split('/realms/')[1]
   if (!slug || !/^[a-z0-9][a-z0-9-]{1,62}$/.test(slug)) return null
   const env = serverEnv()
-  const issuer = `${env.keycloakUrl.replace(/\/$/, '')}/realms/${slug}`
-  if (claimedIssuer !== issuer) return null
+  const expectedIssuer = `${env.keycloakUrl.replace(/\/$/, '')}/realms/${slug}`
+  if (claimedIssuer !== expectedIssuer) return null
   try {
-    const { payload } = await jwtVerify(raw, await deps.jwks(issuer, slug), {
-      issuer,
+    const { payload } = await jwtVerify(logoutToken, await keys.jwks(expectedIssuer, slug), {
+      issuer: expectedIssuer,
       audience: env.clientId,
       maxTokenAge: '5m',
     })
-    return targetOf(payload)
+    return logoutTargetOf(payload)
   } catch {
     return null
   }
 }
 
-const targetOf = (p: JWTPayload): LogoutTarget | null => {
-  const events = p.events
-  if (
-    !events ||
-    typeof events !== 'object' ||
-    !('http://schemas.openid.net/event/backchannel-logout' in events)
-  )
-    return null
-  if ('nonce' in p) return null
-  if (typeof p.sid === 'string' && p.sid) return { sid: p.sid }
-  if (typeof p.sub === 'string' && p.sub && typeof p.iss === 'string')
-    return { issuer: p.iss, subject: p.sub }
+const BACKCHANNEL_LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-logout'
+
+const logoutTargetOf = (claims: JWTPayload): LogoutTarget | null => {
+  const events = claims.events
+  if (!events || typeof events !== 'object' || !(BACKCHANNEL_LOGOUT_EVENT in events)) return null
+  if ('nonce' in claims) return null
+  if (typeof claims.sid === 'string' && claims.sid) return { sid: claims.sid }
+  if (typeof claims.sub === 'string' && claims.sub && typeof claims.iss === 'string') {
+    return { issuer: claims.iss, subject: claims.sub }
+  }
   return null
 }
 
 const jwksFor = async (issuer: string, slug: string) => {
-  let set = jwksByIssuer.get(issuer)
-  if (!set) {
+  let keySet = jwksByIssuer.get(issuer)
+  if (!keySet) {
     const config = await realmConfig(slug)
-    const uri = config.serverMetadata().jwks_uri
-    if (!uri) throw new Error('realm has no jwks_uri')
-    set = createRemoteJWKSet(new URL(uri))
-    jwksByIssuer.set(issuer, set)
+    const jwksUri = config.serverMetadata().jwks_uri
+    if (!jwksUri) throw new Error('realm has no jwks_uri')
+    keySet = createRemoteJWKSet(new URL(jwksUri))
+    jwksByIssuer.set(issuer, keySet)
   }
-  return set
+  return keySet
 }
 
-/** Ends the sessions a valid logout token names through the API's internal endpoint. */
-export const handleBackchannelLogout = async (raw: string): Promise<boolean> => {
-  const target = await verifyLogoutToken(raw)
+export const handleBackchannelLogout = async (logoutToken: string): Promise<boolean> => {
+  const target = await verifyLogoutToken(logoutToken)
   if (!target) return false
   const env = serverEnv()
-  const api = createClient<paths>({ baseUrl: env.apiUrl })
+  const internalApi = createClient<paths>({ baseUrl: env.apiUrl })
   const headers = { 'X-Service-Key': env.serviceKey }
   if ('sid' in target) {
-    const { response } = await api.DELETE('/internal/sessions', {
+    const { response } = await internalApi.DELETE('/internal/sessions', {
       params: { query: { sid: target.sid } },
       headers,
     })
     return response.ok
   }
-  const { data } = await api.GET('/internal/tenants', { headers })
-  const tenant = data?.find((t) => t.issuer === target.issuer)
+  const { data: tenants } = await internalApi.GET('/internal/tenants', { headers })
+  const tenant = tenants?.find((candidate) => candidate.issuer === target.issuer)
   if (!tenant) return false
-  const { response } = await api.DELETE('/internal/sessions', {
+  const { response } = await internalApi.DELETE('/internal/sessions', {
     params: { query: { tenantId: tenant.id, subject: target.subject } },
     headers,
   })

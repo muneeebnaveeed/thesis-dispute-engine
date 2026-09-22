@@ -1,5 +1,3 @@
-// Generates src/api/*.gen.ts from docs/api/openapi.yaml: TypeScript types via openapi-typescript and one TypeBox
-// schema per component, paired with its generated type through Type.Unsafe so form validation and the client agree.
 import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -23,18 +21,20 @@ const types = astToString(
 )
 await writeFile(path.join(outDir, 'schema.gen.ts'), header + types)
 
-// Emit TypeBox builder calls for the JSON Schema subset the spec uses; $refs point at sibling exports.
+// $refs become references to sibling exports, so emission order must follow dependencies
 const schemas = spec.components.schemas
-type Node = Record<string, unknown>
-const opt = (n: Node, keys: string[]) => {
-  const o: Node = {}
-  for (const k of keys) if (n[k] !== undefined) o[k] = n[k]
-  return Object.keys(o).length ? `, ${JSON.stringify(o)}` : ''
+type JsonSchemaNode = Record<string, unknown>
+const typeBoxOptions = (node: JsonSchemaNode, keys: string[]) => {
+  const kept: JsonSchemaNode = {}
+  for (const key of keys) if (node[key] !== undefined) kept[key] = node[key]
+  return Object.keys(kept).length ? `, ${JSON.stringify(kept)}` : ''
 }
-const emit = (n: Node): string => {
-  if (typeof n.$ref === 'string') return n.$ref.replace('#/components/schemas/', '')
-  if (Array.isArray(n.allOf)) return `Type.Intersect([${(n.allOf as Node[]).map(emit).join(', ')}])`
-  const meta = opt(n, [
+const emitTypeBox = (node: JsonSchemaNode): string => {
+  if (typeof node.$ref === 'string') return node.$ref.replace('#/components/schemas/', '')
+  if (Array.isArray(node.allOf)) {
+    return `Type.Intersect([${(node.allOf as JsonSchemaNode[]).map(emitTypeBox).join(', ')}])`
+  }
+  const options = typeBoxOptions(node, [
     'description',
     'default',
     'format',
@@ -45,60 +45,67 @@ const emit = (n: Node): string => {
     'pattern',
     'example',
   ])
-  if (Array.isArray(n.enum)) {
-    const lits = (n.enum as string[]).map((v) => `Type.Literal(${JSON.stringify(v)})`).join(', ')
-    return `Type.Union([${lits}]${meta})`
+  if (Array.isArray(node.enum)) {
+    const literals = (node.enum as string[])
+      .map((value) => `Type.Literal(${JSON.stringify(value)})`)
+      .join(', ')
+    return `Type.Union([${literals}]${options})`
   }
-  switch (n.type) {
+  switch (node.type) {
     case 'string':
-      return `Type.String(${meta.slice(2)})`
+      return `Type.String(${options.slice(2)})`
     case 'integer':
-      return `Type.Integer(${meta.slice(2)})`
+      return `Type.Integer(${options.slice(2)})`
     case 'number':
-      return `Type.Number(${meta.slice(2)})`
+      return `Type.Number(${options.slice(2)})`
     case 'boolean':
-      return `Type.Boolean(${meta.slice(2)})`
+      return `Type.Boolean(${options.slice(2)})`
     case 'array':
-      return `Type.Array(${emit(n.items as Node)}${meta})`
+      return `Type.Array(${emitTypeBox(node.items as JsonSchemaNode)}${options})`
     case 'object': {
-      const props = (n.properties ?? {}) as Record<string, Node>
-      const required = new Set((n.required ?? []) as string[])
-      if (Object.keys(props).length === 0) {
-        const ap = n.additionalProperties
-        const value = ap && typeof ap === 'object' ? emit(ap as Node) : 'Type.Unknown()'
-        return `Type.Record(Type.String(), ${value}${meta})`
+      const properties = (node.properties ?? {}) as Record<string, JsonSchemaNode>
+      const required = new Set((node.required ?? []) as string[])
+      if (Object.keys(properties).length === 0) {
+        const additional = node.additionalProperties
+        const valueSchema =
+          additional && typeof additional === 'object'
+            ? emitTypeBox(additional as JsonSchemaNode)
+            : 'Type.Unknown()'
+        return `Type.Record(Type.String(), ${valueSchema}${options})`
       }
-      const body = Object.entries(props)
-        .map(([k, v]) => `  ${k}: ${required.has(k) ? emit(v) : `Type.Optional(${emit(v)})`},`)
+      const propertyLines = Object.entries(properties)
+        .map(
+          ([name, schema]) =>
+            `  ${name}: ${required.has(name) ? emitTypeBox(schema) : `Type.Optional(${emitTypeBox(schema)})`},`,
+        )
         .join('\n')
-      const ap = n.additionalProperties === false ? ', { additionalProperties: false }' : ''
-      return `Type.Object({\n${body}\n}${ap || meta})`
+      const closed = node.additionalProperties === false ? ', { additionalProperties: false }' : ''
+      return `Type.Object({\n${propertyLines}\n}${closed || options})`
     }
     default:
-      throw new Error(`unsupported schema: ${JSON.stringify(n)}`)
+      throw new Error(`unsupported schema: ${JSON.stringify(node)}`)
   }
 }
 
-// Emit in dependency order so a schema's $ref targets are declared first.
-const order: string[] = []
-const seen = new Set<string>()
-const refsOf = (n: unknown, acc: Set<string>) => {
-  if (Array.isArray(n)) n.forEach((x) => refsOf(x, acc))
-  else if (n && typeof n === 'object') {
-    const o = n as Node
-    if (typeof o.$ref === 'string') acc.add(o.$ref.replace('#/components/schemas/', ''))
-    Object.values(o).forEach((v) => refsOf(v, acc))
+const emissionOrder: string[] = []
+const emitted = new Set<string>()
+const collectRefs = (node: unknown, refs: Set<string>) => {
+  if (Array.isArray(node)) node.forEach((item) => collectRefs(item, refs))
+  else if (node && typeof node === 'object') {
+    const schemaNode = node as JsonSchemaNode
+    if (typeof schemaNode.$ref === 'string') refs.add(schemaNode.$ref.replace('#/components/schemas/', ''))
+    Object.values(schemaNode).forEach((child) => collectRefs(child, refs))
   }
 }
-const visit = (name: string) => {
-  if (seen.has(name)) return
-  seen.add(name)
-  const deps = new Set<string>()
-  refsOf(schemas[name], deps)
-  deps.forEach(visit)
-  order.push(name)
+const emitAfterDependencies = (name: string) => {
+  if (emitted.has(name)) return
+  emitted.add(name)
+  const dependencies = new Set<string>()
+  collectRefs(schemas[name], dependencies)
+  dependencies.forEach(emitAfterDependencies)
+  emissionOrder.push(name)
 }
-Object.keys(schemas).toSorted().forEach(visit)
+Object.keys(schemas).toSorted().forEach(emitAfterDependencies)
 
 const lines = [
   header,
@@ -109,11 +116,11 @@ const lines = [
   'type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never',
   '',
 ]
-for (const name of order) {
-  lines.push(`export const ${name} = ${emit(schemas[name] as Node)}`)
+for (const name of emissionOrder) {
+  lines.push(`export const ${name} = ${emitTypeBox(schemas[name] as JsonSchemaNode)}`)
   lines.push(`export type ${name} = Static<typeof ${name}>`)
   lines.push(`const _${name}: Same<${name}, components['schemas']['${name}']> = true`)
   lines.push(`void _${name}`, '')
 }
 await writeFile(path.join(outDir, 'schemas.gen.ts'), lines.join('\n'))
-console.log(`generated ${order.length} schemas into src/api`)
+console.log(`generated ${emissionOrder.length} schemas into src/api`)

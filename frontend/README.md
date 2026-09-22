@@ -14,7 +14,7 @@ but pnpm. `scripts/check-runtime-versions.sh` fails CI when `Dockerfile` or `pac
 mise install            # from the repo root
 make fe-install         # pnpm install --frozen-lockfile
 make fe-dev             # http://localhost:3002, expects the API on :8090
-make fe-check           # typecheck, lint, format check, tests (what CI runs)
+make fe-check           # typecheck, lint, knip, format check, tests (what CI runs)
 make fe-fix             # apply lint and format fixes
 make fe-build           # production build into .output/, run with pnpm start
 ```
@@ -49,21 +49,22 @@ structural rules are shared; business rules arrive from the API (`allowedEvents`
 ## Talking to the API
 
 The browser never calls the API and never holds a token (docs/adr/0020). Every call is a TanStack
-Start server function in `src/server/functions/`: `reads.ts`, `mutations.ts`, `discovery.ts`,
-`session.ts`, `public-config.ts`. They are built from two shared bases in `src/server/runtime/fn.ts`,
+Start server function in `src/server/functions/`, one file per domain (`disputes.ts`, `notices.ts`,
+`tenant-keys.ts`, `tenant-templates.ts`) plus `session.ts` and `discovery.ts`. They are built from
+two shared bases in `src/server/runtime/fn.ts`,
 `analystGet` and `analystPost`, whose `authed` middleware resolves the session once and supplies an
 API client as `context.api`; each function validates its input with a TypeBox schema
 (`.validator(parse(schema))`) and returns an `Outcome`, a value or a `Problem`, never a throw for a
 problem+json answer.
 
-Reads are TanStack Query options in `src/queries/index.ts`, one per server function; route loaders
+Reads are TanStack Query options in `src/queries/<domain>.ts`, one per server function; route loaders
 load them with `queryClient.query({ ...options, staleTime: 'static' })` (`ensureQueryData` is
 deprecated), components `useSuspenseQuery` them, and `src/router.tsx` wires
 `@tanstack/react-router-ssr-query` so the cache filled during SSR is dehydrated into the page and
 the browser refetches through the same server functions. The options are the only source of key
 truth: pass `null` for the identifying argument to get the invalidation prefix
 (`disputeQuery(null).queryKey` is `['disputes']`). Writes use `useServerMutation`
-(`src/queries/mutation.ts`), which maps the outcome onto the failure taxonomy of docs/adr/0012 and
+(`src/queries/use-server-mutation.ts`), which maps the outcome onto the failure taxonomy of docs/adr/0012 and
 invalidates the prefixes the caller names.
 
 ## Authentication

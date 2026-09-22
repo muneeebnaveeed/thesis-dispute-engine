@@ -2,24 +2,24 @@ import * as client from 'openid-client'
 
 import { serverEnv } from '#/server/runtime/env'
 
-// One Keycloak realm per tenant (ADR 0010): the slug names the realm, so discovery is per slug and cached.
-const configs = new Map<string, Promise<client.Configuration>>()
+// one Keycloak realm per tenant (ADR 0010), so discovery is per slug
+const realmConfigBySlug = new Map<string, Promise<client.Configuration>>()
 
 export const realmConfig = (slug: string): Promise<client.Configuration> => {
   if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(slug)) return Promise.reject(new Error('invalid tenant slug'))
-  let p = configs.get(slug)
-  if (!p) {
+  let discovery = realmConfigBySlug.get(slug)
+  if (!discovery) {
     const env = serverEnv()
     const issuer = new URL(`${env.keycloakUrl}/realms/${slug}`)
-    const opts: client.DiscoveryRequestOptions = {}
-    // Dev Keycloak is plain http on localhost; openid-client refuses that unless told the deployment is local.
-    if (issuer.protocol === 'http:') opts.execute = [client.allowInsecureRequests]
-    p = client.discovery(issuer, env.clientId, env.clientSecret, undefined, opts)
-    p.catch(() => configs.delete(slug))
-    configs.set(slug, p)
+    const discoveryOptions: client.DiscoveryRequestOptions = {}
+    // dev Keycloak is plain http; openid-client refuses that unless told so
+    if (issuer.protocol === 'http:') discoveryOptions.execute = [client.allowInsecureRequests]
+    discovery = client.discovery(issuer, env.clientId, env.clientSecret, undefined, discoveryOptions)
+    discovery.catch(() => realmConfigBySlug.delete(slug))
+    realmConfigBySlug.set(slug, discovery)
   }
-  return p
+  return discovery
 }
 
-// The realm's dispute-api scope already carries username, email, roles and tenant_id; nothing else is requested.
+// the dispute-api scope already carries username, email, roles and tenant_id
 export const scopes = 'openid'

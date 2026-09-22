@@ -127,8 +127,8 @@ fe-install: ## Install frontend dependencies (pnpm, pinned in mise.toml)
 fe-dev: ## Frontend dev server on http://localhost:3002 (expects the API on :8090)
 	$(PNPM) dev
 
-fe-check: ## Frontend typecheck, lint, format check and tests (what CI runs)
-	$(PNPM) generate-routes && $(PNPM) generate:check && $(PNPM) typecheck && $(PNPM) lint && $(PNPM) fmt && $(PNPM) test
+fe-check: ## Frontend typecheck, lint, dead code, format check and tests (what CI runs)
+	$(PNPM) generate-routes && $(PNPM) generate:check && $(PNPM) typecheck && $(PNPM) lint && $(PNPM) knip && $(PNPM) fmt && $(PNPM) test
 
 fe-fix: ## Apply frontend lint and format fixes
 	$(PNPM) lint:fix && $(PNPM) fmt:fix

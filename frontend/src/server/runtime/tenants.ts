@@ -5,33 +5,37 @@ import { serverEnv } from '#/server/runtime/env'
 
 export type TenantSummary = components['schemas']['TenantSummary']
 
-// The active tenant directory from the API, cached briefly: it changes at onboarding time, not per request.
-let cache: { at: number; list: TenantSummary[] } | null = null
+// cached briefly: tenants change at onboarding time, not per request
+const DIRECTORY_CACHE_MILLIS = 60_000
+let directoryCache: { fetchedAt: number; tenants: TenantSummary[] } | null = null
 
-export const activeTenants = async (): Promise<TenantSummary[]> => {
-  if (cache && Date.now() - cache.at < 60_000) return cache.list
+const activeTenants = async (): Promise<TenantSummary[]> => {
+  if (directoryCache && Date.now() - directoryCache.fetchedAt < DIRECTORY_CACHE_MILLIS)
+    return directoryCache.tenants
   const env = serverEnv()
-  const client = createClient<paths>({ baseUrl: env.apiUrl })
-  const { data, response } = await client.GET('/internal/tenants', {
+  const internalApi = createClient<paths>({ baseUrl: env.apiUrl })
+  const { data: tenants, response } = await internalApi.GET('/internal/tenants', {
     headers: { 'X-Service-Key': env.serviceKey },
   })
-  if (!response.ok || !data) throw new Error(`tenant directory: ${response.status}`)
-  cache = { at: Date.now(), list: data }
-  return data
+  if (!response.ok || !tenants) throw new Error(`tenant directory: ${response.status}`)
+  directoryCache = { fetchedAt: Date.now(), tenants }
+  return tenants
 }
 
-export const tenantBySlug = async (slug: string): Promise<TenantSummary | null> => {
-  return (await activeTenants()).find((t) => t.slug === slug) ?? null
-}
+export const tenantBySlug = async (slug: string): Promise<TenantSummary | null> =>
+  (await activeTenants()).find((tenant) => tenant.slug === slug) ?? null
 
-/** Home-realm discovery: the domain of a work email names the tenant. */
 export const tenantByEmail = async (email: string): Promise<TenantSummary | null> => {
-  const at = email.lastIndexOf('@')
-  if (at < 1) return null
-  const domain = email
-    .slice(at + 1)
+  const atSign = email.lastIndexOf('@')
+  if (atSign < 1) return null
+  const emailDomain = email
+    .slice(atSign + 1)
     .trim()
     .toLowerCase()
-  if (!domain) return null
-  return (await activeTenants()).find((t) => t.emailDomains.some((d) => d.toLowerCase() === domain)) ?? null
+  if (!emailDomain) return null
+  return (
+    (await activeTenants()).find((tenant) =>
+      tenant.emailDomains.some((domain) => domain.toLowerCase() === emailDomain),
+    ) ?? null
+  )
 }

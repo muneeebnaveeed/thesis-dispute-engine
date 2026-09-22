@@ -8,34 +8,33 @@ import { TemplateEditor } from '#/components/comms/template-editor'
 import { AppShell } from '#/components/layout/app-shell'
 import { FailureBanner } from '#/components/layout/failure-banner'
 import { TenantMismatch } from '#/components/layout/tenant-mismatch'
-import { tenantTemplatesQuery } from '#/queries'
-import { fieldsOf, useServerMutation } from '#/queries/mutation'
-import { deleteTenantTemplate, putTenantTemplate } from '#/server/functions/mutations'
+import { tenantTemplatesQuery } from '#/queries/tenant-templates'
+import { fieldErrorsOf, useServerMutation } from '#/queries/use-server-mutation'
+import { deleteTenantTemplate, putTenantTemplate } from '#/server/functions/tenant-templates'
 
-type Kind = components['schemas']['NoticeKind']
+type NoticeKind = components['schemas']['NoticeKind']
 type TemplateOverride = components['schemas']['TemplateOverride']
 
-// Tenant admins reword the analyst email templates: the words are theirs, the form stays the engine's.
 const TemplatesPage = () => {
   const { tenant } = Route.useParams()
   const { viewer } = useRouteContext({ from: '__root__' })
   const isAdmin = viewer?.roles.includes('tenant-admin') ?? false
-  const { data: outcome } = useSuspenseQuery(tenantTemplatesQuery())
-  const [note, setNote] = useState<string | null>(null)
-  const save = useServerMutation(
-    (vars: { kind: Kind; override: TemplateOverride }) => putTenantTemplate({ data: vars }),
+  const { data: settingsOutcome } = useSuspenseQuery(tenantTemplatesQuery())
+  const [savedNote, setSavedNote] = useState<string | null>(null)
+  const saveMutation = useServerMutation(
+    (change: { kind: NoticeKind; override: TemplateOverride }) => putTenantTemplate({ data: change }),
     {
       invalidates: () => [tenantTemplatesQuery().queryKey],
       onSuccess: (setting) =>
-        setNote(`${setting.effective.label}: wording saved; analysts see it on their next email.`),
+        setSavedNote(`${setting.effective.label}: wording saved; analysts see it on their next email.`),
     },
   )
-  const revert = useServerMutation((kind: Kind) => deleteTenantTemplate({ data: kind }), {
+  const revertMutation = useServerMutation((kind: NoticeKind) => deleteTenantTemplate({ data: kind }), {
     invalidates: () => [tenantTemplatesQuery().queryKey],
-    onSuccess: () => setNote('Reverted to the standard wording.'),
+    onSuccess: () => setSavedNote('Reverted to the standard wording.'),
   })
-  const failure = save.failure ?? revert.failure
-  const fields = fieldsOf(failure)
+  const failure = saveMutation.failure ?? revertMutation.failure
+  const fieldErrors = fieldErrorsOf(failure)
 
   if (viewer && viewer.tenantSlug !== tenant) return <TenantMismatch wanted={tenant} />
 
@@ -51,41 +50,41 @@ const TemplatesPage = () => {
             These are the emails analysts compose from the dispute page. You can change the words; the fields
             an analyst fills in stay the same, so use their placeholders where the answer belongs.
           </p>
-          {note && (
+          {savedNote && (
             <output className="block rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-              {note}
+              {savedNote}
             </output>
           )}
           {failure && failure.kind !== 'validation' && (
             <FailureBanner
               failure={failure}
               onRetry={() => {
-                save.clearFailure()
-                revert.clearFailure()
+                saveMutation.clearFailure()
+                revertMutation.clearFailure()
               }}
             />
           )}
-          {outcome.value ? (
-            outcome.value.map((s) => (
+          {settingsOutcome.value ? (
+            settingsOutcome.value.map((setting) => (
               <TemplateEditor
-                key={s.base.kind}
-                setting={s}
-                fields={fields}
-                busy={save.isPending || revert.isPending}
-                onSave={(o) => {
-                  setNote(null)
-                  save.mutate({ kind: s.base.kind, override: o })
+                key={setting.base.kind}
+                setting={setting}
+                fields={fieldErrors}
+                busy={saveMutation.isPending || revertMutation.isPending}
+                onSave={(override) => {
+                  setSavedNote(null)
+                  saveMutation.mutate({ kind: setting.base.kind, override })
                 }}
                 onRevert={() => {
-                  setNote(null)
-                  revert.mutate(s.base.kind)
+                  setSavedNote(null)
+                  revertMutation.mutate(setting.base.kind)
                 }}
               />
             ))
           ) : (
             <FailureBanner
               failure={
-                classify({ error: outcome.problem }) ?? {
+                classify({ error: settingsOutcome.problem }) ?? {
                   kind: 'unexpected',
                   status: 0,
                   message: 'no templates',

@@ -18,14 +18,14 @@ test('an analyst opens a dispute and drives it through allowed transitions from 
   await expect(page.getByRole('definition').filter({ hasText: 'EU_PSD2_CARD' })).toBeVisible()
 
   // Everything goes through the app server (ADR 0020): the browser never talks to the API and never holds a token.
-  const direct: string[] = []
-  page.on('request', (r) => {
-    if (r.url().startsWith(api)) direct.push(`${r.method()} ${r.url()}`)
+  const requestsToApi: string[] = []
+  page.on('request', (request) => {
+    if (request.url().startsWith(api)) requestsToApi.push(`${request.method()} ${request.url()}`)
   })
   await page.getByRole('button', { name: 'OPEN_INVESTIGATION' }).click()
   await expect(state).toHaveText('INVESTIGATING')
   await expect(page.getByRole('table', { name: 'Event log' }).getByRole('row')).toHaveCount(3) // header + OPENED + OPEN_INVESTIGATION
-  expect(direct).toEqual([])
+  expect(requestsToApi).toEqual([])
 
   await page.getByRole('button', { name: 'ISSUE_REFUND' }).click()
   await expect(state).toHaveText('FAST_REFUND_ISSUED')
@@ -35,9 +35,9 @@ test('an analyst opens a dispute and drives it through allowed transitions from 
 test('structural mistakes are caught in the browser and shown under the field, with no request made', async ({
   page,
 }) => {
-  const requests: string[] = []
-  page.on('request', (r) => {
-    if (r.url().startsWith(api)) requests.push(r.url())
+  const requestsToApi: string[] = []
+  page.on('request', (request) => {
+    if (request.url().startsWith(api)) requestsToApi.push(request.url())
   })
   const input = page.getByLabel('Transaction ID')
   await input.fill('not-a-uuid')
@@ -45,7 +45,7 @@ test('structural mistakes are caught in the browser and shown under the field, w
   await expect(input).toHaveAttribute('aria-invalid', 'true')
   await expect(page.locator('#transactionId-error')).toBeVisible()
   await expect(page.getByRole('alert')).toHaveCount(0)
-  expect(requests.filter((u) => u.includes('/disputes')).length).toBe(0)
+  expect(requestsToApi.filter((url) => url.includes('/disputes')).length).toBe(0)
 })
 
 test("another tenant's data does not exist for this analyst", async ({ page, request }) => {
@@ -234,7 +234,7 @@ test('a repeat disputer scores HIGH, the credit is held until the analyst record
   request,
 }) => {
   // Three earlier disputes on the same account inside the year, then a large one on a watch-list merchant.
-  for (let i = 0; i < 3; i++) await openDisputeViaApi(request, 'otp')
+  for (let earlier = 0; earlier < 3; earlier++) await openDisputeViaApi(request, 'otp')
   const res = await request.post(`${api}/disputes`, {
     headers: { Authorization: `Bearer ${tenants.otp.key}`, 'Idempotency-Key': crypto.randomUUID() },
     data: { transactionId: '00000000-0000-8000-8000-000000000104', actor: 'e2e' }, // 7450 EUR, MCC 5815

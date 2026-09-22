@@ -4,21 +4,19 @@ import { AppShell } from '#/components/layout/app-shell'
 import { beginLogin } from '#/server/functions/session'
 import { tenantExists } from '#/server/functions/discovery'
 
-// Everything under /<tenant> belongs to one customer. No session: straight to that tenant's realm (silent when the
-// realm's SSO cookie is still alive). A session for a different tenant: say so rather than mixing them.
-type Search = { next?: string }
+type TenantSearch = { next?: string }
 
 export const Route = createFileRoute('/$tenant')({
-  validateSearch: (s: Record<string, unknown>): Search =>
-    typeof s.next === 'string' ? { next: s.next } : {},
+  validateSearch: (rawSearch: Record<string, unknown>): TenantSearch =>
+    typeof rawSearch.next === 'string' ? { next: rawSearch.next } : {},
   beforeLoad: async ({ context, params, location, search }) => {
     const tenant = await tenantExists({ data: params.tenant })
     if (!tenant) throw notFound()
     if (!context.viewer) {
-      // Come back to the page asked for, or to an explicit ?next handed over by the root; the server validates it.
+      // ?next comes from the root; the server validates it
       const next = search.next ?? location.pathname
-      const { url } = await beginLogin({ data: { slug: params.tenant, next } })
-      throw redirect({ href: url })
+      const { url: realmLoginUrl } = await beginLogin({ data: { slug: params.tenant, next } })
+      throw redirect({ href: realmLoginUrl })
     }
     if (search.next) throw redirect({ to: location.pathname, replace: true })
     return { tenant }

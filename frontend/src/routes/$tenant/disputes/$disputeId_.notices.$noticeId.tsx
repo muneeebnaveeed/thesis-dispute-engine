@@ -4,30 +4,29 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { classify } from '#/api/failure'
 import { FailureBanner } from '#/components/layout/failure-banner'
 import { Button } from '#/components/ui/button'
-import { noticeQuery } from '#/queries'
+import { noticeQuery } from '#/queries/notices'
 
-// A letter on its own page, laid out to print: no shell, every value rendered as text.
 const NoticePage = () => {
   const { tenant, disputeId, noticeId } = Route.useParams()
-  const id = Number(noticeId)
-  const { data: outcome } = useSuspenseQuery(noticeQuery(disputeId, id))
+  const noticeNumber = Number(noticeId)
+  const { data: noticeOutcome } = useSuspenseQuery(noticeQuery(disputeId, noticeNumber))
   const queryClient = useQueryClient()
-  if (outcome.problem || !outcome.value) {
-    const f = outcome.problem ? classify({ error: outcome.problem }) : null
+  if (noticeOutcome.problem || !noticeOutcome.value) {
+    const loadFailure = noticeOutcome.problem ? classify({ error: noticeOutcome.problem }) : null
     return (
       <main className="mx-auto max-w-2xl p-8">
-        {f && (
+        {loadFailure && (
           <FailureBanner
-            failure={f}
+            failure={loadFailure}
             onRetry={() =>
-              void queryClient.invalidateQueries({ queryKey: noticeQuery(disputeId, id).queryKey })
+              void queryClient.invalidateQueries({ queryKey: noticeQuery(disputeId, noticeNumber).queryKey })
             }
           />
         )}
       </main>
     )
   }
-  const n = outcome.value
+  const letter = noticeOutcome.value
   return (
     <main className="mx-auto max-w-2xl p-8 font-serif text-[12pt] leading-relaxed text-neutral-900 print:p-0">
       <nav className="mb-8 flex gap-4 font-sans text-sm print:hidden">
@@ -39,24 +38,20 @@ const NoticePage = () => {
         </Button>
       </nav>
       <header className="mb-8 text-neutral-600">
-        <p>{n.bank}</p>
-        <p>{n.date.slice(0, 10)}</p>
-        <p className="mt-4 whitespace-pre-line">{n.recipient}</p>
+        <p>{letter.bank}</p>
+        <p>{letter.date.slice(0, 10)}</p>
+        <p className="mt-4 whitespace-pre-line">{letter.recipient}</p>
       </header>
-      <h1 className="mb-6 text-[14pt] font-semibold">{n.subject}</h1>
-      <p className="mb-4">{n.greeting}</p>
-      {n.paragraphs.map((p, i) => (
-        <p
-          // Paragraphs are prose from the API; position is the only identity they have.
-          // eslint-disable-next-line react/no-array-index-key
-          key={i}
-          className="mb-4 whitespace-pre-line"
-        >
-          {p}
+      <h1 className="mb-6 text-[14pt] font-semibold">{letter.subject}</h1>
+      <p className="mb-4">{letter.greeting}</p>
+      {letter.paragraphs.map((paragraph, paragraphIndex) => (
+        // eslint-disable-next-line react/no-array-index-key -- paragraphs are positional prose
+        <p key={paragraphIndex} className="mb-4 whitespace-pre-line">
+          {paragraph}
         </p>
       ))}
-      <p className="mb-4 whitespace-pre-line">{n.closing}</p>
-      {n.basis && <p className="mt-12 text-[10pt] text-neutral-600">{n.basis}</p>}
+      <p className="mb-4 whitespace-pre-line">{letter.closing}</p>
+      {letter.basis && <p className="mt-12 text-[10pt] text-neutral-600">{letter.basis}</p>}
     </main>
   )
 }

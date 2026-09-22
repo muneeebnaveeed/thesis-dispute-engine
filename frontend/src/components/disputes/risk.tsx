@@ -3,21 +3,19 @@ import { Badge, type BadgeTone } from '#/components/ui/badge'
 import { cn } from '#/lib/cn'
 
 type Risk = NonNullable<Dispute['risk']>
-type Tier = Risk['tier']
+type RiskTier = Risk['tier']
 
-const TONE: Record<Tier, BadgeTone> = { LOW: 'good', MEDIUM: 'warn', HIGH: 'bad' }
+const RISK_TIER_TONE: Record<RiskTier, BadgeTone> = { LOW: 'good', MEDIUM: 'warn', HIGH: 'bad' }
 
-/** The tier as a coloured word, with the score; the same on the list and the dispute page. */
-export const RiskBadge = ({ tier, score }: { tier: Tier; score?: number | undefined }) => {
+export const RiskBadge = ({ tier, score }: { tier: RiskTier; score?: number | undefined }) => {
   return (
-    <Badge tone={TONE[tier]}>
+    <Badge tone={RISK_TIER_TONE[tier]}>
       {tier.toLowerCase()}
       {score !== undefined && <span className="ml-1 opacity-70">{score}</span>}
     </Badge>
   )
 }
 
-/** Every signal that was checked, what it added and why, so the score is an argument rather than a number. */
 export const RiskPanel = ({ risk }: { risk: Risk }) => {
   return (
     <div className="space-y-3 text-sm">
@@ -41,16 +39,16 @@ export const RiskPanel = ({ risk }: { risk: Risk }) => {
           </tr>
         </thead>
         <tbody>
-          {risk.signals.map((s) => (
+          {risk.signals.map((signal) => (
             <tr
-              key={s.name}
-              className={cn('border-t border-neutral-200', s.points === 0 && 'text-neutral-500')}
+              key={signal.name}
+              className={cn('border-t border-neutral-200', signal.points === 0 && 'text-neutral-500')}
             >
-              <td className="py-1 pr-4">{s.name}</td>
+              <td className="py-1 pr-4">{signal.name}</td>
               <td className="py-1 pr-4 text-right font-mono">
-                {s.points}/{s.weight}
+                {signal.points}/{signal.weight}
               </td>
-              <td className="py-1">{s.detail}</td>
+              <td className="py-1">{signal.detail}</td>
             </tr>
           ))}
         </tbody>

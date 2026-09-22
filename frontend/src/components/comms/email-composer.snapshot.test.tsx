@@ -2,7 +2,6 @@ import { render, screen } from '@testing-library/react'
 
 import { EmailComposer } from './email-composer'
 
-// The preview pane as the analyst sees it, with the marker for a missing field. Update with: pnpm vitest run -u
 test('composer preview markup', () => {
   render(
     <EmailComposer
@@ -30,7 +29,7 @@ test('composer preview markup', () => {
       fields={{}}
       busy={false}
       onSend={() => {}}
-      drafts={[{ id: 'a1', filename: 'statement.pdf', size: 2048 }]}
+      attachmentDrafts={[{ id: 'a1', filename: 'statement.pdf', size: 2048 }]}
     />,
   )
   expect(screen.getByRole('region', { name: 'Preview' })).toMatchSnapshot()
