@@ -9,14 +9,12 @@ import {
   DisputeState as DisputeStateSchema,
 } from '#/api/schemas.gen'
 import type { DisputeState } from '#/api/views'
-import { DeadlineBadge, daysRemaining } from '#/components/disputes/deadlines'
-import { RiskBadge } from '#/components/disputes/risk'
+import { DisputeTable } from '#/components/disputes/dispute-table'
 import { AppShell } from '#/components/layout/app-shell'
 import { FailureBanner } from '#/components/layout/failure-banner'
 import { TenantMismatch } from '#/components/layout/tenant-mismatch'
 import { submitTo, submitting, useAppForm } from '#/forms/app-form'
 import { parsed, schemaValidator } from '#/forms/schema'
-import { formatMoney } from '#/lib/money'
 import { disputeQuery, disputesQuery, type DisputeListSearch } from '#/queries/disputes'
 import { useServerMutation } from '#/queries/use-server-mutation'
 import { openDispute } from '#/server/functions/disputes'
@@ -67,13 +65,6 @@ const Workbench = () => {
         },
       }),
   })
-  const findForm = useAppForm({
-    defaultValues: { disputeId: '' },
-    onSubmit: async ({ value }) => {
-      const disputeId = value.disputeId.trim()
-      if (disputeId) await navigate({ to: '/$tenant/disputes/$disputeId', params: { tenant, disputeId } })
-    },
-  })
   const openFailure = openDisputeMutation.failure
   if (viewer && viewer.tenantSlug !== tenant) return <TenantMismatch wanted={tenant} />
 
@@ -108,59 +99,7 @@ const Workbench = () => {
           <FailureBanner failure={loadedPage.failure} />
         ) : loadedPage.value.items.length > 0 ? (
           <>
-            <table className="w-full text-left text-sm">
-              <thead className="text-neutral-500">
-                <tr>
-                  <th className="py-1 pr-4 font-normal">Dispute</th>
-                  <th className="py-1 pr-4 font-normal">State</th>
-                  <th className="py-1 pr-4 font-normal">Regime</th>
-                  <th className="py-1 pr-4 font-normal">Amount</th>
-                  <th className="py-1 pr-4 font-normal">Risk</th>
-                  <th className="py-1 pr-4 font-normal">Next clock</th>
-                  <th className="py-1 font-normal">Opened</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loadedPage.value.items.map((dispute) => (
-                  <tr key={dispute.id} className="border-t border-neutral-200">
-                    <td className="py-1 pr-4 font-mono">
-                      <Link
-                        to="/$tenant/disputes/$disputeId"
-                        params={{ tenant, disputeId: dispute.id }}
-                        className="underline"
-                      >
-                        {dispute.id.slice(0, 8)}
-                      </Link>
-                    </td>
-                    <td className="py-1 pr-4 font-mono">{dispute.state}</td>
-                    <td className="py-1 pr-4 font-mono">{dispute.regime}</td>
-                    <td className="py-1 pr-4">{formatMoney(dispute.disputedAmount, dispute.currency)}</td>
-                    <td className="py-1 pr-4">
-                      {dispute.riskTier ? (
-                        <RiskBadge tier={dispute.riskTier} score={dispute.riskScore} />
-                      ) : (
-                        <span className="text-neutral-400">none</span>
-                      )}
-                    </td>
-                    <td className="py-1 pr-4">
-                      {dispute.nextDeadline ? (
-                        <span className="flex items-center gap-2">
-                          <DeadlineBadge status={dispute.nextDeadline.status} />
-                          <span className="text-neutral-600">
-                            {daysRemaining(dispute.nextDeadline.dueAt)}
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="text-neutral-400">none</span>
-                      )}
-                    </td>
-                    <td className="py-1 text-neutral-500">
-                      {dispute.openedAt.slice(0, 16).replace('T', ' ')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DisputeTable disputes={loadedPage.value.items} tenant={tenant} />
             <div className="mt-3 flex gap-3 text-sm">
               {cursor && (
                 <Link to="/$tenant" params={{ tenant }} search={activeFilters} className="underline">
@@ -215,17 +154,6 @@ const Workbench = () => {
               <FailureBanner failure={openFailure} />
             </div>
           )}
-        </section>
-        <section>
-          <h2 className="mb-3 text-lg font-medium">Find a dispute</h2>
-          <form className="space-y-3" onSubmit={submitting(findForm)}>
-            <findForm.AppField name="disputeId">
-              {(field) => <field.TextField label="Dispute ID" mono inputClassName="px-3 py-2" />}
-            </findForm.AppField>
-            <findForm.AppForm>
-              <findForm.SubmitButton>Show</findForm.SubmitButton>
-            </findForm.AppForm>
-          </form>
         </section>
       </div>
     </AppShell>

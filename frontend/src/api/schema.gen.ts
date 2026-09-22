@@ -999,6 +999,7 @@ export interface operations {
     parameters: {
       query?: {
         state?: components['schemas']['DisputeState']
+        reason?: components['schemas']['DisputeReason']
         limit?: number
         /** @description Opaque; from the previous page's nextCursor. */
         cursor?: string

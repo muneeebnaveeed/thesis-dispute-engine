@@ -1270,16 +1270,18 @@ const listDisputes = `-- name: ListDisputes :many
 SELECT id, regime, state, transaction_id, disputed_amount, currency, opened_at, updated_at, reason
 FROM disputes
 WHERE ($1::text IS NULL OR state = $1::text)
-  AND (NOT $2::boolean OR EXISTS (
+  AND ($2::text IS NULL OR reason = $2::text)
+  AND (NOT $3::boolean OR EXISTS (
         SELECT 1 FROM dispute_deadlines dl
-        WHERE dl.dispute_id = disputes.id AND dl.met_at IS NULL AND dl.voided_at IS NULL AND dl.due_at < $3::timestamptz))
-  AND ($4::timestamptz IS NULL OR (opened_at, id) < ($4::timestamptz, $5::uuid))
+        WHERE dl.dispute_id = disputes.id AND dl.met_at IS NULL AND dl.voided_at IS NULL AND dl.due_at < $4::timestamptz))
+  AND ($5::timestamptz IS NULL OR (opened_at, id) < ($5::timestamptz, $6::uuid))
 ORDER BY opened_at DESC, id DESC
-LIMIT $6
+LIMIT $7
 `
 
 type ListDisputesParams struct {
 	State          *string
+	Reason         *string
 	Overdue        bool
 	Now            time.Time
 	BeforeOpenedAt pgtype.Timestamptz
@@ -1303,6 +1305,7 @@ type ListDisputesRow struct {
 func (q *Queries) ListDisputes(ctx context.Context, arg ListDisputesParams) ([]ListDisputesRow, error) {
 	rows, err := q.db.Query(ctx, listDisputes,
 		arg.State,
+		arg.Reason,
 		arg.Overdue,
 		arg.Now,
 		arg.BeforeOpenedAt,

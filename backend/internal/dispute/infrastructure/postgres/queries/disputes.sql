@@ -165,6 +165,7 @@ SELECT id, prefix, label, created_at, last_used_at, expires_at, revoked_at FROM 
 SELECT id, regime, state, transaction_id, disputed_amount, currency, opened_at, updated_at, reason
 FROM disputes
 WHERE (sqlc.narg(state)::text IS NULL OR state = sqlc.narg(state)::text)
+  AND (sqlc.narg(reason)::text IS NULL OR reason = sqlc.narg(reason)::text)
   AND (NOT sqlc.arg(overdue)::boolean OR EXISTS (
         SELECT 1 FROM dispute_deadlines dl
         WHERE dl.dispute_id = disputes.id AND dl.met_at IS NULL AND dl.voided_at IS NULL AND dl.due_at < sqlc.arg(now)::timestamptz))

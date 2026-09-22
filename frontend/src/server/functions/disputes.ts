@@ -1,11 +1,12 @@
 import { Type } from '@sinclair/typebox'
 
-import { ApplyEventRequest, CreateDisputeRequest, DisputeState } from '#/api/schemas.gen'
+import { ApplyEventRequest, CreateDisputeRequest, DisputeReason, DisputeState } from '#/api/schemas.gen'
 import { withSerialisableEvents } from '#/api/views'
 import { authenticatedGet, authenticatedPost, parse, uuid } from '#/server/runtime/fn'
 
 export const DisputeListSearch = Type.Object({
   state: Type.Optional(DisputeState),
+  reason: Type.Optional(DisputeReason),
   cursor: Type.Optional(Type.String()),
   overdue: Type.Optional(Type.Boolean()),
 })

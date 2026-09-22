@@ -60,11 +60,14 @@
       }
     },
     {
-      "files": ["src/components/shadcn/**"],
+      "files": ["src/components/shadcn/**", "src/hooks/use-mobile.ts"],
       "rules": {
         "func-style": "off",
         "react/no-array-index-key": "off",
-        "jsx-a11y/prefer-tag-over-role": "off"
+        "jsx-a11y/prefer-tag-over-role": "off",
+        "react/set-state-in-effect": "off",
+        "eslint/no-shadow": "off",
+        "typescript/no-unsafe-type-assertion": "off"
       }
     }
   ]

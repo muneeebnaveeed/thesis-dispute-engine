@@ -371,6 +371,9 @@ func (t *memTx) ListDisputes(_ context.Context, q application.ListQuery) ([]appl
 		if d.TenantID != t.tenant || (q.State != nil && d.State != *q.State) {
 			continue
 		}
+		if q.Reason != nil && d.Reason != *q.Reason {
+			continue
+		}
 		if q.Overdue && !t.overdue(d.ID, q.Now) {
 			continue
 		}

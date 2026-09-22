@@ -92,6 +92,9 @@ mutation.mutateAsync(...))`, which puts an API validation refusal on the fields 
   (`session-impl.ts`); route files import only `src/server/functions/*`, whose exports are server
   functions. Start's import protection fails the build otherwise. Never log or return tokens to
   the browser.
+- `AppShell` is the page frame: signed in it renders the vendored sidebar (Disputes, Search, and an
+  Admin panel group last for tenant admins) beside the content, signed out a plain centred header. A
+  page passes a title and its body; it never draws navigation of its own.
 - The tenant is the first path segment. `src/routes/$tenant/route.tsx` owns sign-in: no viewer means
   a redirect to that tenant's realm with the current path as `next`; `safeNext(raw, slug)` keeps
   destinations inside the tenant. A viewer for a different tenant renders `TenantMismatch`.
