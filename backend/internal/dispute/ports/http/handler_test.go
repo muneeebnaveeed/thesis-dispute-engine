@@ -596,6 +596,15 @@ func TestListDisputesPagesNewestFirstWithinTheTenant(t *testing.T) {
 	if _, filtered := page("?state=CLOSED"); len(filtered) != 0 {
 		t.Errorf("state filter: %v", filtered)
 	}
+	if _, filtered := page("?reason=UNAUTHORISED"); len(filtered) != 5 {
+		t.Errorf("reason filter keeps the seeded reason: %v", filtered)
+	}
+	if _, filtered := page("?reason=DUPLICATE"); len(filtered) != 0 {
+		t.Errorf("reason filter excludes the others: %v", filtered)
+	}
+	if rec, _ := a.do(http.MethodGet, "/disputes?reason=NONSENSE", nil, nil); rec.Code != http.StatusBadRequest {
+		t.Errorf("reason outside the enum should fail validation: %d", rec.Code)
+	}
 	if rec, p := a.do(http.MethodGet, "/disputes?cursor=not-a-cursor", nil, nil); rec.Code != http.StatusBadRequest || p["code"] != "contract-violation" {
 		t.Errorf("bad cursor: %d %v", rec.Code, p)
 	}

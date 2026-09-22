@@ -813,7 +813,7 @@ func (s *Service) ListDisputes(ctx context.Context, q ListQuery) (Page, error) {
 	var page Page
 	err := s.store.WithTx(ctx, func(tx Tx) error {
 		// Ask for one more than the page to learn whether a next page exists without a second query.
-		recs, err := tx.ListDisputes(ctx, ListQuery{State: q.State, After: q.After, Limit: q.Limit + 1, Overdue: q.Overdue, Now: now})
+		recs, err := tx.ListDisputes(ctx, ListQuery{State: q.State, Reason: q.Reason, After: q.After, Limit: q.Limit + 1, Overdue: q.Overdue, Now: now})
 		if err != nil {
 			return err
 		}

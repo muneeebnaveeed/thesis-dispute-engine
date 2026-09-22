@@ -223,6 +223,7 @@ type SuspenseBalance struct {
 // only disputes with an open clock past due at Now.
 type ListQuery struct {
 	State   *domain.State
+	Reason  *domain.Reason
 	After   *Cursor
 	Limit   int
 	Overdue bool

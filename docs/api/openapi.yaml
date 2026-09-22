@@ -47,6 +47,9 @@ paths:
         - name: state
           in: query
           schema: { $ref: "#/components/schemas/DisputeState" }
+        - name: reason
+          in: query
+          schema: { $ref: "#/components/schemas/DisputeReason" }
         - name: limit
           in: query
           schema: { type: integer, minimum: 1, maximum: 100, default: 25 }

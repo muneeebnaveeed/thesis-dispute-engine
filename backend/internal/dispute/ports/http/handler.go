@@ -669,6 +669,10 @@ func (h *Handler) ListDisputes(ctx context.Context, req oapi.ListDisputesRequest
 		st := domain.State(*req.Params.State)
 		q.State = &st
 	}
+	if req.Params.Reason != nil {
+		reason := domain.Reason(*req.Params.Reason)
+		q.Reason = &reason
+	}
 	if req.Params.Overdue != nil {
 		q.Overdue = *req.Params.Overdue
 	}

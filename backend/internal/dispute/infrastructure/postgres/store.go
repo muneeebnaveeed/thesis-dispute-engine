@@ -298,6 +298,10 @@ func (t *txn) ListDisputes(ctx context.Context, q application.ListQuery) ([]appl
 		st := string(*q.State)
 		params.State = &st
 	}
+	if q.Reason != nil {
+		reason := string(*q.Reason)
+		params.Reason = &reason
+	}
 	if q.After != nil {
 		params.BeforeOpenedAt = pgtype.Timestamptz{Time: q.After.OpenedAt, Valid: true}
 		params.BeforeID = pgtype.UUID{Bytes: q.After.ID, Valid: true}
