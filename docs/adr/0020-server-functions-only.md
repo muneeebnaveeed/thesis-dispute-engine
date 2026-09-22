@@ -38,12 +38,12 @@ RPC); at that point the second transport bought nothing.
   browser starts with the data it was rendered with and refetches through the same server functions afterwards.
 - Writes are server functions called through `useServerMutation`, which classifies a problem or a
   thrown error into the ADR 0012 `Failure` and invalidates the query prefixes the caller names.
-- Server code is arranged by role: `src/server/functions/` (what pages call: reads, mutations,
-  discovery, session, public config), `src/server/runtime/` (how they run: env, middleware, API
-  client construction, builders, security headers, tenant lookup) and `src/server/auth/` (the OIDC
-  flow and the sealed store). Client code follows suit: `src/api/` (generated contract, `call`,
-  failures, views), `src/queries/`, `src/forms/`, `src/lib/`, and `src/components/{ui,layout,
-  disputes,comms}`. Style is uniform: const arrow functions everywhere (oxlint `func-style`),
+- Server code is arranged by role, then by domain: `src/server/functions/` (what pages call, one
+  file per domain: disputes, notices, tenant keys, tenant templates, plus session and discovery),
+  `src/server/runtime/` (how they run: env, middleware, API client construction, builders, security
+  headers, tenant lookup) and `src/server/auth/` (the OIDC flow and the sealed store). Client code
+  follows suit: `src/api/` (generated contract, failures, views), `src/queries/` (one file per
+  domain), `src/forms/`, `src/lib/`, and `src/components/{ui,layout,disputes,comms}`. Style is uniform: const arrow functions everywhere (oxlint `func-style`),
   `cn` (clsx and tailwind-merge) for class composition, `cva` for the few variant primitives.
 
 ## Consequences

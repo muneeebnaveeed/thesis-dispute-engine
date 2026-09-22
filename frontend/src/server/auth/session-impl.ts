@@ -1,20 +1,25 @@
-// Server-only: cookies, OIDC, the sealed store. Route files never import this; session.ts wraps it in server functions.
+// server-only; route files import functions/session.ts, never this
 import { deleteCookie, getCookie, setCookie } from '@tanstack/react-start/server'
 import * as client from 'openid-client'
 
 import { serverEnv } from '#/server/runtime/env'
+import { safeNext } from './next'
 import { realmConfig, scopes } from './oidc'
 import * as store from './store'
 
-export const cookieName = 'de_session'
-/** Long-lived, non-secret: which tenant this browser signed in to last, so the root can skip the question. */
+const sessionCookie = 'de_session'
+const REFRESH_AHEAD_MILLIS = 30_000
+const LAST_SEEN_WRITE_INTERVAL_MILLIS = 60_000
+const PENDING_LOGIN_SECONDS = 600
+const REMEMBERED_TENANT_SECONDS = 365 * 24 * 3600
+// non-secret: lets the root skip the tenant question
 export const rememberedTenantCookie = 'de_tenant'
 
 const cookieOptions = (maxAge = serverEnv().sessionTtlSeconds) => {
   return { httpOnly: true, sameSite: 'lax' as const, secure: serverEnv().secureCookies, path: '/', maxAge }
 }
 
-/** What the browser is allowed to know about the signed-in analyst. Never the tokens. */
+// never the tokens
 export type Viewer = {
   tenantId: string
   tenantSlug: string
@@ -23,39 +28,34 @@ export type Viewer = {
   roles: string[]
 }
 
-/** Only same-origin paths may be a post-login destination; anything else falls back to home. */
-export const safeNext = (raw: unknown): string => {
-  return typeof raw === 'string' && raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/t/')
-    ? raw
-    : '/'
+type SignedInSession = {
+  id: string
+  session: store.Session & { identity: NonNullable<store.Session['identity']> }
 }
 
-type Live = { id: string; session: store.Session & { identity: NonNullable<store.Session['identity']> } }
-
-// A live session, with the sliding idle rule applied: too long unused and it is gone; otherwise its last-seen mark
-// moves forward (at most once a minute, to keep writes rare).
-const current = async (): Promise<Live | null> => {
-  const id = getCookie(cookieName)
-  if (!id) return null
-  const session = await store.get(id)
+// sliding idle rule; last-seen advances at most once a minute to keep writes rare
+const signedInSession = async (): Promise<SignedInSession | null> => {
+  const sessionId = getCookie(sessionCookie)
+  if (!sessionId) return null
+  const session = await store.get(sessionId)
   if (!session?.identity) return null
   const env = serverEnv()
   const now = Date.now()
-  const lastSeen = session.lastSeenAt ? Date.parse(session.lastSeenAt) : now
-  if (now - lastSeen > env.sessionIdleSeconds * 1000) {
-    await store.remove(id)
-    deleteCookie(cookieName, { path: '/' })
+  const lastSeenAt = session.lastSeenAt ? Date.parse(session.lastSeenAt) : now
+  if (now - lastSeenAt > env.sessionIdleSeconds * 1000) {
+    await store.remove(sessionId)
+    deleteCookie(sessionCookie, { path: '/' })
     return null
   }
-  if (now - lastSeen > 60_000) {
+  if (now - lastSeenAt > LAST_SEEN_WRITE_INTERVAL_MILLIS) {
     session.lastSeenAt = new Date(now).toISOString()
-    await store.put(id, session, env.sessionTtlSeconds)
+    await store.put(sessionId, session, env.sessionTtlSeconds)
   }
-  return { id, session: { ...session, identity: session.identity } }
+  return { id: sessionId, session: { ...session, identity: session.identity } }
 }
 
 export const viewer = async (): Promise<Viewer | null> => {
-  const live = await current()
+  const live = await signedInSession()
   if (!live) return null
   const { identity } = live.session
   return {
@@ -67,21 +67,20 @@ export const viewer = async (): Promise<Viewer | null> => {
   }
 }
 
-/** Step 1 of login: remember state, PKCE and where to go afterwards, then hand the browser to the tenant's realm. */
-export const begin = async (data: { slug: string; next?: string }): Promise<{ url: string }> => {
+export const begin = async ({ slug, next }: { slug: string; next?: string }): Promise<{ url: string }> => {
   const env = serverEnv()
-  const config = await realmConfig(data.slug)
+  const config = await realmConfig(slug)
   const verifier = client.randomPKCECodeVerifier()
   const state = client.randomState()
   const nonce = client.randomNonce()
-  const id = crypto.randomUUID()
+  const pendingId = crypto.randomUUID()
   await store.put(
-    id,
-    { tenantSlug: data.slug, pending: { state, verifier, nonce, next: safeNext(data.next) } },
-    600,
+    pendingId,
+    { tenantSlug: slug, pending: { state, verifier, nonce, next: safeNext(next, slug) } },
+    PENDING_LOGIN_SECONDS,
   )
-  setCookie(cookieName, id, cookieOptions(600))
-  const url = client.buildAuthorizationUrl(config, {
+  setCookie(sessionCookie, pendingId, cookieOptions(PENDING_LOGIN_SECONDS))
+  const authorizationUrl = client.buildAuthorizationUrl(config, {
     redirect_uri: `${env.appUrl}/auth/callback`,
     scope: scopes,
     code_challenge: await client.calculatePKCECodeChallenge(verifier),
@@ -89,13 +88,12 @@ export const begin = async (data: { slug: string; next?: string }): Promise<{ ur
     state,
     nonce,
   })
-  return { url: url.href }
+  return { url: authorizationUrl.href }
 }
 
-/** Step 2, run by /auth/callback with the full callback URL. Returns the path to send the browser to. */
 export const completeLogin = async (callbackUrl: URL): Promise<string> => {
   const env = serverEnv()
-  const pendingId = getCookie(cookieName)
+  const pendingId = getCookie(sessionCookie)
   if (!pendingId) throw new Error('no sign-in in progress')
   const pendingSession = await store.get(pendingId)
   if (!pendingSession?.pending) throw new Error('sign-in state expired')
@@ -111,12 +109,12 @@ export const completeLogin = async (callbackUrl: URL): Promise<string> => {
   const tenantId = typeof claims.tenant_id === 'string' ? claims.tenant_id : null
   if (!tenantId) throw new Error('realm issued no tenant_id claim')
   const roles = Array.isArray(claims.roles)
-    ? claims.roles.filter((r): r is string => typeof r === 'string')
+    ? claims.roles.filter((role): role is string => typeof role === 'string')
     : []
-  // A new id: the pre-login cookie value cannot be replayed into a live session.
-  const id = crypto.randomUUID()
+  // fresh id: the pre-login cookie can never become a live session
+  const sessionId = crypto.randomUUID()
   await store.put(
-    id,
+    sessionId,
     {
       tenantSlug,
       identity: {
@@ -133,29 +131,30 @@ export const completeLogin = async (callbackUrl: URL): Promise<string> => {
     env.sessionTtlSeconds,
   )
   await store.remove(pendingId)
-  setCookie(cookieName, id, cookieOptions())
-  setCookie(rememberedTenantCookie, tenantSlug, { ...cookieOptions(365 * 24 * 3600), httpOnly: true })
+  setCookie(sessionCookie, sessionId, cookieOptions())
+  setCookie(rememberedTenantCookie, tenantSlug, {
+    ...cookieOptions(REMEMBERED_TENANT_SECONDS),
+    httpOnly: true,
+  })
   return pending.next
 }
 
-const toTokens = (t: client.TokenEndpointResponse): NonNullable<store.Session['tokens']> => {
-  const ttl = typeof t.expires_in === 'number' ? t.expires_in : 300
+const toTokens = (granted: client.TokenEndpointResponse): NonNullable<store.Session['tokens']> => {
+  const lifetimeSeconds = typeof granted.expires_in === 'number' ? granted.expires_in : 300
   return {
-    access: t.access_token,
-    refresh: t.refresh_token ?? null,
-    id: t.id_token ?? null,
-    accessExpiresAt: new Date(Date.now() + ttl * 1000).toISOString(),
+    access: granted.access_token,
+    refresh: granted.refresh_token ?? null,
+    id: granted.id_token ?? null,
+    accessExpiresAt: new Date(Date.now() + lifetimeSeconds * 1000).toISOString(),
   }
 }
 
-/** The browser asks for this before calling the API directly; refresh happens here, never in the browser. */
-export const accessToken = async (): Promise<{ token: string; expiresAt: string } | null> => {
-  const live = await current()
+export const accessTokenForRequest = async (): Promise<string | null> => {
+  const live = await signedInSession()
   const tokens = live?.session.tokens
   if (!live || !tokens) return null
-  if (Date.parse(tokens.accessExpiresAt) - Date.now() > 30_000) {
-    return { token: tokens.access, expiresAt: tokens.accessExpiresAt }
-  }
+  const stillValidFor = Date.parse(tokens.accessExpiresAt) - Date.now()
+  if (stillValidFor > REFRESH_AHEAD_MILLIS) return tokens.access
   if (!tokens.refresh) return null
   try {
     const config = await realmConfig(live.session.tenantSlug)
@@ -165,34 +164,31 @@ export const accessToken = async (): Promise<{ token: string; expiresAt: string 
       { ...live.session, tokens: { ...fresh, id: fresh.id ?? tokens.id } },
       serverEnv().sessionTtlSeconds,
     )
-    return { token: fresh.access, expiresAt: fresh.accessExpiresAt }
+    return fresh.access
   } catch {
-    // The refresh token died (idle timeout, revoked at Keycloak): the session is over.
+    // refresh token dead (idle timeout, revoked): the session is over
     await store.remove(live.id)
-    deleteCookie(cookieName, { path: '/' })
+    deleteCookie(sessionCookie, { path: '/' })
     return null
   }
 }
 
-/** Server-side callers (SSR loaders) get the same token the browser would, with the same refresh rule. */
-export const accessTokenForRequest = async (): Promise<string | null> => {
-  const res = await accessToken()
-  return res?.token ?? null
-}
-
 export const endSession = async (): Promise<{ url: string }> => {
   const env = serverEnv()
-  const live = await current()
-  deleteCookie(cookieName, { path: '/' })
+  const live = await signedInSession()
+  deleteCookie(sessionCookie, { path: '/' })
   if (!live) return { url: '/' }
   await store.remove(live.id)
-  // After Keycloak ends its session, land on the tenant's own front door, not the generic root.
-  const home = `${env.appUrl}/${live.session.tenantSlug}`
+  // the tenant's own front door, not the generic root
+  const tenantHome = `${env.appUrl}/${live.session.tenantSlug}`
   try {
     const config = await realmConfig(live.session.tenantSlug)
-    const params: Record<string, string> = { post_logout_redirect_uri: home, client_id: env.clientId }
-    if (live.session.tokens?.id) params.id_token_hint = live.session.tokens.id
-    return { url: client.buildEndSessionUrl(config, params).href }
+    const endSessionParams: Record<string, string> = {
+      post_logout_redirect_uri: tenantHome,
+      client_id: env.clientId,
+    }
+    if (live.session.tokens?.id) endSessionParams.id_token_hint = live.session.tokens.id
+    return { url: client.buildEndSessionUrl(config, endSessionParams).href }
   } catch {
     return { url: `/${live.session.tenantSlug}` }
   }

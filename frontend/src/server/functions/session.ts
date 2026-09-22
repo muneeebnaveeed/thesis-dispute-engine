@@ -1,15 +1,11 @@
 import { Type } from '@sinclair/typebox'
 import { createServerFn } from '@tanstack/react-start'
 
+import * as sessions from '#/server/auth/session-impl'
 import { parse } from '#/server/runtime/fn'
 
-import * as impl from '#/server/auth/session-impl'
-
-export type { Viewer } from '#/server/auth/session-impl'
-
-// Thin server functions over session-impl.ts, so route files can import this module without dragging server-only
-// code into the browser bundle.
-export const getViewer = createServerFn({ method: 'GET' }).handler(() => impl.viewer())
+// route files import this, never session-impl.ts, so server-only code stays out of the browser bundle
+export const getViewer = createServerFn({ method: 'GET' }).handler(() => sessions.viewer())
 
 export const beginLogin = createServerFn({ method: 'POST' })
   .validator(
@@ -20,6 +16,6 @@ export const beginLogin = createServerFn({ method: 'POST' })
       }),
     ),
   )
-  .handler(({ data }) => impl.begin(data))
+  .handler(({ data }) => sessions.begin(data))
 
-export const logout = createServerFn({ method: 'POST' }).handler(() => impl.endSession())
+export const logout = createServerFn({ method: 'POST' }).handler(() => sessions.endSession())

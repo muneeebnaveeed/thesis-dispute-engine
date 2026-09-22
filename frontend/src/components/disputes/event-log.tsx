@@ -1,8 +1,7 @@
 import type { Dispute } from '#/api/views'
 
-/** The append-only log, newest first; each row is one accepted transition. */
 export const EventLog = ({ events }: { events: Dispute['events'] }) => {
-  const rows = events.toSorted((a, b) => b.seq - a.seq)
+  const newestFirst = events.toSorted((earlier, later) => later.seq - earlier.seq)
   return (
     <table className="w-full text-left text-sm" aria-label="Event log">
       <thead className="text-neutral-500">
@@ -16,15 +15,15 @@ export const EventLog = ({ events }: { events: Dispute['events'] }) => {
         </tr>
       </thead>
       <tbody>
-        {rows.map((e) => (
-          <tr key={e.seq} className="border-t border-neutral-200 font-mono">
-            <td className="py-1 pr-4 text-neutral-500">{e.seq}</td>
-            <td className="py-1 pr-4">{e.event}</td>
-            <td className="py-1 pr-4 text-neutral-500">{e.fromState || '-'}</td>
-            <td className="py-1 pr-4">{e.toState}</td>
-            <td className="py-1 pr-4">{e.actor}</td>
+        {newestFirst.map((transition) => (
+          <tr key={transition.seq} className="border-t border-neutral-200 font-mono">
+            <td className="py-1 pr-4 text-neutral-500">{transition.seq}</td>
+            <td className="py-1 pr-4">{transition.event}</td>
+            <td className="py-1 pr-4 text-neutral-500">{transition.fromState || '-'}</td>
+            <td className="py-1 pr-4">{transition.toState}</td>
+            <td className="py-1 pr-4">{transition.actor}</td>
             <td className="py-1 text-neutral-500">
-              {new Date(e.occurredAt).toISOString().replace('T', ' ').slice(0, 19)}
+              {new Date(transition.occurredAt).toISOString().replace('T', ' ').slice(0, 19)}
             </td>
           </tr>
         ))}

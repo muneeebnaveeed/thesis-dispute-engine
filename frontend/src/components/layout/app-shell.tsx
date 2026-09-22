@@ -1,21 +1,19 @@
 import { Link, useRouteContext, useRouter } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 
-import { buttonVariants } from '#/components/ui/button'
+import { Button, buttonVariants } from '#/components/ui/button'
 import { cn } from '#/lib/cn'
 import { logout } from '#/server/functions/session'
 
-type Props = { title: string; children: ReactNode }
+const navLinkClass = cn(buttonVariants({ variant: 'link', size: 'bare' }), 'mr-3')
 
-const navLink = cn(buttonVariants({ variant: 'link', size: 'bare' }), 'mr-3')
-
-export const AppShell = ({ title, children }: Props) => {
+export const AppShell = ({ title, children }: { title: string; children: ReactNode }) => {
   const { viewer } = useRouteContext({ from: '__root__' })
   const router = useRouter()
   const signOut = async () => {
-    const { url } = await logout()
-    if (url.startsWith('/')) await router.navigate({ to: url })
-    else window.location.assign(url)
+    const { url: afterLogoutUrl } = await logout()
+    if (afterLogoutUrl.startsWith('/')) await router.navigate({ to: afterLogoutUrl })
+    else window.location.assign(afterLogoutUrl)
   }
   return (
     <div className="mx-auto max-w-5xl px-6 py-8">
@@ -28,22 +26,18 @@ export const AppShell = ({ title, children }: Props) => {
           <span className="text-sm text-neutral-600">
             {viewer.roles.includes('tenant-admin') && (
               <>
-                <Link to="/$tenant/keys" params={{ tenant: viewer.tenantSlug }} className={navLink}>
+                <Link to="/$tenant/keys" params={{ tenant: viewer.tenantSlug }} className={navLinkClass}>
                   Keys
                 </Link>
-                <Link to="/$tenant/templates" params={{ tenant: viewer.tenantSlug }} className={navLink}>
+                <Link to="/$tenant/templates" params={{ tenant: viewer.tenantSlug }} className={navLinkClass}>
                   Templates
                 </Link>
               </>
             )}
             {viewer.name} <span className="text-neutral-400">at</span> {viewer.tenantSlug}{' '}
-            <button
-              type="button"
-              onClick={() => void signOut()}
-              className="ml-2 underline hover:text-neutral-900"
-            >
+            <Button variant="link" size="bare" onClick={() => void signOut()} className="ml-2">
               Sign out
-            </button>
+            </Button>
           </span>
         ) : (
           <span className="text-sm text-neutral-400">Not signed in</span>

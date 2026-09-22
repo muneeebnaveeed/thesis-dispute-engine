@@ -6,22 +6,19 @@ import { getGlobalStartContext } from '@tanstack/react-start'
 import { routeTree } from './routeTree.gen'
 
 export const getRouter = () => {
-  // One QueryClient per router: on the server that is one per request, so no request sees another's cache. The
-  // SSR integration dehydrates what loaders fetched into the HTML and hydrates it in the browser, so first paint
-  // needs no client fetch and later navigations hit the cache, then the API directly.
+  // one client per router: SSR requests must not share a cache
   const queryClient = new QueryClient({
     defaultOptions: { queries: { staleTime: 30_000, retry: false, refetchOnWindowFocus: false } },
   })
-  // The nonce minted by the request middleware tags every inline script Start emits, which is what makes the
-  // strict CSP in security-headers.ts possible.
-  const ctx = getGlobalStartContext() as { nonce?: string } | undefined
+  // the strict CSP in security-headers.ts depends on this nonce
+  const startContext = getGlobalStartContext() as { nonce?: string } | undefined
   const router = createTanStackRouter({
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
     defaultPreload: 'intent',
     defaultPreloadStaleTime: 0,
-    ...(ctx?.nonce ? { ssr: { nonce: ctx.nonce } } : {}),
+    ...(startContext?.nonce ? { ssr: { nonce: startContext.nonce } } : {}),
   })
   setupRouterSsrQueryIntegration({ router, queryClient })
   return router

@@ -3,7 +3,7 @@ import type { HTMLAttributes } from 'react'
 
 import { cn } from '#/lib/cn'
 
-export const badgeVariants = cva('rounded px-1.5 py-0.5 text-xs font-medium', {
+const badgeVariants = cva('rounded px-1.5 py-0.5 text-xs font-medium', {
   variants: {
     tone: {
       neutral: 'bg-neutral-100 text-neutral-800',

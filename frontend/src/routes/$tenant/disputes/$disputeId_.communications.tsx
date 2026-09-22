@@ -4,115 +4,125 @@ import { useState } from 'react'
 
 import { classify } from '#/api/failure'
 import type { components } from '#/api/schema.gen'
-import { EmailComposer, type Draft } from '#/components/comms/email-composer'
+import { EmailComposer, type AttachmentDraft } from '#/components/comms/email-composer'
 import { SentEmails } from '#/components/comms/sent-emails'
 import { AppShell } from '#/components/layout/app-shell'
 import { FailureBanner } from '#/components/layout/failure-banner'
 import { TenantMismatch } from '#/components/layout/tenant-mismatch'
 import { Badge } from '#/components/ui/badge'
 import { cn } from '#/lib/cn'
-import { disputeQuery, emailTemplatesQuery } from '#/queries'
-import { fieldsOf, useServerMutation } from '#/queries/mutation'
-import { composeEmail, resendNotice, uploadAttachment } from '#/server/functions/mutations'
+import { disputeQuery } from '#/queries/disputes'
+import { emailTemplatesQuery } from '#/queries/notices'
+import { fieldErrorsOf, useServerMutation } from '#/queries/use-server-mutation'
+import { composeEmail, resendNotice, uploadAttachment } from '#/server/functions/notices'
 
-type Tab = 'create' | 'sent'
-type Kind = components['schemas']['NoticeKind']
+type CommunicationsTab = 'create' | 'sent'
+type NoticeKind = components['schemas']['NoticeKind']
 
 const CommunicationsPage = () => {
   const { tenant, disputeId } = Route.useParams()
-  const { tab = 'create' } = Route.useSearch()
+  const { tab: activeTab = 'create' } = Route.useSearch()
   const { viewer } = useRouteContext({ from: '__root__' })
   const router = useRouter()
   const queryClient = useQueryClient()
-  const { data: outcome } = useSuspenseQuery(disputeQuery(disputeId))
-  const { data: catalogue } = useSuspenseQuery(emailTemplatesQuery(disputeId))
-  const [sentNote, setSentNote] = useState<string | null>(null)
-  const [drafts, setDrafts] = useState<Draft[]>([])
+  const { data: disputeOutcome } = useSuspenseQuery(disputeQuery(disputeId))
+  const { data: catalogueOutcome } = useSuspenseQuery(emailTemplatesQuery(disputeId))
+  const [queuedNote, setQueuedNote] = useState<string | null>(null)
+  const [attachmentDrafts, setAttachmentDrafts] = useState<AttachmentDraft[]>([])
 
-  const showTab = (next: Tab) =>
+  const showTab = (tab: CommunicationsTab) =>
     router.navigate({
       to: '/$tenant/disputes/$disputeId/communications',
       params: { tenant, disputeId },
-      search: next === 'sent' ? { tab: 'sent' } : {},
+      search: tab === 'sent' ? { tab: 'sent' } : {},
     })
 
-  const send = useServerMutation(
-    (vars: { template: Kind; fields: Record<string, string> }) =>
+  const sendMutation = useServerMutation(
+    ({ template, fields }: { template: NoticeKind; fields: Record<string, string> }) =>
       composeEmail({
         data: {
           disputeId,
-          body: { template: vars.template, fields: vars.fields, attachments: drafts.map((d) => d.id) },
+          body: { template, fields, attachments: attachmentDrafts.map((draft) => draft.id) },
         },
       }),
     {
       invalidates: () => [disputeQuery(null).queryKey],
       onSuccess: async () => {
-        setSentNote('Email queued; it appears under Sent Emails as it goes out.')
-        setDrafts([])
+        setQueuedNote('Email queued; it appears under Sent Emails as it goes out.')
+        setAttachmentDrafts([])
         await showTab('sent')
       },
     },
   )
-  const resend = useServerMutation((noticeId: number) => resendNotice({ data: { disputeId, noticeId } }), {
-    invalidates: () => [disputeQuery(null).queryKey],
-    onSuccess: () => setSentNote('Email queued again; it appears below as it goes out.'),
-  })
-  const upload = useServerMutation(
-    (file: File) => {
-      const form = new FormData()
-      form.append('disputeId', disputeId)
-      form.append('file', file, file.name)
-      return uploadAttachment({ data: form })
+  const resendMutation = useServerMutation(
+    (noticeId: number) => resendNotice({ data: { disputeId, noticeId } }),
+    {
+      invalidates: () => [disputeQuery(null).queryKey],
+      onSuccess: () => setQueuedNote('Email queued again; it appears below as it goes out.'),
     },
-    { onSuccess: (a) => setDrafts((cur) => [...cur, { id: a.id, filename: a.filename, size: a.size }]) },
   )
-  const failure = send.failure ?? upload.failure ?? resend.failure
+  const uploadMutation = useServerMutation(
+    (file: File) => {
+      const multipart = new FormData()
+      multipart.append('disputeId', disputeId)
+      multipart.append('file', file, file.name)
+      return uploadAttachment({ data: multipart })
+    },
+    {
+      onSuccess: (uploaded) =>
+        setAttachmentDrafts((current) => [
+          ...current,
+          { id: uploaded.id, filename: uploaded.filename, size: uploaded.size },
+        ]),
+    },
+  )
+  const failure = sendMutation.failure ?? uploadMutation.failure ?? resendMutation.failure
   const clearFailures = () => {
-    send.clearFailure()
-    upload.clearFailure()
-    resend.clearFailure()
+    sendMutation.clearFailure()
+    uploadMutation.clearFailure()
+    resendMutation.clearFailure()
   }
-  const busy = send.isPending || upload.isPending || resend.isPending
+  const busy = sendMutation.isPending || uploadMutation.isPending || resendMutation.isPending
 
   if (viewer && viewer.tenantSlug !== tenant) return <TenantMismatch wanted={tenant} />
-  if (outcome.problem || !outcome.value) {
-    const f = outcome.problem ? classify({ error: outcome.problem }) : null
+  if (disputeOutcome.problem || !disputeOutcome.value) {
+    const loadFailure = disputeOutcome.problem ? classify({ error: disputeOutcome.problem }) : null
     return (
       <AppShell title="Communications">
-        {f && (
+        {loadFailure && (
           <FailureBanner
-            failure={f}
+            failure={loadFailure}
             onRetry={() => void queryClient.invalidateQueries({ queryKey: disputeQuery(disputeId).queryKey })}
           />
         )}
       </AppShell>
     )
   }
-  const d = outcome.value
-  const fields = fieldsOf(failure)
-  const tabClass = (t: Tab) =>
+  const dispute = disputeOutcome.value
+  const fieldErrors = fieldErrorsOf(failure)
+  const tabClass = (tab: CommunicationsTab) =>
     cn(
       'border-b-2 px-3 py-2 text-sm',
-      tab === t
+      activeTab === tab
         ? 'border-neutral-900 font-medium'
         : 'border-transparent text-neutral-500 hover:text-neutral-900',
     )
 
   return (
-    <AppShell title={`Communications for dispute ${d.id.slice(0, 8)}`}>
+    <AppShell title={`Communications for dispute ${dispute.id.slice(0, 8)}`}>
       <p className="mb-4 text-sm">
         <Link to="/$tenant/disputes/$disputeId" params={{ tenant, disputeId }} className="underline">
           Back to the dispute
         </Link>
         <span className="ml-3 text-neutral-500">
-          {d.reason} / {d.regime} / {d.state}
+          {dispute.reason} / {dispute.regime} / {dispute.state}
         </span>
       </p>
       <div role="tablist" aria-label="Communications" className="mb-6 flex gap-2 border-b border-neutral-200">
         <button
           type="button"
           role="tab"
-          aria-selected={tab === 'create'}
+          aria-selected={activeTab === 'create'}
           className={tabClass('create')}
           onClick={() => void showTab('create')}
         >
@@ -121,19 +131,19 @@ const CommunicationsPage = () => {
         <button
           type="button"
           role="tab"
-          aria-selected={tab === 'sent'}
+          aria-selected={activeTab === 'sent'}
           className={tabClass('sent')}
           onClick={() => void showTab('sent')}
         >
           Sent Emails
           <Badge tone="neutral" className="ml-2 rounded-full px-2">
-            {d.notices.length}
+            {dispute.notices.length}
           </Badge>
         </button>
       </div>
-      {sentNote && (
+      {queuedNote && (
         <output className="mb-4 block rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-          {sentNote}
+          {queuedNote}
         </output>
       )}
       {failure && failure.kind !== 'validation' && (
@@ -141,22 +151,24 @@ const CommunicationsPage = () => {
           <FailureBanner failure={failure} onRetry={clearFailures} />
         </div>
       )}
-      {tab === 'create' ? (
-        catalogue.value ? (
+      {activeTab === 'create' ? (
+        catalogueOutcome.value ? (
           <EmailComposer
-            templates={catalogue.value.templates}
-            facts={catalogue.value.facts}
-            fields={fields}
+            templates={catalogueOutcome.value.templates}
+            facts={catalogueOutcome.value.facts}
+            fields={fieldErrors}
             busy={busy}
-            onSend={(template, inputs) => send.mutate({ template, fields: inputs })}
-            drafts={drafts}
-            onUpload={(f) => upload.mutate(f)}
-            onRemoveDraft={(id) => setDrafts((cur) => cur.filter((draft) => draft.id !== id))}
+            onSend={(template, fields) => sendMutation.mutate({ template, fields })}
+            attachmentDrafts={attachmentDrafts}
+            onUpload={(file) => uploadMutation.mutate(file)}
+            onRemoveAttachmentDraft={(draftId) =>
+              setAttachmentDrafts((current) => current.filter((draft) => draft.id !== draftId))
+            }
           />
         ) : (
           <FailureBanner
             failure={
-              classify({ error: catalogue.problem }) ?? {
+              classify({ error: catalogueOutcome.problem }) ?? {
                 kind: 'unexpected',
                 status: 0,
                 message: 'no templates',
@@ -165,15 +177,20 @@ const CommunicationsPage = () => {
           />
         )
       ) : (
-        <SentEmails notices={d.notices} disputeId={d.id} busy={busy} onResend={(id) => resend.mutate(id)} />
+        <SentEmails
+          notices={dispute.notices}
+          disputeId={dispute.id}
+          busy={busy}
+          onResend={(noticeId) => resendMutation.mutate(noticeId)}
+        />
       )}
     </AppShell>
   )
 }
 
-// The communications panel: compose from a template with a live preview, or read what has gone out.
 export const Route = createFileRoute('/$tenant/disputes/$disputeId_/communications')({
-  validateSearch: (s: Record<string, unknown>): { tab?: Tab } => (s.tab === 'sent' ? { tab: 'sent' } : {}),
+  validateSearch: (rawSearch: Record<string, unknown>): { tab?: CommunicationsTab } =>
+    rawSearch.tab === 'sent' ? { tab: 'sent' } : {},
   loader: ({ params, context }) =>
     Promise.all([
       context.queryClient.query({ ...disputeQuery(params.disputeId), staleTime: 'static' }),

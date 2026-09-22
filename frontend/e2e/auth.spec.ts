@@ -15,10 +15,10 @@ test('a signed-out visitor to a tenant page is sent through the realm and back t
   await expect(page.getByText(/at otp/)).toBeVisible()
 
   const cookies = await page.context().cookies()
-  const session = cookies.find((c) => c.name === 'de_session')
+  const session = cookies.find((cookie) => cookie.name === 'de_session')
   expect(session?.httpOnly).toBe(true)
   expect(session?.value).toMatch(/^[0-9a-f-]{36}$/)
-  expect(cookies.find((c) => c.name === 'de_tenant')?.value).toBe('otp')
+  expect(cookies.find((cookie) => cookie.name === 'de_tenant')?.value).toBe('otp')
   const stored = await page.evaluate(() =>
     [...Object.values(localStorage), ...Object.values(sessionStorage)].join(' '),
   )
@@ -76,11 +76,11 @@ test('a destination outside this tenant is never used after sign-in', async ({ p
 })
 
 test('every page carries the security headers and a nonce-based CSP', async ({ page, request }) => {
-  const res = await page.goto('/')
-  const csp = res?.headers()['content-security-policy'] ?? ''
+  const response = await page.goto('/')
+  const csp = response?.headers()['content-security-policy'] ?? ''
   expect(csp).toMatch(/script-src 'self' 'nonce-[a-f0-9]{32}'/)
   expect(csp).toContain("frame-ancestors 'none'")
-  expect(res?.headers()['x-content-type-options']).toBe('nosniff')
+  expect(response?.headers()['x-content-type-options']).toBe('nosniff')
   // Start's inline scripts remove themselves after running, so check the raw HTML: each carries the header's nonce.
   const raw = await request.get('/')
   const html = await raw.text()

@@ -7,9 +7,9 @@ export const Route = createFileRoute('/auth/backchannel-logout')({
       POST: async ({ request }) => {
         const { handleBackchannelLogout } = await import('#/server/auth/backchannel')
         const form = await request.formData()
-        const token = form.get('logout_token')
-        const ok = typeof token === 'string' && (await handleBackchannelLogout(token))
-        return new Response(null, { status: ok ? 200 : 400, headers: { 'Cache-Control': 'no-store' } })
+        const logoutToken = form.get('logout_token')
+        const ended = typeof logoutToken === 'string' && (await handleBackchannelLogout(logoutToken))
+        return new Response(null, { status: ended ? 200 : 400, headers: { 'Cache-Control': 'no-store' } })
       },
     },
   },

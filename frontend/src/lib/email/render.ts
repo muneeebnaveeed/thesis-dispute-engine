@@ -2,106 +2,122 @@ import type { components } from '#/api/schema.gen'
 
 export type EmailTemplate = components['schemas']['EmailTemplate']
 export type TemplateField = EmailTemplate['fields'][number]
+export type EmailLineSegment = { text: string; unfilledPlaceholder: boolean }
+export type RenderedEmail = { subject: string; paragraphs: string[] }
 
-/**
- * The browser half of the template language (the server half is notice.Fill): {{id}} placeholders, {{#id}}...{{/id}}
- * sections that appear only when the field has a value, paragraphs that are only a list field rendered as bullet
- * lines, empty paragraphs dropped. Facts are already substituted by the server; dueDate is computed here from "days".
- */
-const placeholder = /\{\{([A-Za-z][A-Za-z0-9]*)\}\}/g
-const section = /\{\{#([A-Za-z][A-Za-z0-9]*)\}\}(.*?)\{\{\/([A-Za-z][A-Za-z0-9]*)\}\}/g
+// the browser half of the template language; the server half is notice.Fill and the two must agree
+const placeholderPattern = /\{\{([A-Za-z][A-Za-z0-9]*)\}\}/g
+const sectionPattern = /\{\{#([A-Za-z][A-Za-z0-9]*)\}\}(.*?)\{\{\/([A-Za-z][A-Za-z0-9]*)\}\}/g
+const lonePlaceholderPattern = /^\{\{([A-Za-z][A-Za-z0-9]*)\}\}$/
 
-/** What the customer will read for each field, from what the analyst typed or chose. */
-export const displayValues = (
+export const customerFacingFieldValues = (
   fields: TemplateField[],
-  inputs: Record<string, string>,
+  analystInputs: Record<string, string>,
   today: Date,
 ): Record<string, string> => {
-  const out: Record<string, string> = {}
-  for (const f of fields) {
-    const raw = (inputs[f.id] ?? '').trim() || (f.default ?? '')
-    if (!raw) continue
-    switch (f.type) {
+  const fieldValues: Record<string, string> = {}
+  for (const field of fields) {
+    const rawInput = (analystInputs[field.id] ?? '').trim() || (field.default ?? '')
+    if (!rawInput) continue
+    switch (field.type) {
       case 'SELECT':
-        out[f.id] = f.options?.find((o) => o.key === raw)?.text ?? ''
+        fieldValues[field.id] = field.options?.find((option) => option.key === rawInput)?.text ?? ''
         break
       case 'MULTISELECT':
-        out[f.id] = raw
+        fieldValues[field.id] = rawInput
           .split(',')
-          .map((k) => f.options?.find((o) => o.key === k.trim())?.text ?? '')
+          .map((optionKey) => field.options?.find((option) => option.key === optionKey.trim())?.text ?? '')
           .filter(Boolean)
           .join('\n')
         break
       case 'DATE': {
-        const d = new Date(`${raw}T00:00:00Z`)
-        out[f.id] = Number.isNaN(d.getTime()) ? raw : longDate(d)
+        const date = new Date(`${rawInput}T00:00:00Z`)
+        fieldValues[field.id] = Number.isNaN(date.getTime()) ? rawInput : formatLongDate(date)
         break
       }
       case 'NUMBER':
       case 'TEXT':
       case 'TEXTAREA':
-        out[f.id] = raw
+        fieldValues[field.id] = rawInput
     }
   }
-  const days = Number(out.days)
-  if (Number.isInteger(days) && days > 0) {
-    const due = new Date(today)
-    due.setUTCDate(due.getUTCDate() + days)
-    out.dueDate = longDate(due)
+  const daysToReply = Number(fieldValues.days)
+  if (Number.isInteger(daysToReply) && daysToReply > 0) {
+    const dueDate = new Date(today)
+    dueDate.setUTCDate(dueDate.getUTCDate() + daysToReply)
+    fieldValues.dueDate = formatLongDate(dueDate)
   }
-  return out
+  return fieldValues
 }
 
-export const longDate = (d: Date): string => {
-  return `${d.getUTCDate()} ${d.toLocaleString('en-GB', { month: 'long', timeZone: 'UTC' })} ${d.getUTCFullYear()}`
-}
+const formatLongDate = (date: Date): string =>
+  `${date.getUTCDate()} ${date.toLocaleString('en-GB', { month: 'long', timeZone: 'UTC' })} ${date.getUTCFullYear()}`
 
-const listy = (fields: TemplateField[]) =>
+const listFieldIds = (fields: TemplateField[]) =>
   new Set(
-    fields.filter((f) => f.type === 'MULTISELECT' || (f.type === 'TEXTAREA' && f.list)).map((f) => f.id),
+    fields
+      .filter((field) => field.type === 'MULTISELECT' || (field.type === 'TEXTAREA' && field.list))
+      .map((field) => field.id),
   )
 
-/** Renders one line with the display values; unfilled placeholders stay as {{id}} so the preview can mark them. */
-export const substitute = (
-  line: string,
-  values: Record<string, string>,
-  lists: Set<string>,
-  keepUnfilled: boolean,
+const fillEmailLine = (
+  templateLine: string,
+  fieldValues: Record<string, string>,
+  listFields: Set<string>,
+  keepUnfilledPlaceholders: boolean,
 ): string => {
-  let s = line.replace(section, (_m, id: string, inner: string) => (values[id] ? inner : ''))
-  const onlyId = /^\{\{([A-Za-z][A-Za-z0-9]*)\}\}$/.exec(s.trim())?.[1]
-  const listValue = onlyId && lists.has(onlyId) ? values[onlyId] : undefined
+  const withSectionsResolved = templateLine.replace(
+    sectionPattern,
+    (_match, fieldId: string, inner: string) => (fieldValues[fieldId] ? inner : ''),
+  )
+  const loneFieldId = lonePlaceholderPattern.exec(withSectionsResolved.trim())?.[1]
+  const listValue = loneFieldId && listFields.has(loneFieldId) ? fieldValues[loneFieldId] : undefined
   if (listValue) {
     return listValue
       .split('\n')
-      .map((l: string) => l.trim())
+      .map((item) => item.trim())
       .filter(Boolean)
-      .map((l) => `- ${l.replace(/^- /, '')}`)
+      .map((item) => `- ${item.replace(/^- /, '')}`)
       .join('\n')
   }
-  s = s.replace(placeholder, (m, id: string) => values[id] ?? (keepUnfilled ? m : ''))
-  return s.trim()
+  return withSectionsResolved
+    .replace(
+      placeholderPattern,
+      (match, fieldId: string) => fieldValues[fieldId] ?? (keepUnfilledPlaceholders ? match : ''),
+    )
+    .trim()
 }
 
-/** The whole message as the customer would read it; paragraphs that come out empty are dropped. */
-export const preview = (t: EmailTemplate, inputs: Record<string, string>, today: Date) => {
-  const values = displayValues(t.fields, inputs, today)
-  const lists = listy(t.fields)
+export const renderEmailPreview = (
+  template: EmailTemplate,
+  analystInputs: Record<string, string>,
+  today: Date,
+): RenderedEmail => {
+  const fieldValues = customerFacingFieldValues(template.fields, analystInputs, today)
+  const listFields = listFieldIds(template.fields)
   return {
-    subject: substitute(t.subject, values, lists, true),
-    paragraphs: t.paragraphs.map((p) => substitute(p, values, lists, true)).filter((p) => p !== ''),
+    subject: fillEmailLine(template.subject, fieldValues, listFields, true),
+    paragraphs: template.paragraphs
+      .map((paragraph) => fillEmailLine(paragraph, fieldValues, listFields, true))
+      .filter((paragraph) => paragraph !== ''),
   }
 }
 
-/** Splits a preview line into text and unfilled {{placeholder}} runs so the UI can mark what is still missing. */
-export const segments = (line: string): { text: string; missing: boolean }[] => {
-  const out: { text: string; missing: boolean }[] = []
-  let last = 0
-  for (const m of line.matchAll(placeholder)) {
-    if (m.index > last) out.push({ text: line.slice(last, m.index), missing: false })
-    out.push({ text: m[1] ?? '', missing: true })
-    last = m.index + m[0].length
+export const emailLineSegments = (renderedLine: string): EmailLineSegment[] => {
+  const segments: EmailLineSegment[] = []
+  let consumedUpTo = 0
+  for (const match of renderedLine.matchAll(placeholderPattern)) {
+    if (match.index > consumedUpTo) {
+      segments.push({
+        text: renderedLine.slice(consumedUpTo, match.index),
+        unfilledPlaceholder: false,
+      })
+    }
+    segments.push({ text: match[1] ?? '', unfilledPlaceholder: true })
+    consumedUpTo = match.index + match[0].length
   }
-  if (last < line.length) out.push({ text: line.slice(last), missing: false })
-  return out
+  if (consumedUpTo < renderedLine.length) {
+    segments.push({ text: renderedLine.slice(consumedUpTo), unfilledPlaceholder: false })
+  }
+  return segments
 }

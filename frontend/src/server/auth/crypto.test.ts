@@ -1,10 +1,10 @@
 import { open, seal } from './crypto'
 
 test('seals and opens a payload, with a fresh nonce each time', async () => {
-  const a = await seal({ hello: 'world' })
-  const b = await seal({ hello: 'world' })
-  expect(Buffer.from(a).equals(Buffer.from(b))).toBe(false)
-  expect(await open(a)).toEqual({ hello: 'world' })
+  const first = await seal({ hello: 'world' })
+  const second = await seal({ hello: 'world' })
+  expect(Buffer.from(first).equals(Buffer.from(second))).toBe(false)
+  expect(await open(first)).toEqual({ hello: 'world' })
 })
 
 test('a tampered box does not open', async () => {

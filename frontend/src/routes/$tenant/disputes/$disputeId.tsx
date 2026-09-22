@@ -17,29 +17,25 @@ import { Button } from '#/components/ui/button'
 import { inputVariants, invalidProps } from '#/components/ui/field'
 import { cn } from '#/lib/cn'
 import { formatMoney } from '#/lib/money'
-import { disputeQuery } from '#/queries'
-import { fieldsOf, useServerMutation } from '#/queries/mutation'
-import { applyEvent } from '#/server/functions/mutations'
+import { disputeQuery } from '#/queries/disputes'
+import { fieldErrorsOf, useServerMutation } from '#/queries/use-server-mutation'
+import { applyEvent } from '#/server/functions/disputes'
 
-type Event = Dispute['allowedEvents'][number]
+type DisputeEvent = Dispute['allowedEvents'][number]
 
 const DisputePage = () => {
   const { tenant, disputeId } = Route.useParams()
   const { viewer } = useRouteContext({ from: '__root__' })
-  const { data: outcome } = useSuspenseQuery(disputeQuery(disputeId))
+  const { data: disputeOutcome } = useSuspenseQuery(disputeQuery(disputeId))
   const queryClient = useQueryClient()
-  // Facts an action may carry: the customer's share of a refund, why a HIGH-risk credit goes out, how an advance clears.
   const [liability, setLiability] = useState('')
   const [settlement, setSettlement] = useState('')
   const [riskOverride, setRiskOverride] = useState('')
-  const [busyEvent, setBusyEvent] = useState<Event | null>(null)
+  const [eventInFlight, setEventInFlight] = useState<DisputeEvent | null>(null)
 
-  // The idempotency key makes the call safe to repeat, so a short outage or budget hit is retried once for the person.
-  const apply = useServerMutation(
-    (vars: { event: Event; payload: Record<string, unknown> }) =>
-      applyEvent({
-        data: { disputeId, body: { event: vars.event, actor: 'analyst', payload: vars.payload } },
-      }),
+  const applyEventMutation = useServerMutation(
+    ({ event, payload }: { event: DisputeEvent; payload: Record<string, unknown> }) =>
+      applyEvent({ data: { disputeId, body: { event, actor: 'analyst', payload } } }),
     {
       invalidates: () => [disputeQuery(null).queryKey],
       onSuccess: () => {
@@ -49,103 +45,100 @@ const DisputePage = () => {
       },
     },
   )
-  const fields = fieldsOf(apply.failure)
+  const applyFailure = applyEventMutation.failure
+  const fieldErrors = fieldErrorsOf(applyFailure)
+  const refreshDispute = () =>
+    void queryClient.invalidateQueries({ queryKey: disputeQuery(disputeId).queryKey })
 
   if (viewer && viewer.tenantSlug !== tenant) return <TenantMismatch wanted={tenant} />
-  if (outcome.problem || !outcome.value) {
-    const f = outcome.problem ? classify({ error: outcome.problem }) : null
+  if (disputeOutcome.problem || !disputeOutcome.value) {
+    const loadFailure = disputeOutcome.problem ? classify({ error: disputeOutcome.problem }) : null
     return (
       <AppShell title="Dispute">
-        {f && (
-          <FailureBanner
-            failure={f}
-            onRetry={() => void queryClient.invalidateQueries({ queryKey: disputeQuery(disputeId).queryKey })}
-          />
-        )}
+        {loadFailure && <FailureBanner failure={loadFailure} onRetry={refreshDispute} />}
       </AppShell>
     )
   }
-  const d = outcome.value
-  const canRefund = d.allowedEvents.includes('ISSUE_REFUND')
-  const canSettle = d.allowedEvents.includes('CLOSE') && Number(d.balances.suspense) > 0
+  const dispute = disputeOutcome.value
+  const canRefund = dispute.allowedEvents.includes('ISSUE_REFUND')
+  const canSettle = dispute.allowedEvents.includes('CLOSE') && Number(dispute.balances.suspense) > 0
 
-  const run = (event: Event, extra: Record<string, unknown> = {}) => {
-    const payload: Record<string, unknown> = { ...extra }
+  const applyWithFormFacts = (event: DisputeEvent, payloadExtras: Record<string, unknown> = {}) => {
+    const payload: Record<string, unknown> = { ...payloadExtras }
     if (event === 'ISSUE_REFUND' && liability.trim()) payload.liability = liability.trim()
     if (event === 'ISSUE_REFUND' && riskOverride.trim()) payload.riskOverride = riskOverride.trim()
     if (event === 'CLOSE' && settlement) payload.settlement = settlement
-    setBusyEvent(event)
-    apply.mutate(
+    setEventInFlight(event)
+    applyEventMutation.mutate(
       { event, payload },
       {
         onSettled: (_data, error) => {
-          setBusyEvent(null)
-          // A conflict means the state moved under us; show the truth alongside the message.
-          if (error && apply.failure?.kind === 'conflict')
-            void queryClient.invalidateQueries({ queryKey: disputeQuery(disputeId).queryKey })
+          setEventInFlight(null)
+          // conflict: the state moved under us, show the truth next to the message
+          if (error && applyEventMutation.failure?.kind === 'conflict') refreshDispute()
         },
       },
     )
   }
-  const fieldFailure = Boolean(
-    fields.liability ||
-    fields.riskOverride ||
-    fields.settlement ||
-    Object.keys(fields).some((k) => k.startsWith('answers.')),
+  const failureShownAtField = Boolean(
+    fieldErrors.liability ||
+    fieldErrors.riskOverride ||
+    fieldErrors.settlement ||
+    Object.keys(fieldErrors).some((fieldPath) => fieldPath.startsWith('answers.')),
   )
 
   return (
-    <AppShell title={`Dispute ${d.id.slice(0, 8)}`}>
+    <AppShell title={`Dispute ${dispute.id.slice(0, 8)}`}>
       <dl className="mb-6 grid grid-cols-2 gap-x-6 gap-y-2 text-sm md:grid-cols-4">
-        <Field label="State" value={d.state} mono />
-        <Field label="Regime" value={d.regime} mono />
-        <Field label="Reason" value={d.reason} mono />
-        <Field label="Amount" value={formatMoney(d.disputedAmount, d.currency)} />
-        <Field label="Appeals used" value={String(d.appeals)} />
+        <Fact label="State" value={dispute.state} mono />
+        <Fact label="Regime" value={dispute.regime} mono />
+        <Fact label="Reason" value={dispute.reason} mono />
+        <Fact label="Amount" value={formatMoney(dispute.disputedAmount, dispute.currency)} />
+        <Fact label="Appeals used" value={String(dispute.appeals)} />
       </dl>
 
-      {d.risk && (
+      {dispute.risk && (
         <section className="mb-8">
           <h2 className="mb-2 text-lg font-medium">Fraud risk</h2>
-          <RiskPanel risk={d.risk} />
+          <RiskPanel risk={dispute.risk} />
         </section>
       )}
 
       <section className="mb-8">
         <h2 className="mb-2 text-lg font-medium">Regulatory clocks</h2>
-        <Deadlines deadlines={d.deadlines} />
+        <Deadlines deadlines={dispute.deadlines} />
       </section>
 
-      {d.questionnaire && (
+      {dispute.questionnaire && (
         <section className="mb-8">
           <h2 className="mb-2 text-lg font-medium">Questionnaire</h2>
           <QuestionnairePanel
-            questionnaire={d.questionnaire}
-            canReceive={d.allowedEvents.includes('RECEIVE_QUESTIONNAIRE')}
-            fields={fields}
-            busy={apply.isPending}
-            onReceive={(answers) => run('RECEIVE_QUESTIONNAIRE', { answers })}
+            questionnaire={dispute.questionnaire}
+            canReceive={dispute.allowedEvents.includes('RECEIVE_QUESTIONNAIRE')}
+            fields={fieldErrors}
+            busy={applyEventMutation.isPending}
+            onReceive={(answers) => applyWithFormFacts('RECEIVE_QUESTIONNAIRE', { answers })}
           />
         </section>
       )}
 
       <section className="mb-8">
         <h2 className="mb-2 text-lg font-medium">Actions</h2>
-        {d.allowedEvents.length === 0 ? (
+        {dispute.allowedEvents.length === 0 ? (
           <p className="text-sm text-neutral-600">This dispute is closed; nothing more can happen to it.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {d.allowedEvents
-              .filter((ev) => ev !== 'RECEIVE_QUESTIONNAIRE')
-              .map((ev) => (
+            {dispute.allowedEvents
+              .filter((event) => event !== 'RECEIVE_QUESTIONNAIRE')
+              .map((event) => (
                 <Button
-                  key={ev}
+                  key={event}
                   variant="action"
                   size="sm"
-                  disabled={apply.isPending}
-                  onClick={() => run(ev)}
+                  disabled={applyEventMutation.isPending}
+                  onClick={() => applyWithFormFacts(event)}
                 >
-                  {busyEvent === ev && apply.isPending ? '...' : ev}
+                  {eventInFlight === event && applyEventMutation.isPending ? '...' : event}
                 </Button>
               ))}
           </div>
@@ -154,29 +147,32 @@ const DisputePage = () => {
           <div className="mt-3 flex flex-wrap gap-6 text-sm">
             {canRefund && (
               <label className="block">
-                Customer liability ({d.currency}, optional)
+                Customer liability ({dispute.currency}, optional)
                 <input
                   value={liability}
-                  onChange={(e) => setLiability(e.target.value)}
+                  onChange={(event) => setLiability(event.target.value)}
                   inputMode="decimal"
                   placeholder="0.00"
-                  className={cn(inputVariants({ invalid: Boolean(fields.liability), mono: true }), 'w-40')}
-                  {...invalidProps('liability', fields.liability)}
+                  className={cn(
+                    inputVariants({ invalid: Boolean(fieldErrors.liability), mono: true }),
+                    'w-40',
+                  )}
+                  {...invalidProps('liability', fieldErrors.liability)}
                 />
-                <FieldError id="liability-error" message={fields.liability} />
+                <FieldError id="liability-error" message={fieldErrors.liability} />
               </label>
             )}
-            {canRefund && d.risk?.tier === 'HIGH' && (
+            {canRefund && dispute.risk?.tier === 'HIGH' && (
               <label className="block basis-full">
                 Justification for crediting despite the HIGH risk score
                 <textarea
                   value={riskOverride}
-                  onChange={(e) => setRiskOverride(e.target.value)}
+                  onChange={(event) => setRiskOverride(event.target.value)}
                   rows={2}
-                  className={cn(inputVariants({ invalid: Boolean(fields.riskOverride) }), 'max-w-xl')}
-                  {...invalidProps('riskOverride', fields.riskOverride)}
+                  className={cn(inputVariants({ invalid: Boolean(fieldErrors.riskOverride) }), 'max-w-xl')}
+                  {...invalidProps('riskOverride', fieldErrors.riskOverride)}
                 />
-                <FieldError id="riskOverride-error" message={fields.riskOverride} />
+                <FieldError id="riskOverride-error" message={fieldErrors.riskOverride} />
               </label>
             )}
             {canSettle && (
@@ -184,29 +180,29 @@ const DisputePage = () => {
                 Outstanding advance on close
                 <select
                   value={settlement}
-                  onChange={(e) => setSettlement(e.target.value)}
-                  className={cn(inputVariants({ invalid: Boolean(fields.settlement) }), 'w-auto')}
-                  {...invalidProps('settlement', fields.settlement)}
+                  onChange={(event) => setSettlement(event.target.value)}
+                  className={cn(inputVariants({ invalid: Boolean(fieldErrors.settlement) }), 'w-auto')}
+                  {...invalidProps('settlement', fieldErrors.settlement)}
                 >
                   <option value="">regime default</option>
                   <option value="RECOVERED">recovered</option>
                   <option value="WRITTEN_OFF">written off</option>
                 </select>
-                <FieldError id="settlement-error" message={fields.settlement} />
+                <FieldError id="settlement-error" message={fieldErrors.settlement} />
               </label>
             )}
           </div>
         )}
-        {apply.failure && !fieldFailure && (
+        {applyFailure && !failureShownAtField && (
           <div className="mt-4">
-            <FailureBanner failure={apply.failure} onRetry={apply.clearFailure} />
+            <FailureBanner failure={applyFailure} onRetry={applyEventMutation.clearFailure} />
           </div>
         )}
       </section>
 
       <section className="mb-8">
         <h2 className="mb-2 text-lg font-medium">Ledger</h2>
-        <Ledger ledger={d.ledger} balances={d.balances} currency={d.currency} />
+        <Ledger ledger={dispute.ledger} balances={dispute.balances} currency={dispute.currency} />
       </section>
 
       <section className="mb-8">
@@ -214,31 +210,30 @@ const DisputePage = () => {
           <h2 className="text-lg font-medium">Communications</h2>
           <Link
             to="/$tenant/disputes/$disputeId/communications"
-            params={{ tenant, disputeId: d.id }}
+            params={{ tenant, disputeId: dispute.id }}
             className="text-sm underline"
           >
             Open the communications panel
           </Link>
         </div>
-        <Notices notices={d.notices} tenant={tenant} disputeId={d.id} />
+        <Notices notices={dispute.notices} tenant={tenant} disputeId={dispute.id} />
       </section>
 
       <section>
         <h2 className="mb-2 text-lg font-medium">Event log</h2>
-        <EventLog events={d.events} />
+        <EventLog events={dispute.events} />
       </section>
     </AppShell>
   )
 }
 
-const Field = ({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) => (
+const Fact = ({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) => (
   <div>
     <dt className="text-neutral-500">{label}</dt>
     <dd className={cn(mono && 'font-mono')}>{value}</dd>
   </div>
 )
 
-// First paint comes from the server with the session's token; actions go straight from the browser to the API.
 export const Route = createFileRoute('/$tenant/disputes/$disputeId')({
   loader: ({ params, context }) =>
     context.queryClient.query({ ...disputeQuery(params.disputeId), staleTime: 'static' }),

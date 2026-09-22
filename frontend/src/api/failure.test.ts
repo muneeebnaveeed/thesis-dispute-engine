@@ -81,26 +81,26 @@ test('non-problem failures are classified too', () => {
 })
 
 test('ledger refusals point at the fact in the payload', () => {
-  const f = fromProblem({
+  const failure = fromProblem({
     ...base,
     status: 422,
     code: 'invalid-liability',
     title: 'the customer liability is not allowed under this regime',
     errors: [{ field: 'body.payload.liability', message: 'exceeds the 50.00 EUR cap under EU_PSD2_CARD' }],
   })
-  const fields = f.kind === 'validation' ? f.fields : {}
+  const fields = failure.kind === 'validation' ? failure.fields : {}
   expect(fields.liability).toMatch(/cap/)
 })
 
 test('a core decline is its own kind, with the core answer in the title', () => {
-  const f = fromProblem({
+  const failure = fromProblem({
     ...base,
     status: 422,
     code: 'core-declined',
     title: 'the banking core declined the posting',
     detail: 'the banking core declined the posting: exceeds amount limit (61)',
   })
-  expect(f.kind).toBe('declined')
-  expect(describe(f).title).toMatch(/61/)
-  expect(isRetryable(f)).toBe(false)
+  expect(failure.kind).toBe('declined')
+  expect(describe(failure).title).toMatch(/61/)
+  expect(isRetryable(failure)).toBe(false)
 })

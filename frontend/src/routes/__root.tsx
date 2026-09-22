@@ -4,7 +4,6 @@ import type { ReactNode } from 'react'
 
 import { RouteError } from '#/components/layout/route-error'
 import { getViewer } from '#/server/functions/session'
-import { publicConfig } from '#/server/functions/public-config'
 import appCss from '../styles.css?url'
 
 const RootDocument = ({ children }: { children: ReactNode }) => {
@@ -21,9 +20,8 @@ const RootDocument = ({ children }: { children: ReactNode }) => {
   )
 }
 
-// Every page knows who is signed in (or that nobody is) and the browser-facing API URL, from one server round trip.
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  beforeLoad: async () => ({ viewer: await getViewer(), config: await publicConfig() }),
+  beforeLoad: async () => ({ viewer: await getViewer() }),
   head: () => ({
     meta: [
       { charSet: 'utf-8' },

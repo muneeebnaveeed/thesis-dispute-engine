@@ -43,9 +43,9 @@ test('a tenant admin issues a key, the key works for that tenant, and revoking i
 test('an analyst without the admin role cannot manage keys', async ({ request }) => {
   // The seeded analysts are admins; the API-level rule is covered by the contract tests, so here we only assert a
   // tenant key (a machine credential) is refused with forbidden, not unauthenticated.
-  const res = await request.get(`${api}/tenant-keys`, {
+  const response = await request.get(`${api}/tenant-keys`, {
     headers: { Authorization: 'Bearer tk_dev_tenant_a' },
   })
-  expect(res.status()).toBe(403)
-  expect(((await res.json()) as { code: string }).code).toBe('forbidden')
+  expect(response.status()).toBe(403)
+  expect(((await response.json()) as { code: string }).code).toBe('forbidden')
 })

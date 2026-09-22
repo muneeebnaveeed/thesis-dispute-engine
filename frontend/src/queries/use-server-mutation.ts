@@ -1,0 +1,61 @@
+import { useMutation, useQueryClient, type QueryKey } from '@tanstack/react-query'
+import { useState } from 'react'
+
+import { classify, type Failure } from '#/api/failure'
+import type { Outcome } from '#/api/views'
+
+export const useServerMutation = <TVariables, TData>(
+  run: (variables: TVariables) => Promise<Outcome<TData>>,
+  options: {
+    invalidates?: (variables: TVariables, data: TData) => QueryKey[]
+    onSuccess?: (data: TData, variables: TVariables) => void | Promise<void>
+  } = {},
+) => {
+  const queryClient = useQueryClient()
+  const [failure, setFailure] = useState<Failure | null>(null)
+  const mutation = useMutation({
+    mutationFn: async (variables: TVariables): Promise<TData> => {
+      setFailure(null)
+      let outcome: Outcome<TData>
+      try {
+        outcome = await run(variables)
+      } catch (thrown) {
+        const unreachable = classify({ thrown }) ?? {
+          kind: 'unreachable' as const,
+          message: 'the server could not be reached',
+        }
+        setFailure(unreachable)
+        throw unreachable
+      }
+      if (outcome.problem || outcome.value === null) {
+        const refused = classify({ error: outcome.problem }) ?? {
+          kind: 'unexpected' as const,
+          status: 0,
+          message: 'no data',
+        }
+        setFailure(refused)
+        throw refused
+      }
+      return outcome.value
+    },
+    onSuccess: async (data, variables) => {
+      await Promise.all(
+        (options.invalidates?.(variables, data) ?? []).map((queryKey) =>
+          queryClient.invalidateQueries({ queryKey }),
+        ),
+      )
+      await options.onSuccess?.(data, variables)
+    },
+    throwOnError: false,
+  })
+  return { ...mutation, failure, clearFailure: () => setFailure(null) }
+}
+
+// the event payload nests its fields under `payload.`; the form knows them by bare name
+export const fieldErrorsOf = (failure: Failure | null): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(failure?.kind === 'validation' ? failure.fields : {}).map(([fieldPath, message]) => [
+      fieldPath.replace(/^payload\./, ''),
+      message,
+    ]),
+  )
