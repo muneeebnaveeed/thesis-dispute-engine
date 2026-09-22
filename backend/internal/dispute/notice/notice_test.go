@@ -31,8 +31,14 @@ func TestEveryKindComposesAndRendersBothWays(t *testing.T) {
 			t.Errorf("%s: %+v", kind, d)
 		}
 		h := d.HTML(f.Now)
-		if !strings.Contains(h, "<h1>"+d.Subject+"</h1>") || !strings.Contains(h, "Kovács Anna") {
+		if !strings.Contains(h, "<b>"+d.Subject+"</b>") || !strings.Contains(h, "Kovács Anna") {
 			t.Errorf("%s: html %s", kind, h[:80])
+		}
+		// Email-client friendly: no stylesheet, no margins or max-width, every style inline on table cells.
+		for _, banned := range []string{"<style", "max-width", "margin:3em", "font:"} {
+			if strings.Contains(h, banned) {
+				t.Errorf("%s: html uses %q, which email clients render unevenly", kind, banned)
+			}
 		}
 	}
 }

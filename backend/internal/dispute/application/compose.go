@@ -169,6 +169,10 @@ func (s *Service) Resend(ctx context.Context, in ResendInput) (DisputeView, erro
 		}
 		now := s.now()
 		id := orig.ID
+		// Point at the root of the chain so a resend of a resend still finds the files.
+		if orig.ResendOf != nil {
+			id = *orig.ResendOf
+		}
 		n := NoticeRecord{DisputeID: rec.ID, Seq: orig.Seq, Kind: orig.Kind, Channel: domain.ChannelEmail, Recipient: account.Email,
 			Subject: orig.Subject, Document: orig.Document, CreatedAt: now, Actor: in.Actor, ResendOf: &id}
 		if _, err := tx.InsertNotice(ctx, n); err != nil {

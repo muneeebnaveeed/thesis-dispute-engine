@@ -4,7 +4,8 @@
 API=${API:-http://localhost:8090}
 TENANT_KEY=${TENANT_KEY:-tk_dev_tenant_a}
 INTERVAL=${INTERVAL:-60}
-TXNS="00000000-0000-8000-8000-000000000101 00000000-0000-8000-8000-000000000201 00000000-0000-8000-8000-000000000103 00000000-0000-8000-8000-000000000202"
+# The probe account has no addresses, so these disputes exercise everything except the mail relay.
+TXNS="00000000-0000-8000-8000-000000000901 00000000-0000-8000-8000-000000000902"
 post() { path=$1; shift; curl -sS -m 5 -X POST "$API$path" -H 'Content-Type: application/json' -H "Authorization: Bearer $TENANT_KEY" "$@"; }
 while true; do
   for txn in $TXNS; do

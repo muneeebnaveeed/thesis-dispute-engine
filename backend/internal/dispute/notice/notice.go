@@ -139,22 +139,31 @@ func (d Document) Text() string {
 	return b.String()
 }
 
-// HTML renders the document as a printable letter dated date; every value is escaped, the layout is fixed.
+// HTML renders the document for the body of an email. Email clients are not browsers: no stylesheet, no
+// margins, no max-width, a table for layout and every style inline, which is what the widest set of clients
+// renders the same way. The printable letter is laid out by the workbench, not by this.
 func (d Document) HTML(date time.Time) string {
+	const text = "font-family:Georgia,'Times New Roman',serif;font-size:16px;line-height:24px;color:#111111;"
+	const small = "font-family:Georgia,'Times New Roman',serif;font-size:13px;line-height:20px;color:#555555;"
+	cell := func(style, inner string) string {
+		return "<tr><td style=\"" + style + "padding:0 0 16px 0;\">" + inner + "</td></tr>"
+	}
 	var b strings.Builder
-	b.WriteString("<!doctype html><html><head><meta charset=\"utf-8\"><title>" + html.EscapeString(d.Subject) + "</title>" +
-		"<style>body{font:12pt/1.5 Georgia,serif;max-width:42em;margin:3em auto;color:#111}h1{font-size:14pt}p{margin:0 0 1em}.meta{color:#555}.basis{font-size:10pt;color:#555;margin-top:3em}@media print{body{margin:0}}</style></head><body>")
-	b.WriteString("<p class=\"meta\">" + html.EscapeString(d.Bank) + "<br>" + html.EscapeString(date.Format("2 January 2006")) + "</p>")
-	b.WriteString("<h1>" + html.EscapeString(d.Subject) + "</h1>")
-	b.WriteString("<p>" + html.EscapeString(d.Greeting) + "</p>")
+	b.WriteString("<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>" + html.EscapeString(d.Subject) + "</title></head>")
+	b.WriteString("<body>")
+	b.WriteString("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td align=\"center\" style=\"padding:24px 12px;\">")
+	b.WriteString("<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\">")
+	b.WriteString(cell(small, html.EscapeString(d.Bank)+"<br>"+html.EscapeString(date.Format("2 January 2006"))))
+	b.WriteString(cell(text+"font-size:20px;line-height:28px;", "<b>"+html.EscapeString(d.Subject)+"</b>"))
+	b.WriteString(cell(text, html.EscapeString(d.Greeting)))
 	for _, p := range d.Paragraphs {
-		b.WriteString("<p>" + html.EscapeString(p) + "</p>")
+		b.WriteString(cell(text, strings.ReplaceAll(html.EscapeString(p), "\n", "<br>")))
 	}
-	b.WriteString("<p>" + strings.ReplaceAll(html.EscapeString(d.Closing), "\n", "<br>") + "</p>")
+	b.WriteString(cell(text, strings.ReplaceAll(html.EscapeString(d.Closing), "\n", "<br>")))
 	if d.Basis != "" {
-		b.WriteString("<p class=\"basis\">" + html.EscapeString(d.Basis) + "</p>")
+		b.WriteString(cell(small, html.EscapeString(d.Basis)))
 	}
-	b.WriteString("</body></html>")
+	b.WriteString("</table></td></tr></table></body></html>")
 	return b.String()
 }
 

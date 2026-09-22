@@ -979,6 +979,9 @@ func (s *Service) view(ctx context.Context, tx Tx, rec DisputeRecord) (DisputeVi
 	view.Notices = make([]NoticeView, 0, len(notices))
 	for _, n := range notices {
 		atts := byNotice[n.ID]
+		if n.ResendOf != nil {
+			atts = byNotice[*n.ResendOf]
+		}
 		if atts == nil {
 			atts = []AttachmentView{}
 		}

@@ -69,3 +69,6 @@ from `make db-seed` (run by `make otel-up`).
 - New metric: create it next to the code that emits it (see `application/service.go`), keep labels
   bounded (enums, routes), never IDs.
 - New span attribute: put variable data in attributes, never in span names.
+
+The probe opens its disputes on a seeded account with no email or postal address ("Probe Account"), so
+synthetic traffic exercises every component except the mail relay and never fills an inbox.
