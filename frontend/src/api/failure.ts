@@ -76,6 +76,7 @@ export function fromProblem(p: Problem): Failure {
     case 'invalid-answers':
     case 'invalid-fields':
     case 'unknown-template':
+    case 'invalid-template-override':
       return { kind: 'validation', problem: p, fields: fieldErrors(p) }
     case 'attachment-refused':
     case 'attachment-unknown':

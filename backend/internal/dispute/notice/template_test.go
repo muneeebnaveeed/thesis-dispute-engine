@@ -116,3 +116,33 @@ func TestLoadTemplatesRefusesBadFiles(t *testing.T) {
 		}
 	}
 }
+
+func TestApplyOverrideChangesWordsNotForm(t *testing.T) {
+	base, _ := TemplateFor(domain.NoticeRequestForInformation)
+	got, err := Apply(base, Override{
+		Label:       "Kérjük, küldjön dokumentumokat",
+		Subject:     "A little more about your {{merchant}} payment",
+		Paragraphs:  []string{"Kedves ügyfelünk, we need:", "{{items}}", "By {{dueDate}}.", "Ref {{dispute}}."},
+		OptionTexts: map[string]string{"items.receipt": "a copy of the receipt (számla)"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Label == base.Label || got.Fields[0].Options[0].Text != "a copy of the receipt (számla)" || base.Fields[0].Options[0].Text == got.Fields[0].Options[0].Text {
+		t.Errorf("override not applied or base mutated: %+v", got.Fields[0].Options[0])
+	}
+	if len(got.Fields) != len(base.Fields) || got.Fields[2].ID != "days" {
+		t.Errorf("form changed: %+v", got.Fields)
+	}
+	bad := []Override{
+		{Paragraphs: []string{"{{nothing}}"}},
+		{OptionTexts: map[string]string{"items.unicorn": "x"}},
+		{OptionTexts: map[string]string{"days.1": "x"}},
+		{OptionTexts: map[string]string{"items.receipt": " "}},
+	}
+	for i, o := range bad {
+		if _, err := Apply(base, o); !errors.Is(err, ErrInvalidOverride) {
+			t.Errorf("bad override %d accepted: %v", i, err)
+		}
+	}
+}

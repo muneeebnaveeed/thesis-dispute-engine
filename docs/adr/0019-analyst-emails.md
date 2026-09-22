@@ -31,6 +31,13 @@ needs the template engine's rules for facts, and the server never trusts the bro
   automatic notices, with the analyst recorded as the actor and a letter added where the template
   is a letter and the regime requires writing. Tenant keys cannot compose: machines do not write to
   customers.
+- A tenant may reword any kind: label, description, subject, paragraphs and the customer-facing
+  text of each option, stored per tenant under row-level security and laid over the base at read
+  time. The form (field ids and types) stays the base's, so the workbench and the validator keep
+  one contract, and an override is checked by the same rules as a file at start (placeholders must
+  be fields or facts). A stored override that no longer fits a changed base falls back to the base
+  rather than break the tenant's mail. Tenant admins edit on a Templates page with the same live
+  preview, filled with sample values.
 - Attachments are uploaded first and claimed by the email that sends them, the two-step shape of
   comparable tools: a draft belongs to the dispute, a claim binds it to one notice for good, and
   drafts nobody claimed are swept after a day. Bytes live in the database (5 MB per file, three per
@@ -52,6 +59,6 @@ needs the template engine's rules for facts, and the server never trusts the bro
   with its author; the two-tab shape is what analysts already know from comparable tools.
 - Harder: the substitution language is deliberately tiny (no loops, no conditionals beyond
   presence), and both halves must stay in step, which the unit tests on each side pin; templates
-  are one language and shared by every tenant; attachments in the database cap the sensible size
+  are one language per tenant (a second language is a second override, not modelled); attachments in the database cap the sensible size
   and would move to object storage under real volume; a sent email cannot be recalled, only
   followed by another or resent.

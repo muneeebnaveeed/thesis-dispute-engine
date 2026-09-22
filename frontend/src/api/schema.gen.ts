@@ -203,6 +203,47 @@ export type paths = {
     patch?: never
     trace?: never
   }
+  '/tenant-templates': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The tenant's wording for each analyst email kind
+     * @description Tenant admins only. Each kind comes with the base template, the tenant's override if any, and the result analysts see.
+     */
+    get: operations['listTenantTemplates']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/tenant-templates/{kind}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    /**
+     * Set the tenant's wording for one kind
+     * @description Words only: label, description, subject, paragraphs and option texts by "fieldId.optionKey". The form (field ids and types) stays the base's. Placeholders must name the form's fields or the engine's facts; refused with invalid-template-override, one error per problem.
+     */
+    put: operations['putTenantTemplate']
+    post?: never
+    /** Revert one kind to the base wording */
+    delete: operations['deleteTenantTemplate']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/tenant-keys': {
     parameters: {
       query?: never
@@ -336,6 +377,7 @@ export type components = {
       | 'not-resendable'
       | 'attachment-refused'
       | 'attachment-unknown'
+      | 'invalid-template-override'
       | 'concurrent-update'
       | 'idempotency-key-reuse'
       | 'no-regime'
@@ -739,6 +781,25 @@ export type components = {
         /** Format: date */
         today: string
       }
+    }
+    /** @description A tenant's wording; empty members leave the base as it is. */
+    TemplateOverride: {
+      label?: string
+      description?: string
+      subject?: string
+      paragraphs?: string[]
+      /** @description Customer-facing text per option, keyed "fieldId.optionKey". */
+      optionTexts?: {
+        [key: string]: string
+      }
+    }
+    TemplateSetting: {
+      base: components['schemas']['EmailTemplate']
+      override?: components['schemas']['TemplateOverride']
+      effective: components['schemas']['EmailTemplate']
+      updatedBy?: string
+      /** Format: date-time */
+      updatedAt?: string
     }
     ComposeEmailRequest: {
       template: components['schemas']['NoticeKind']
@@ -1249,6 +1310,84 @@ export interface operations {
         }
       }
       401: components['responses']['Unauthorized']
+      404: components['responses']['NotFound']
+      429: components['responses']['TooManyRequests']
+    }
+  }
+  listTenantTemplates: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description One entry per kind. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TemplateSetting'][]
+        }
+      }
+      401: components['responses']['Unauthorized']
+      403: components['responses']['Forbidden']
+      429: components['responses']['TooManyRequests']
+    }
+  }
+  putTenantTemplate: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        kind: components['schemas']['NoticeKind']
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TemplateOverride']
+      }
+    }
+    responses: {
+      /** @description Stored; the entry as analysts now see it. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TemplateSetting']
+        }
+      }
+      400: components['responses']['BadRequest']
+      401: components['responses']['Unauthorized']
+      403: components['responses']['Forbidden']
+      422: components['responses']['Unprocessable']
+      429: components['responses']['TooManyRequests']
+    }
+  }
+  deleteTenantTemplate: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        kind: components['schemas']['NoticeKind']
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Reverted. */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      401: components['responses']['Unauthorized']
+      403: components['responses']['Forbidden']
       404: components['responses']['NotFound']
       429: components['responses']['TooManyRequests']
     }

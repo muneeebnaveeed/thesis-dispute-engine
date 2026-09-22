@@ -24,6 +24,7 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 	disputepg "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/notice"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/ports/http/oapi"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/auth"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
@@ -383,28 +384,7 @@ func (h *Handler) ListEmailTemplates(ctx context.Context, req oapi.ListEmailTemp
 	out.Facts.Customer, out.Facts.Bank, out.Facts.Amount, out.Facts.Merchant, out.Facts.Dispute = cat.Facts.Customer, cat.Facts.Bank, cat.Facts.Amount, cat.Facts.Merchant, cat.Facts.Dispute
 	out.Facts.Today = openapi_types.Date{Time: cat.Facts.Today}
 	for _, t := range cat.Templates {
-		fields := make([]oapi.TemplateField, 0, len(t.Fields))
-		for _, f := range t.Fields {
-			tf := oapi.TemplateField{Id: f.ID, Label: f.Label, Type: oapi.FieldType(f.Type), Required: f.Required, Min: f.Min, Max: f.Max}
-			if f.List {
-				list := true
-				tf.List = &list
-			}
-			if f.Default != "" {
-				d := f.Default
-				tf.Default = &d
-			}
-			if len(f.Options) > 0 {
-				opts := make([]oapi.TemplateOption, 0, len(f.Options))
-				for _, o := range f.Options {
-					opts = append(opts, oapi.TemplateOption{Key: o.Key, Label: o.Label, Text: o.Text})
-				}
-				tf.Options = &opts
-			}
-			fields = append(fields, tf)
-		}
-		out.Templates = append(out.Templates, oapi.EmailTemplate{Kind: oapi.NoticeKind(t.Kind), Label: t.Label, Description: t.Description,
-			Letter: t.Letter, Fields: fields, Subject: t.Subject, Paragraphs: t.Paragraphs})
+		out.Templates = append(out.Templates, templateOf(t))
 	}
 	return oapi.ListEmailTemplates200JSONResponse(out), nil
 }
@@ -529,6 +509,134 @@ func (h *Handler) ResendNotice(ctx context.Context, req oapi.ResendNoticeRequest
 		return nil, err
 	}
 	return oapi.ResendNotice201JSONResponse(toAPI(view)), nil
+}
+
+// templateOf maps a notice template to the API shape.
+func templateOf(t notice.Template) oapi.EmailTemplate {
+	fields := make([]oapi.TemplateField, 0, len(t.Fields))
+	for _, f := range t.Fields {
+		tf := oapi.TemplateField{Id: f.ID, Label: f.Label, Type: oapi.FieldType(f.Type), Required: f.Required, Min: f.Min, Max: f.Max}
+		if f.List {
+			list := true
+			tf.List = &list
+		}
+		if f.Default != "" {
+			d := f.Default
+			tf.Default = &d
+		}
+		if len(f.Options) > 0 {
+			opts := make([]oapi.TemplateOption, 0, len(f.Options))
+			for _, o := range f.Options {
+				opts = append(opts, oapi.TemplateOption{Key: o.Key, Label: o.Label, Text: o.Text})
+			}
+			tf.Options = &opts
+		}
+		fields = append(fields, tf)
+	}
+	return oapi.EmailTemplate{Kind: oapi.NoticeKind(t.Kind), Label: t.Label, Description: t.Description, Letter: t.Letter, Fields: fields, Subject: t.Subject, Paragraphs: t.Paragraphs}
+}
+
+func overrideOf(o *notice.Override) *oapi.TemplateOverride {
+	if o == nil {
+		return nil
+	}
+	out := oapi.TemplateOverride{}
+	if o.Label != "" {
+		out.Label = &o.Label
+	}
+	if o.Description != "" {
+		out.Description = &o.Description
+	}
+	if o.Subject != "" {
+		out.Subject = &o.Subject
+	}
+	if len(o.Paragraphs) > 0 {
+		out.Paragraphs = &o.Paragraphs
+	}
+	if len(o.OptionTexts) > 0 {
+		out.OptionTexts = &o.OptionTexts
+	}
+	return &out
+}
+
+func settingOf(s application.TemplateSetting) oapi.TemplateSetting {
+	out := oapi.TemplateSetting{Base: templateOf(s.Base), Effective: templateOf(s.Effective), Override: overrideOf(s.Override), UpdatedAt: s.UpdatedAt}
+	if s.UpdatedBy != "" {
+		by := s.UpdatedBy
+		out.UpdatedBy = &by
+	}
+	return out
+}
+
+// ListTenantTemplates is the tenant admin's view of every analyst email kind.
+func (h *Handler) ListTenantTemplates(ctx context.Context, _ oapi.ListTenantTemplatesRequestObject) (oapi.ListTenantTemplatesResponseObject, error) {
+	if err := auth.RequireRole(ctx, auth.RoleTenantAdmin); err != nil {
+		return nil, err
+	}
+	settings, err := h.svc.ListTemplateSettings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(oapi.ListTenantTemplates200JSONResponse, 0, len(settings))
+	for _, s := range settings {
+		out = append(out, settingOf(s))
+	}
+	return out, nil
+}
+
+// PutTenantTemplate stores the tenant's wording for one kind.
+func (h *Handler) PutTenantTemplate(ctx context.Context, req oapi.PutTenantTemplateRequestObject) (oapi.PutTenantTemplateResponseObject, error) {
+	if err := auth.RequireRole(ctx, auth.RoleTenantAdmin); err != nil {
+		return nil, err
+	}
+	principal, _ := auth.PrincipalFrom(ctx)
+	actor := principal.Email
+	if actor == "" {
+		actor = principal.Subject
+	}
+	o := notice.Override{}
+	if req.Body.Label != nil {
+		o.Label = *req.Body.Label
+	}
+	if req.Body.Description != nil {
+		o.Description = *req.Body.Description
+	}
+	if req.Body.Subject != nil {
+		o.Subject = *req.Body.Subject
+	}
+	if req.Body.Paragraphs != nil {
+		o.Paragraphs = *req.Body.Paragraphs
+	}
+	if req.Body.OptionTexts != nil {
+		o.OptionTexts = *req.Body.OptionTexts
+	}
+	setting, err := h.svc.PutTemplateSetting(ctx, domain.NoticeKind(req.Kind), o, actor)
+	if err != nil {
+		p := h.problem(ctx, "/tenant-templates/"+string(req.Kind), err, uuid.Nil)
+		switch p.Status {
+		case http.StatusUnprocessableEntity:
+			return oapi.PutTenantTemplate422ApplicationProblemPlusJSONResponse{UnprocessableApplicationProblemPlusJSONResponse: oapi.UnprocessableApplicationProblemPlusJSONResponse(p)}, nil
+		case http.StatusBadRequest:
+			return oapi.PutTenantTemplate400ApplicationProblemPlusJSONResponse{BadRequestApplicationProblemPlusJSONResponse: oapi.BadRequestApplicationProblemPlusJSONResponse(p)}, nil
+		}
+		return nil, err
+	}
+	return oapi.PutTenantTemplate200JSONResponse(settingOf(setting)), nil
+}
+
+// DeleteTenantTemplate reverts one kind to the base wording.
+func (h *Handler) DeleteTenantTemplate(ctx context.Context, req oapi.DeleteTenantTemplateRequestObject) (oapi.DeleteTenantTemplateResponseObject, error) {
+	if err := auth.RequireRole(ctx, auth.RoleTenantAdmin); err != nil {
+		return nil, err
+	}
+	if err := h.svc.DeleteTemplateSetting(ctx, domain.NoticeKind(req.Kind)); err != nil {
+		if errors.Is(err, application.ErrNotFound) {
+			p := h.problem(ctx, "/tenant-templates/"+string(req.Kind), err, uuid.Nil)
+			return oapi.DeleteTenantTemplate404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: oapi.NotFoundApplicationProblemPlusJSONResponse(p)}, nil
+		}
+		return nil, err
+	}
+	return oapi.DeleteTenantTemplate204Response{}, nil
 }
 
 // GetNotice returns one composed communication of a dispute.

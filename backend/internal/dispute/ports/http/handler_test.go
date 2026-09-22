@@ -734,3 +734,87 @@ func TestAttachmentsTravelWithComposedEmails(t *testing.T) {
 		t.Errorf("download: %d %v %q", rec.Code, rec.Header(), rec.Body.String())
 	}
 }
+
+func TestTenantAdminsRewordTemplatesAndAnalystsSeeTheResult(t *testing.T) {
+	a := newAPI(t, nil)
+	id := txnDispute(t, a)
+	admin := map[string]string{"Authorization": "", "X-Test-Analyst": "a:analyst,tenant-admin"}
+	analyst := map[string]string{"Authorization": "", "X-Test-Analyst": "a:analyst"}
+
+	if rec, _ := a.do(http.MethodGet, "/tenant-templates", nil, analyst); rec.Code != 403 {
+		t.Fatalf("analyst listing settings: %d", rec.Code)
+	}
+	rec, _ := a.do(http.MethodGet, "/tenant-templates", nil, admin)
+	if rec.Code != 200 {
+		t.Fatalf("list: %d %s", rec.Code, rec.Body.String())
+	}
+	var settings []map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &settings)
+	if len(settings) != 4 || settings[0]["override"] != nil {
+		t.Fatalf("settings = %v", settings)
+	}
+
+	// A placeholder the form does not have is refused; a good override is stored and reported.
+	rec, problem := a.do(http.MethodPut, "/tenant-templates/STATUS_UPDATE", map[string]any{"paragraphs": []string{"{{nothing}}"}}, admin)
+	if rec.Code != 422 || problem["code"] != "invalid-template-override" {
+		t.Fatalf("bad override: %d %v", rec.Code, problem)
+	}
+	rec, stored := a.do(http.MethodPut, "/tenant-templates/STATUS_UPDATE", map[string]any{
+		"subject":     "Where your {{merchant}} dispute stands",
+		"paragraphs":  []string{"{{stage}}", "{{note}}", "Reference {{dispute}}. Yours, {{bank}}."},
+		"optionTexts": map[string]any{"stage.final": "We are close to a decision and will write within days."},
+	}, admin)
+	if rec.Code != 200 || stored["updatedBy"] != "analyst-a" {
+		t.Fatalf("put: %d %v", rec.Code, stored["updatedBy"])
+	}
+	effective := stored["effective"].(map[string]any)
+	if effective["subject"] != "Where your {{merchant}} dispute stands" {
+		t.Errorf("effective = %v", effective)
+	}
+
+	// Analysts get the tenant's wording, with facts filled; the base label stays since it was not overridden.
+	rec, cat := a.do(http.MethodGet, "/disputes/"+id+"/email-templates", nil, analyst)
+	if rec.Code != 200 {
+		t.Fatal(rec.Code)
+	}
+	var found bool
+	for _, x := range cat["templates"].([]any) {
+		m := x.(map[string]any)
+		if m["kind"] != "STATUS_UPDATE" {
+			continue
+		}
+		found = true
+		if m["subject"] != "Where your ACME dispute stands" || m["label"] != "Status update" {
+			t.Errorf("analyst view = %v", m)
+		}
+		for _, f := range m["fields"].([]any) {
+			if fm := f.(map[string]any); fm["id"] == "stage" {
+				for _, o := range fm["options"].([]any) {
+					if om := o.(map[string]any); om["key"] == "final" && om["text"] != "We are close to a decision and will write within days." {
+						t.Errorf("option text = %v", om)
+					}
+				}
+			}
+		}
+	}
+	if !found {
+		t.Fatal("STATUS_UPDATE missing")
+	}
+	// And a composed email uses it.
+	rec, sent := a.do(http.MethodPost, "/disputes/"+id+"/notices", map[string]any{"template": "STATUS_UPDATE", "fields": map[string]any{"stage": "final"}}, analyst)
+	if rec.Code != 201 {
+		t.Fatalf("compose: %d %s", rec.Code, rec.Body.String())
+	}
+	notices := sent["notices"].([]any)
+	if last := notices[len(notices)-1].(map[string]any); last["subject"] != "Where your ACME dispute stands" {
+		t.Errorf("sent subject = %v", last["subject"])
+	}
+
+	// Reverting brings the base back.
+	if rec, _ := a.do(http.MethodDelete, "/tenant-templates/STATUS_UPDATE", nil, admin); rec.Code != 204 {
+		t.Fatalf("delete: %d", rec.Code)
+	}
+	if rec, _ := a.do(http.MethodDelete, "/tenant-templates/STATUS_UPDATE", nil, admin); rec.Code != 404 {
+		t.Errorf("delete again: %d", rec.Code)
+	}
+}
