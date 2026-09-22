@@ -40,7 +40,9 @@ var (
 	accountEUR = "00000000-0000-8000-8000-000000000001"
 	accountUSD = "00000000-0000-8000-8000-000000000002"
 	accountB   = "00000000-0000-8000-8000-000000000003"
-	seedTxns   = []txn{
+	// accountProbe has no email or postal address, so the synthetic probe's disputes send nothing to anyone.
+	accountProbe = "00000000-0000-8000-8000-000000000004"
+	seedTxns     = []txn{
 		{"00000000-0000-8000-8000-000000000101", tenantA, accountEUR, "CARD", "125.40", "EUR", "Ryanair", 3, "4511"},
 		{"00000000-0000-8000-8000-000000000102", tenantA, accountEUR, "CARD", "1899.00", "EUR", "MediaMarkt", 12, "5732"},
 		{"00000000-0000-8000-8000-000000000103", tenantA, accountEUR, "SEPA_DD", "49.99", "EUR", "Vodafone Hungary", 20, "4814"},
@@ -48,6 +50,9 @@ var (
 		{"00000000-0000-8000-8000-000000000201", tenantA, accountUSD, "CARD", "89.10", "USD", "Amazon", 5, "5942"},
 		{"00000000-0000-8000-8000-000000000202", tenantA, accountUSD, "CREDIT_CARD", "412.00", "USD", "Delta Air Lines", 9, "4511"},
 		{"00000000-0000-8000-8000-000000000301", tenantB, accountB, "CARD", "64.00", "EUR", "Bolt", 2, "4121"},
+		// Probe traffic (deploy/probe.sh): one card and one direct debit on the silent account.
+		{"00000000-0000-8000-8000-000000000901", tenantA, accountProbe, "CARD", "42.00", "EUR", "Probe Shop", 4, "5999"},
+		{"00000000-0000-8000-8000-000000000902", tenantA, accountProbe, "SEPA_DD", "19.90", "EUR", "Probe Utility", 9, "4900"},
 		{"00000000-0000-8000-8000-000000000302", tenantB, accountB, "SEPA_DD", "29.90", "EUR", "Telekom", 15, "4814"},
 	}
 )
@@ -123,13 +128,13 @@ func run() error {
 	}
 	// Addresses are where notices go: example.com mailboxes land in Mailpit in development.
 	for _, a := range []struct{ id, tenant, holder, currency, email, address string }{
+		{accountProbe, tenantA, "Probe Account", "EUR", "", ""},
 		{accountEUR, tenantA, "Kovács Anna", "EUR", "anna.kovacs@example.com", "Kovács Anna, Andrássy út 12, 1061 Budapest, Hungary"},
 		{accountUSD, tenantA, "Jordan Lee", "USD", "jordan.lee@example.com", "Jordan Lee, 350 Fifth Avenue, New York, NY 10118, USA"},
 		{accountB, tenantB, "Nagy Péter", "EUR", "peter.nagy@example.com", "Nagy Péter, Fő utca 3, 9021 Győr, Hungary"},
 	} {
-		email, address := a.email, a.address
 		if err := q.InsertAccount(ctx, sqlcgen.InsertAccountParams{ID: uuid.MustParse(a.id), TenantID: uuid.MustParse(a.tenant), HolderName: a.holder, Currency: a.currency,
-			Email: &email, PostalAddress: &address}); err != nil {
+			Email: mccPtr(a.email), PostalAddress: mccPtr(a.address)}); err != nil {
 			return err
 		}
 	}
@@ -142,13 +147,14 @@ func run() error {
 			return err
 		}
 	}
-	fmt.Printf("seeded 2 tenants (otp, erste; tenant keys %s, %s; analyst/analyst in each realm), 3 accounts and %d transactions\n", devKeyA, devKeyB, len(seedTxns))
+	fmt.Printf("seeded 2 tenants (otp, erste; tenant keys %s, %s; analyst/analyst in each realm), 4 accounts and %d transactions\n", devKeyA, devKeyB, len(seedTxns))
 	for _, t := range seedTxns {
 		fmt.Printf("  %s  tenant %s  %-11s %8s %s  %s\n", t.id, t.tenant[len(t.tenant)-4:], t.rail, t.amount, t.currency, t.merchant)
 	}
 	return nil
 }
 
+// mccPtr turns an optional seed value into a nullable column: empty means NULL.
 func mccPtr(m string) *string {
 	if m == "" {
 		return nil

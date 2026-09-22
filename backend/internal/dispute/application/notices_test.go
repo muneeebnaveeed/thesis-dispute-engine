@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application/apptest"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
@@ -121,7 +123,7 @@ func TestDispatcherDrainsTheOutboxAndRetriesFailures(t *testing.T) {
 	}
 	mailer.mu.Lock()
 	defer mailer.mu.Unlock()
-	if len(mailer.sent) != 1 || mailer.sent[0].To != "holder@example.com" || !strings.Contains(mailer.sent[0].Text, "Dear Test Holder") || !strings.Contains(mailer.sent[0].HTML, "<h1>") {
+	if len(mailer.sent) != 1 || mailer.sent[0].To != "holder@example.com" || !strings.Contains(mailer.sent[0].Text, "Dear Test Holder") || !strings.Contains(mailer.sent[0].HTML, "<table") {
 		t.Errorf("mail = %+v", mailer.sent)
 	}
 }
@@ -157,5 +159,50 @@ func TestResendIsANewNoticeChainedToTheOriginal(t *testing.T) {
 	letter := regE.View.Notices[1]
 	if _, err := svc.Resend(apptest.Ctx(), application.ResendInput{DisputeID: regE.View.ID, NoticeID: letter.ID}); !errors.Is(err, application.ErrNotResendable) {
 		t.Errorf("resend of a letter: %v", err)
+	}
+}
+
+func TestResendCarriesTheOriginalAttachments(t *testing.T) {
+	svc, store, _ := clockService(t)
+	mailer := &recorder{}
+	d := application.NewDispatcher(store, mailer, application.RenderMail, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	txn := store.AddTransaction(domain.RailCard, "EUR", "EUR", "10")
+	created, _ := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn})
+	file, err := svc.Upload(apptest.Ctx(), application.UploadInput{DisputeID: created.View.ID, Filename: "r.pdf", ContentType: "application/pdf", Content: []byte("%PDF"), Actor: "a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err := svc.ComposeEmail(apptest.Ctx(), application.ComposeEmailInput{DisputeID: created.View.ID, Template: domain.NoticeCustom,
+		Fields: map[string]string{"subject": "s", "body": "b"}, Attachments: []uuid.UUID{file.ID}, Actor: "a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := view.Notices[len(view.Notices)-1]
+	if err := store.FinishNotice(context.Background(), original.ID, ""); err != nil {
+		t.Fatal(err)
+	}
+	after, err := svc.Resend(apptest.Ctx(), application.ResendInput{DisputeID: created.View.ID, NoticeID: original.ID, Actor: "a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	copyN := after.Notices[len(after.Notices)-1]
+	if len(copyN.Attachments) != 1 || copyN.Attachments[0].Filename != "r.pdf" {
+		t.Errorf("resend lists %+v", copyN.Attachments)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go d.Run(ctx)
+	d.Kick()
+	time.Sleep(150 * time.Millisecond)
+	mailer.mu.Lock()
+	defer mailer.mu.Unlock()
+	var withFile int
+	for _, m := range mailer.sent {
+		if m.Subject == "s" && len(m.Files) == 1 && m.Files[0].Name == "r.pdf" {
+			withFile++
+		}
+	}
+	if withFile != 1 { // the original was marked sent by hand; only the resend went through the mailer
+		t.Errorf("mails carrying the file = %d of %d", withFile, len(mailer.sent))
 	}
 }

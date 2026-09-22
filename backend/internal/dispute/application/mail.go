@@ -101,8 +101,13 @@ func (d *Dispatcher) pass(ctx context.Context, sent metric.Int64Counter) int {
 		failure := ""
 		m, err := d.render(n)
 		if err == nil {
+			// A resend carries what the original carried.
 			var files []Attachment
-			if files, err = d.store.NoticeAttachments(ctx, n.ID); err == nil {
+			source := n.ID
+			if n.ResendOf != nil {
+				source = *n.ResendOf
+			}
+			if files, err = d.store.NoticeAttachments(ctx, source); err == nil {
 				for _, f := range files {
 					m.Files = append(m.Files, MailFile{Name: f.Filename, ContentType: f.ContentType, Content: f.Content})
 				}
