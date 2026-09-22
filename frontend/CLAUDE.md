@@ -33,8 +33,10 @@ lint and format fixes. `make fe-dev` for the dev server on :3002. Inside `fronte
   function in `src/server/functions/<domain>.ts`, built from `analystGet` or `analystPost`
   (`src/server/runtime/fn.ts`): the `authed` middleware resolves the session once and provides
   `context.api`; `.validator(parse(schema))` checks the input with a TypeBox schema (the generated
-  one where the contract has it) before the handler runs; `asAnalyst(context.api, api => ...)` turns
-  the result into an `Outcome` (`{ value }` or `{ problem }`, never a throw for problem+json).
+  one where the contract has it) before the handler runs; the handler is always
+  `asAnalyst((api, input) => api.GET(...))`, which runs the call as the analyst (or answers 401 when
+  nobody is signed in) and turns the result into an `Outcome` (`{ value }` or `{ problem }`, never a
+  throw for problem+json). Endpoints that return a dispute wrap the call in `withDisputeView`.
   Never use `inputValidator`; never call `createServerFn` directly for an analyst endpoint.
 - Reads are `queryOptions` in `src/queries/<domain>.ts`, one per server function, and they are the
   only source of key truth: `disputeQuery(id).queryKey` is `['disputes', id]`, and the null form
