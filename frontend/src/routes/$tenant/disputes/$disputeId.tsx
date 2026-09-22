@@ -1,6 +1,5 @@
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, useRouteContext } from '@tanstack/react-router'
-import { useState } from 'react'
 
 import type { Dispute } from '#/api/views'
 import { Deadlines } from '#/components/disputes/deadlines'
@@ -30,7 +29,6 @@ const DisputePage = () => {
   const { viewer } = useRouteContext({ from: '__root__' })
   const { data: loadedDispute } = useSuspenseQuery(disputeQuery(disputeId))
   const queryClient = useQueryClient()
-  const [eventInFlight, setEventInFlight] = useState<DisputeEvent | null>(null)
   const refreshDispute = () =>
     void queryClient.invalidateQueries({ queryKey: disputeQuery(disputeId).queryKey })
 
@@ -52,9 +50,7 @@ const DisputePage = () => {
       if (event === 'ISSUE_REFUND' && value.riskOverride.trim())
         facts.riskOverride = value.riskOverride.trim()
       if (event === 'CLOSE' && value.settlement) facts.settlement = value.settlement
-      setEventInFlight(event)
       await submitTo(formApi, () => applyEventMutation.mutateAsync({ event, payload: facts }))
-      setEventInFlight(null)
       // conflict: the state moved under us, show the truth next to the message
       if (applyEventMutation.failure?.kind === 'conflict') refreshDispute()
     },
@@ -127,7 +123,9 @@ const DisputePage = () => {
                   disabled={applyEventMutation.isPending}
                   onClick={() => apply(event)}
                 >
-                  {eventInFlight === event && applyEventMutation.isPending ? '...' : event}
+                  {applyEventMutation.isPending && applyEventMutation.variables?.event === event
+                    ? '...'
+                    : event}
                 </Button>
               ))}
           </div>
