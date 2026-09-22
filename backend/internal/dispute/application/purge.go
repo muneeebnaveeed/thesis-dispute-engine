@@ -32,7 +32,12 @@ func RunIdempotencyPurge(ctx context.Context, store Store, ttl time.Duration, lo
 			log.Warn("idempotency purge", "err", err)
 		case n > 0:
 			counter.Add(ctx, n)
-			log.Info("idempotency purge", "deleted", n, "older_than", ttl)
+			// a sweep that removed nothing is the normal case and not worth a line at INFO
+			level := slog.LevelDebug
+			if n > 0 {
+				level = slog.LevelInfo
+			}
+			log.Log(ctx, level, "idempotency purge", "deleted", n, "older_than", ttl)
 		}
 		timer.Reset(every)
 	}

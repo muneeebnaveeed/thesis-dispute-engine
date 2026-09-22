@@ -98,7 +98,12 @@ func RunPurge(ctx context.Context, c *PGCounter, log *slog.Logger) {
 		if n, err := c.Purge(ctx); err != nil && ctx.Err() == nil {
 			log.Warn("rate window purge", "err", err)
 		} else if n > 0 {
-			log.Info("rate window purge", "deleted", n)
+			// a sweep that removed nothing is the normal case and not worth a line at INFO
+			level := slog.LevelDebug
+			if n > 0 {
+				level = slog.LevelInfo
+			}
+			log.Log(ctx, level, "rate window purge", "deleted", n)
 		}
 	}
 }

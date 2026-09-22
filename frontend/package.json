@@ -28,6 +28,7 @@
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/api-logs": "^0.222.0",
+    "@opentelemetry/instrumentation-runtime-node": "^0.35.0",
     "@opentelemetry/instrumentation-undici": "^0.32.0",
     "@opentelemetry/resources": "^2.11.0",
     "@opentelemetry/sdk-node": "^0.222.0",

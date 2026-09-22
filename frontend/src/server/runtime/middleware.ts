@@ -1,3 +1,4 @@
+import { trace } from '@opentelemetry/api'
 import { createMiddleware } from '@tanstack/react-start'
 
 import { accessTokenForRequest } from '#/server/auth/session-impl'
@@ -18,9 +19,11 @@ const isSignedOutOutcome = (handlerResult: unknown): boolean =>
   handlerResult.result.problem.code === 'unauthenticated'
 
 export const authed = createMiddleware({ type: 'function' }).server(async ({ next }) => {
-  const token = await accessTokenForRequest()
-  if (!token) throw signInAgain()
-  const handled = await next({ context: { api: createServerApi(token) } })
+  const credential = await accessTokenForRequest()
+  if (!credential) throw signInAgain()
+  // the active span is the server function's; the tenant is bounded and is what an operator filters by
+  trace.getActiveSpan()?.setAttribute('tenant.slug', credential.tenantSlug)
+  const handled = await next({ context: { api: createServerApi(credential.token) } })
   if (isSignedOutOutcome(handled)) throw signInAgain()
   return handled
 })

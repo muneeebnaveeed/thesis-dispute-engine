@@ -3,7 +3,7 @@ import { isRedirect } from '@tanstack/react-router'
 import { createMiddleware } from '@tanstack/react-start'
 
 import { log } from './log'
-import { meter, tracer } from './sdk'
+import { SECONDS_BUCKETS, meter, tracer } from './sdk'
 
 const ATTR_FN = 'workbench.server_fn'
 const ATTR_OUTCOME = 'workbench.outcome'
@@ -29,6 +29,7 @@ const fnDuration = () =>
   meter().createHistogram('workbench.server_fn.duration', {
     unit: 's',
     description: 'Time a server function took, by function and outcome (ok or the problem code)',
+    advice: { explicitBucketBoundaries: SECONDS_BUCKETS },
   })
 
 // one span per server function call, inside the request span; the outcome is the API's problem code when there is
