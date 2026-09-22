@@ -1,4 +1,4 @@
-import { createFileRoute, useRouteContext, useRouter } from '@tanstack/react-router'
+import { Link, createFileRoute, useRouteContext, useRouter } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 
 import { createBrowserApi } from '#/api/browser'
@@ -215,7 +215,16 @@ function DisputePage() {
       </section>
 
       <section className="mb-8">
-        <h2 className="mb-2 text-lg font-medium">Communications</h2>
+        <div className="mb-2 flex items-baseline justify-between">
+          <h2 className="text-lg font-medium">Communications</h2>
+          <Link
+            to="/$tenant/disputes/$disputeId/communications"
+            params={{ tenant, disputeId: d.id }}
+            className="text-sm underline"
+          >
+            Open the communications panel
+          </Link>
+        </div>
         <Notices notices={d.notices} tenant={tenant} disputeId={d.id} />
       </section>
 

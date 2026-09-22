@@ -244,16 +244,16 @@ UPDATE questionnaires SET answers = $2, received_at = $3 WHERE dispute_id = $1 A
 SELECT dispute_id, reason, questions, answers, sent_at, received_at FROM questionnaires WHERE dispute_id = $1;
 
 -- name: InsertNotice :one
-INSERT INTO notices (dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO notices (dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at, actor)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING id;
 
 -- name: ListNotices :many
-SELECT id, dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at, attempts, last_error
+SELECT id, dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at, attempts, last_error, actor
 FROM notices WHERE dispute_id = $1 ORDER BY id;
 
 -- name: GetNotice :one
-SELECT id, dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at, attempts, last_error
+SELECT id, dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at, attempts, last_error, actor
 FROM notices WHERE id = $1 AND dispute_id = $2;
 
 -- name: ClaimNotices :many

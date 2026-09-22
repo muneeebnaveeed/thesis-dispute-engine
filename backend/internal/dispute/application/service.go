@@ -42,6 +42,7 @@ type Service struct {
 	coreMessages  metric.Int64Counter
 	coreLatency   metric.Float64Histogram
 	riskTiers     metric.Int64Counter
+	composed      metric.Int64Counter
 }
 
 // Option configures a Service beyond its store and clock.
@@ -94,6 +95,10 @@ func NewService(store Store, now Clock, opts ...Option) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	composed, err := m.Int64Counter("dispute.emails_composed", metric.WithDescription("Analyst-composed emails, by template"))
+	if err != nil {
+		return nil, err
+	}
 	if _, err := m.Float64ObservableGauge("dispute.suspense", metric.WithDescription("What the bank has advanced on open disputes and not yet cleared"),
 		metric.WithFloat64Callback(func(ctx context.Context, o metric.Float64Observer) error {
 			balances, err := store.SuspenseBalances(ctx)
@@ -139,7 +144,7 @@ func NewService(store Store, now Clock, opts ...Option) (*Service, error) {
 	}
 	svc := &Service{store: store, now: now, tracer: otel.Tracer(scopeName), core: CoreRouter{}, coreTimeout: 5 * time.Second, afterCommit: func() {},
 		transitions: transitions, replays: replays, timeInState: timeInState, deadlineSlack: deadlineSlack, postings: postings,
-		coreMessages: coreMessages, coreLatency: coreLatency, riskTiers: riskTiers}
+		coreMessages: coreMessages, coreLatency: coreLatency, riskTiers: riskTiers, composed: composed}
 	for _, o := range opts {
 		o(svc)
 	}
@@ -198,6 +203,7 @@ type NoticeView struct {
 	CreatedAt time.Time         `json:"createdAt"`
 	SentAt    *time.Time        `json:"sentAt,omitempty"`
 	Error     *string           `json:"error,omitempty"`
+	Actor     string            `json:"actor,omitempty"`
 }
 
 // QuestionnaireView is the questionnaire as exposed by the API, with the contradictions found in the answers.
@@ -949,7 +955,7 @@ func (s *Service) view(ctx context.Context, tx Tx, rec DisputeRecord) (DisputeVi
 	view.Notices = make([]NoticeView, 0, len(notices))
 	for _, n := range notices {
 		view.Notices = append(view.Notices, NoticeView{ID: n.ID, Seq: n.Seq, Kind: n.Kind, Channel: n.Channel, Recipient: n.Recipient, Subject: n.Subject,
-			CreatedAt: n.CreatedAt, SentAt: n.SentAt, Error: n.LastError})
+			CreatedAt: n.CreatedAt, SentAt: n.SentAt, Error: n.LastError, Actor: n.Actor})
 	}
 	if risk, err := tx.ListRisk(ctx, rec.ID); err != nil {
 		return DisputeView{}, err

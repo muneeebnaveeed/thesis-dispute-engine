@@ -11,6 +11,10 @@ const KIND: Record<Notice['kind'], string> = {
   REFUND: 'Refund notice',
   REVERSAL: 'Reversal notice',
   RESOLUTION: 'Resolution',
+  REQUEST_FOR_INFORMATION: 'Request for information',
+  STATUS_UPDATE: 'Status update',
+  DOCUMENTS_RECEIVED: 'Documents received',
+  CUSTOM: 'Custom message',
 }
 
 /** Every communication owed to the customer: what, how, to whom, and whether it has gone. */

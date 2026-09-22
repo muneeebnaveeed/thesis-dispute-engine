@@ -1,0 +1,29 @@
+{
+  "kind": "STATUS_UPDATE",
+  "label": "Status update",
+  "description": "Tell the customer where the investigation stands and what happens next.",
+  "letter": false,
+  "fields": [
+    {
+      "id": "stage",
+      "label": "Where we are",
+      "type": "SELECT",
+      "required": true,
+      "options": [
+        { "key": "reviewing", "label": "Reviewing your documents", "text": "We have received your documents and are reviewing them." },
+        { "key": "merchant", "label": "Waiting for the merchant", "text": "We have raised the case with the merchant's bank through the card network and are waiting for their response." },
+        { "key": "network", "label": "With the card network", "text": "The merchant contested the case and it is now being decided by the card network." },
+        { "key": "final", "label": "Nearly decided", "text": "Our investigation is nearly complete and we expect to write to you with the outcome shortly." }
+      ]
+    },
+    { "id": "note", "label": "Anything to add", "type": "TEXTAREA", "required": false },
+    { "id": "nextBy", "label": "You will hear from us by", "type": "DATE", "required": false }
+  ],
+  "subject": "An update on your dispute",
+  "paragraphs": [
+    "{{stage}}",
+    "{{note}}",
+    "{{#nextBy}}We will write to you again by {{nextBy}}.{{/nextBy}}",
+    "There is nothing you need to do now. Dispute reference {{dispute}}."
+  ]
+}

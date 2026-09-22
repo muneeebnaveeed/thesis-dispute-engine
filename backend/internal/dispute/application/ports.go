@@ -102,6 +102,7 @@ type NoticeRecord struct {
 	SentAt    *time.Time
 	Attempts  int
 	LastError *string
+	Actor     string // the analyst who composed it; empty for the engine's own notices
 }
 
 // StoredResponse is a prior answer kept for idempotent replay.

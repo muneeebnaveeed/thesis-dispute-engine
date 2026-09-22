@@ -16,6 +16,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/google/uuid"
 	nethttpmiddleware "github.com/oapi-codegen/nethttp-middleware"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
@@ -365,6 +366,69 @@ func (h *Handler) GetDispute(ctx context.Context, req oapi.GetDisputeRequestObje
 	return oapi.GetDispute200JSONResponse(toAPI(view)), nil
 }
 
+// ListEmailTemplates returns the analyst's catalogue for one dispute.
+func (h *Handler) ListEmailTemplates(ctx context.Context, req oapi.ListEmailTemplatesRequestObject) (oapi.ListEmailTemplatesResponseObject, error) {
+	cat, err := h.svc.ListEmailTemplates(ctx, req.DisputeId)
+	if err != nil {
+		if errors.Is(err, application.ErrNotFound) {
+			p := h.problem(ctx, "/disputes/"+req.DisputeId.String()+"/email-templates", err, uuid.Nil)
+			return oapi.ListEmailTemplates404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: oapi.NotFoundApplicationProblemPlusJSONResponse(p)}, nil
+		}
+		return nil, err
+	}
+	out := oapi.EmailTemplates{Templates: make([]oapi.EmailTemplate, 0, len(cat.Templates))}
+	out.Facts.Customer, out.Facts.Bank, out.Facts.Amount, out.Facts.Merchant, out.Facts.Dispute = cat.Facts.Customer, cat.Facts.Bank, cat.Facts.Amount, cat.Facts.Merchant, cat.Facts.Dispute
+	out.Facts.Today = openapi_types.Date{Time: cat.Facts.Today}
+	for _, t := range cat.Templates {
+		fields := make([]oapi.TemplateField, 0, len(t.Fields))
+		for _, f := range t.Fields {
+			tf := oapi.TemplateField{Id: f.ID, Label: f.Label, Type: oapi.FieldType(f.Type), Required: f.Required, Min: f.Min, Max: f.Max}
+			if f.Default != "" {
+				d := f.Default
+				tf.Default = &d
+			}
+			if len(f.Options) > 0 {
+				opts := make([]oapi.TemplateOption, 0, len(f.Options))
+				for _, o := range f.Options {
+					opts = append(opts, oapi.TemplateOption{Key: o.Key, Label: o.Label, Text: o.Text})
+				}
+				tf.Options = &opts
+			}
+			fields = append(fields, tf)
+		}
+		out.Templates = append(out.Templates, oapi.EmailTemplate{Kind: oapi.NoticeKind(t.Kind), Label: t.Label, Description: t.Description,
+			Letter: t.Letter, Fields: fields, Subject: t.Subject, Paragraphs: t.Paragraphs})
+	}
+	return oapi.ListEmailTemplates200JSONResponse(out), nil
+}
+
+// ComposeEmail sends a templated email as the signed-in analyst; tenant keys are refused.
+func (h *Handler) ComposeEmail(ctx context.Context, req oapi.ComposeEmailRequestObject) (oapi.ComposeEmailResponseObject, error) {
+	principal, ok := auth.PrincipalFrom(ctx)
+	if !ok {
+		return nil, auth.ErrForbidden.WithDetail("emails to customers are written by analysts, not by tenant keys")
+	}
+	actor := principal.Email
+	if actor == "" {
+		actor = principal.Subject
+	}
+	view, err := h.svc.ComposeEmail(ctx, application.ComposeEmailInput{DisputeID: req.DisputeId, Template: domain.NoticeKind(req.Body.Template),
+		Fields: req.Body.Fields, Actor: actor})
+	if err != nil {
+		p := h.problem(ctx, "/disputes/"+req.DisputeId.String()+"/notices", err, req.DisputeId)
+		switch p.Status {
+		case http.StatusNotFound:
+			return oapi.ComposeEmail404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: oapi.NotFoundApplicationProblemPlusJSONResponse(p)}, nil
+		case http.StatusUnprocessableEntity:
+			return oapi.ComposeEmail422ApplicationProblemPlusJSONResponse{UnprocessableApplicationProblemPlusJSONResponse: oapi.UnprocessableApplicationProblemPlusJSONResponse(p)}, nil
+		case http.StatusBadRequest:
+			return oapi.ComposeEmail400ApplicationProblemPlusJSONResponse{BadRequestApplicationProblemPlusJSONResponse: oapi.BadRequestApplicationProblemPlusJSONResponse(p)}, nil
+		}
+		return nil, err
+	}
+	return oapi.ComposeEmail201JSONResponse(toAPI(view)), nil
+}
+
 // GetNotice returns one composed communication of a dispute.
 func (h *Handler) GetNotice(ctx context.Context, req oapi.GetNoticeRequestObject) (oapi.GetNoticeResponseObject, error) {
 	rec, doc, err := h.svc.GetNotice(ctx, req.DisputeId, req.NoticeId)
@@ -611,8 +675,13 @@ func toAPI(v application.DisputeView) oapi.Dispute {
 	}
 	out.Notices = make([]oapi.Notice, 0, len(v.Notices))
 	for _, n := range v.Notices {
-		out.Notices = append(out.Notices, oapi.Notice{Id: n.ID, Seq: n.Seq, Kind: oapi.NoticeKind(n.Kind), Channel: oapi.Channel(n.Channel),
-			Recipient: n.Recipient, Subject: n.Subject, CreatedAt: n.CreatedAt, SentAt: n.SentAt, Error: n.Error})
+		nv := oapi.Notice{Id: n.ID, Seq: n.Seq, Kind: oapi.NoticeKind(n.Kind), Channel: oapi.Channel(n.Channel),
+			Recipient: n.Recipient, Subject: n.Subject, CreatedAt: n.CreatedAt, SentAt: n.SentAt, Error: n.Error}
+		if n.Actor != "" {
+			actor := n.Actor
+			nv.Actor = &actor
+		}
+		out.Notices = append(out.Notices, nv)
 	}
 	if r := v.Risk; r != nil {
 		signals := make([]oapi.RiskSignal, 0, len(r.Signals))

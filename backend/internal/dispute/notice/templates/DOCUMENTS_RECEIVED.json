@@ -1,0 +1,18 @@
+{
+  "kind": "DOCUMENTS_RECEIVED",
+  "label": "Documents received",
+  "description": "Confirm what the customer sent and whether anything is still missing.",
+  "letter": false,
+  "fields": [
+    { "id": "received", "label": "What we received (one item per line)", "type": "TEXTAREA", "required": true },
+    { "id": "missing", "label": "Still missing (one item per line)", "type": "TEXTAREA", "required": false }
+  ],
+  "subject": "Thank you, we have your documents",
+  "paragraphs": [
+    "Thank you for sending us the following about your dispute of the {{amount}} payment to {{merchant}}:",
+    "{{received}}",
+    "{{#missing}}We are still missing:{{/missing}}",
+    "{{missing}}",
+    "We will let you know as soon as our investigation is complete. Dispute reference {{dispute}}."
+  ]
+}

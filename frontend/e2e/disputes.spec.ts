@@ -309,3 +309,47 @@ test('a repeat disputer scores HIGH, the credit is held until the analyst record
   await page.getByRole('button', { name: 'ISSUE_REFUND' }).click()
   await expect(page.getByRole('alert')).toContainText(/declined/)
 })
+
+test('the communications panel composes an email from a template with a live preview, sends it, and lists it as sent', async ({
+  page,
+  request,
+}) => {
+  const id = await openDisputeViaApi(request, 'otp')
+  await page.goto(`/otp/disputes/${id}`)
+  await page.getByRole('link', { name: 'Open the communications panel' }).click()
+  await expect(page).toHaveURL(new RegExp(`/otp/disputes/${id}/communications$`))
+  await expect(page.getByRole('tab', { name: /Sent Emails/ })).toContainText('1') // the acknowledgement
+
+  // The preview updates as fields are chosen; unfilled ones are visibly marked.
+  await page.getByLabel(/Email template/).selectOption('REQUEST_FOR_INFORMATION')
+  const preview = page.getByRole('region', { name: 'Preview' })
+  await expect(preview).toContainText('Dear Kovács Anna,')
+  await expect(preview.locator('mark[data-missing="items"]')).toBeVisible()
+  await page.getByLabel(/Receipt or invoice/).check()
+  await page.getByLabel(/Proof of merchant contact/).check()
+  await expect(preview).toContainText('- a copy of the receipt')
+  await expect(preview).toContainText('- any correspondence with the merchant')
+  await expect(preview.locator('mark[data-missing="items"]')).toHaveCount(0)
+  await page.getByLabel(/Days to respond/).fill('5')
+  await expect(preview).toContainText('(5 days from today)')
+
+  // Sending queues it and switches to Sent Emails, where it is selected and shown as composed.
+  await page.getByRole('button', { name: 'Send email' }).click()
+  await expect(page).toHaveURL(/tab=sent/)
+  const sent = page.getByRole('table', { name: 'Sent emails' })
+  const row = sent.getByRole('row').filter({ hasText: 'Request for information' })
+  await expect(row).toBeVisible()
+  await expect(row).toContainText('analyst')
+  await expect(row).toContainText(/sent|queued/)
+  const shown = page.getByRole('region', { name: 'Sent email preview' })
+  await expect(shown).toContainText('a copy of the receipt')
+  await expect(shown).toContainText('5 days from today')
+
+  // A form the server refuses is reported under the field, not as a banner.
+  await page.getByRole('tab', { name: 'Create Email' }).click()
+  await page.getByLabel(/Email template/).selectOption('CUSTOM')
+  await page.getByLabel(/^Subject/).fill('x'.repeat(201))
+  await page.getByLabel(/^Message/).fill('Hello')
+  await page.getByRole('button', { name: 'Send email' }).click()
+  await expect(page.locator('#field-subject-error')).toContainText(/200/)
+})
