@@ -6,7 +6,6 @@ import type { Api } from '#/api/client'
 import type { Problem } from '#/api/failure'
 import { toOutcome, type Outcome } from '#/api/views'
 import { authed } from './middleware'
-import { signInAgain } from './sign-in-again'
 
 export const uuid = Type.String({ format: 'uuid' })
 
@@ -30,12 +29,9 @@ export const analystGet = createServerFn({ method: 'GET' }).middleware([authed])
 export const analystPost = createServerFn({ method: 'POST' }).middleware([authed])
 
 // the handler of every analyst server function. Start's builder types cannot be wrapped generically, which is why
-// this is a handler and not part of the builders above. An API 401 means the token died between the middleware
-// and the call, so it is handled the same way the middleware handles a missing session.
+// this is a handler and not part of the builders above. Nothing server-only may be imported here: route files
+// import this module and only middleware .server() bodies are stripped from the client bundle.
 export const asAnalyst =
   <Input, T>(call: AnalystCall<Input, T>) =>
-  async ({ data, context }: HandlerContext<Input>): Promise<Outcome<T>> => {
-    const outcome = toOutcome(await call(context.api, data))
-    if (outcome.problem?.code === 'unauthenticated') throw signInAgain()
-    return outcome
-  }
+  ({ data, context }: HandlerContext<Input>): Promise<Outcome<T>> =>
+    call(context.api, data).then(toOutcome)
