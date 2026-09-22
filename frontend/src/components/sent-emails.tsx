@@ -40,6 +40,22 @@ export function SentEmails({
   const [picked, setSelected] = useState<number | null>(null)
   const selected = picked ?? rows[0]?.id ?? null
   const doc = useNotice(api, disputeId, selected)
+  const selectedNotice = rows.find((n) => n.id === selected)
+
+  // The file comes back through the same bearer as everything else, then opens in a new tab as a blob.
+  async function openAttachment(id: string, filename: string) {
+    const res = await api.GET('/disputes/{disputeId}/attachments/{attachmentId}', {
+      params: { path: { disputeId, attachmentId: id } },
+      parseAs: 'blob',
+    })
+    if (!res.data) return
+    const url = URL.createObjectURL(res.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  }
 
   if (rows.length === 0) return <p className="text-sm text-neutral-600">Nothing has been sent yet.</p>
   return (
@@ -117,6 +133,22 @@ export function SentEmails({
             ))}
             <p className="whitespace-pre-line">{doc.closing}</p>
             {doc.basis && <p className="mt-8 text-[10pt] text-neutral-600">{doc.basis}</p>}
+            {selectedNotice && selectedNotice.attachments.length > 0 && (
+              <ul className="mt-6 space-y-1 font-sans text-sm" aria-label="Attachments">
+                {selectedNotice.attachments.map((a) => (
+                  <li key={a.id}>
+                    <button
+                      type="button"
+                      className="underline"
+                      onClick={() => void openAttachment(a.id, a.filename)}
+                    >
+                      {a.filename}
+                    </button>{' '}
+                    <span className="text-neutral-500">({Math.ceil(a.size / 1024)} KB)</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </>
         ) : (
           <p className="text-sm text-neutral-500">Loading...</p>

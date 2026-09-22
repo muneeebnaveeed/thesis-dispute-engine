@@ -3,6 +3,7 @@ package apptest
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -37,6 +38,7 @@ type MemStore struct {
 	Questions    map[uuid.UUID]application.Questionnaire
 	Notices      []application.NoticeRecord
 	Risk         map[uuid.UUID][]application.RiskRecord
+	Attachments  map[uuid.UUID]application.Attachment
 	Accounts     map[uuid.UUID]application.AccountRecord
 	Names        map[uuid.UUID]string
 	nextNotice   int64
@@ -58,6 +60,7 @@ func NewMemStore() *MemStore {
 		Questions:    map[uuid.UUID]application.Questionnaire{},
 		Accounts:     map[uuid.UUID]application.AccountRecord{},
 		Risk:         map[uuid.UUID][]application.RiskRecord{},
+		Attachments:  map[uuid.UUID]application.Attachment{},
 		Names:        map[uuid.UUID]string{},
 		Calendars:    map[uuid.UUID]domain.Calendar{},
 		Cores:        map[uuid.UUID]application.CoreConfig{},
@@ -138,6 +141,7 @@ type snapshotT struct {
 	questions  map[uuid.UUID]application.Questionnaire
 	notices    []application.NoticeRecord
 	risk       map[uuid.UUID][]application.RiskRecord
+	files      map[uuid.UUID]application.Attachment
 }
 
 func (m *MemStore) snapshot() snapshotT {
@@ -151,6 +155,10 @@ func (m *MemStore) snapshot() snapshotT {
 	s.risk = map[uuid.UUID][]application.RiskRecord{}
 	for k, v := range m.Risk {
 		s.risk[k] = append([]application.RiskRecord(nil), v...)
+	}
+	s.files = map[uuid.UUID]application.Attachment{}
+	for k, v := range m.Attachments {
+		s.files[k] = v
 	}
 	for k, v := range m.Deadlines {
 		s.deadlines[k] = append([]domain.Deadline(nil), v...)
@@ -171,7 +179,35 @@ func (m *MemStore) snapshot() snapshotT {
 }
 
 func (m *MemStore) restore(s snapshotT) {
-	m.Disputes, m.Events, m.Idempotent, m.Deadlines, m.Ledger, m.Questions, m.Notices, m.Risk = s.disputes, s.events, s.idempotent, s.deadlines, s.ledger, s.questions, s.notices, s.risk
+	m.Disputes, m.Events, m.Idempotent, m.Deadlines, m.Ledger, m.Questions, m.Notices, m.Risk, m.Attachments = s.disputes, s.events, s.idempotent, s.deadlines, s.ledger, s.questions, s.notices, s.risk, s.files
+}
+
+// NoticeAttachments implements application.Store.
+func (m *MemStore) NoticeAttachments(_ context.Context, noticeID int64) ([]application.Attachment, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []application.Attachment
+	for _, a := range m.Attachments {
+		if a.NoticeID != nil && *a.NoticeID == noticeID {
+			out = append(out, a)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].UploadedAt.Before(out[j].UploadedAt) })
+	return out, nil
+}
+
+// PurgeDraftAttachments implements application.Store.
+func (m *MemStore) PurgeDraftAttachments(_ context.Context, before time.Time) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var n int64
+	for id, a := range m.Attachments {
+		if a.NoticeID == nil && a.UploadedAt.Before(before) {
+			delete(m.Attachments, id)
+			n++
+		}
+	}
+	return n, nil
 }
 
 // ClaimNotices implements application.Store; backoff is not modelled, every unsent email is offered each pass.
@@ -565,4 +601,51 @@ func (t *memTx) LatestRisk(_ context.Context, ids []uuid.UUID) (map[uuid.UUID]do
 		}
 	}
 	return out, nil
+}
+
+func (t *memTx) InsertAttachment(_ context.Context, disputeID uuid.UUID, a application.Attachment) error {
+	if _, err := t.GetDispute(context.Background(), disputeID); err != nil {
+		return err
+	}
+	a.DisputeID = disputeID
+	t.s.Attachments[a.ID] = a
+	return nil
+}
+
+func (t *memTx) ClaimAttachments(_ context.Context, disputeID uuid.UUID, noticeID int64, ids []uuid.UUID) (int, error) {
+	n := 0
+	for _, id := range ids {
+		a, ok := t.s.Attachments[id]
+		if !ok || a.NoticeID != nil || a.DisputeID != disputeID {
+			continue
+		}
+		nid := noticeID
+		a.NoticeID = &nid
+		t.s.Attachments[id] = a
+		n++
+	}
+	return n, nil
+}
+
+func (t *memTx) ListAttachmentMeta(_ context.Context, disputeID uuid.UUID, noticeIDs []int64) ([]application.Attachment, error) {
+	var out []application.Attachment
+	for _, a := range t.s.Attachments {
+		if a.DisputeID != disputeID {
+			continue
+		}
+		if a.NoticeID == nil || slices.Contains(noticeIDs, *a.NoticeID) {
+			a.Content = nil
+			out = append(out, a)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].UploadedAt.Before(out[j].UploadedAt) })
+	return out, nil
+}
+
+func (t *memTx) GetAttachment(_ context.Context, disputeID, id uuid.UUID) (application.Attachment, error) {
+	a, ok := t.s.Attachments[id]
+	if !ok || a.DisputeID != disputeID {
+		return application.Attachment{}, application.ErrNotFound
+	}
+	return a, nil
 }

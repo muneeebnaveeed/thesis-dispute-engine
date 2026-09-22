@@ -194,17 +194,26 @@ type RiskHistoryView struct {
 
 // NoticeView is one communication as listed on the dispute; the document itself is fetched separately.
 type NoticeView struct {
-	ID        int64             `json:"id"`
-	Seq       int               `json:"seq"`
-	Kind      domain.NoticeKind `json:"kind"`
-	Channel   domain.Channel    `json:"channel"`
-	Recipient string            `json:"recipient"`
-	Subject   string            `json:"subject"`
-	CreatedAt time.Time         `json:"createdAt"`
-	SentAt    *time.Time        `json:"sentAt,omitempty"`
-	Error     *string           `json:"error,omitempty"`
-	Actor     string            `json:"actor,omitempty"`
-	ResendOf  *int64            `json:"resendOf,omitempty"`
+	ID          int64             `json:"id"`
+	Seq         int               `json:"seq"`
+	Kind        domain.NoticeKind `json:"kind"`
+	Channel     domain.Channel    `json:"channel"`
+	Recipient   string            `json:"recipient"`
+	Subject     string            `json:"subject"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	SentAt      *time.Time        `json:"sentAt,omitempty"`
+	Error       *string           `json:"error,omitempty"`
+	Actor       string            `json:"actor,omitempty"`
+	ResendOf    *int64            `json:"resendOf,omitempty"`
+	Attachments []AttachmentView  `json:"attachments"`
+}
+
+// AttachmentView is a file on an email, without its bytes.
+type AttachmentView struct {
+	ID          uuid.UUID `json:"id"`
+	Filename    string    `json:"filename"`
+	ContentType string    `json:"contentType"`
+	Size        int       `json:"size"`
 }
 
 // QuestionnaireView is the questionnaire as exposed by the API, with the contradictions found in the answers.
@@ -953,10 +962,28 @@ func (s *Service) view(ctx context.Context, tx Tx, rec DisputeRecord) (DisputeVi
 	if err != nil {
 		return DisputeView{}, err
 	}
+	noticeIDs := make([]int64, 0, len(notices))
+	for _, n := range notices {
+		noticeIDs = append(noticeIDs, n.ID)
+	}
+	files, err := tx.ListAttachmentMeta(ctx, rec.ID, noticeIDs)
+	if err != nil {
+		return DisputeView{}, err
+	}
+	byNotice := map[int64][]AttachmentView{}
+	for _, f := range files {
+		if f.NoticeID != nil {
+			byNotice[*f.NoticeID] = append(byNotice[*f.NoticeID], AttachmentView{ID: f.ID, Filename: f.Filename, ContentType: f.ContentType, Size: f.Size})
+		}
+	}
 	view.Notices = make([]NoticeView, 0, len(notices))
 	for _, n := range notices {
+		atts := byNotice[n.ID]
+		if atts == nil {
+			atts = []AttachmentView{}
+		}
 		view.Notices = append(view.Notices, NoticeView{ID: n.ID, Seq: n.Seq, Kind: n.Kind, Channel: n.Channel, Recipient: n.Recipient, Subject: n.Subject,
-			CreatedAt: n.CreatedAt, SentAt: n.SentAt, Error: n.LastError, Actor: n.Actor, ResendOf: n.ResendOf})
+			CreatedAt: n.CreatedAt, SentAt: n.SentAt, Error: n.LastError, Actor: n.Actor, ResendOf: n.ResendOf, Attachments: atts})
 	}
 	if risk, err := tx.ListRisk(ctx, rec.ID); err != nil {
 		return DisputeView{}, err

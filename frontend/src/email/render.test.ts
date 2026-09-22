@@ -17,7 +17,7 @@ const rfi = {
         { key: 'delivery', label: 'Delivery', text: 'the expected delivery date' },
       ],
     },
-    { id: 'other', label: 'Other', type: 'TEXTAREA' as const, required: false },
+    { id: 'other', label: 'Other', type: 'TEXTAREA' as const, required: false, list: true },
     { id: 'days', label: 'Days', type: 'NUMBER' as const, required: true, default: '10' },
     { id: 'nextBy', label: 'Next', type: 'DATE' as const, required: false },
   ],

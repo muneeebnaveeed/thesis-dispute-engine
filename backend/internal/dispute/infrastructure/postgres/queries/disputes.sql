@@ -261,3 +261,25 @@ SELECT id, tenant_id, dispute_id, seq, kind, channel, recipient, subject, docume
 
 -- name: FinishNotice :exec
 SELECT finish_notice(sqlc.arg(notice_id), sqlc.narg(failure)::text);
+
+-- name: InsertAttachment :exec
+INSERT INTO attachments (id, dispute_id, filename, content_type, size, content, uploaded_by, uploaded_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+
+-- name: ClaimAttachments :execrows
+-- Drafts of this dispute only; a claimed attachment belongs to its notice for good.
+UPDATE attachments SET notice_id = sqlc.arg(notice_id)
+WHERE dispute_id = sqlc.arg(dispute_id) AND notice_id IS NULL AND id = ANY(sqlc.arg(ids)::uuid[]);
+
+-- name: ListAttachmentMeta :many
+SELECT id, notice_id, filename, content_type, size, uploaded_by, uploaded_at FROM attachments
+WHERE dispute_id = $1 AND (notice_id = ANY(sqlc.arg(notice_ids)::bigint[]) OR notice_id IS NULL) ORDER BY uploaded_at;
+
+-- name: GetAttachment :one
+SELECT id, notice_id, filename, content_type, size, content, uploaded_by, uploaded_at FROM attachments WHERE id = $1 AND dispute_id = $2;
+
+-- name: NoticeAttachments :many
+SELECT id, filename, content_type, size, content FROM notice_attachments($1);
+
+-- name: PurgeDraftAttachments :one
+SELECT purge_draft_attachments($1)::bigint AS n;

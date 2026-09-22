@@ -67,6 +67,16 @@ export type ApplyEventRequest = Static<typeof ApplyEventRequest>
 const _ApplyEventRequest: Same<ApplyEventRequest, components['schemas']['ApplyEventRequest']> = true
 void _ApplyEventRequest
 
+export const Attachment = Type.Object({
+  id: Type.String({ format: 'uuid' }),
+  filename: Type.String(),
+  contentType: Type.String(),
+  size: Type.Integer(),
+})
+export type Attachment = Static<typeof Attachment>
+const _Attachment: Same<Attachment, components['schemas']['Attachment']> = true
+void _Attachment
+
 export const Balances = Type.Object(
   {
     customer: Type.String(),
@@ -115,6 +125,12 @@ export const ComposeEmailRequest = Type.Object({
   fields: Type.Record(Type.String(), Type.String(), {
     description: 'Field id to value; MULTISELECT values are comma-separated option keys.',
   }),
+  attachments: Type.Optional(
+    Type.Array(Type.String({ format: 'uuid' }), {
+      description:
+        'Draft attachment ids uploaded for this dispute, at most 3; they travel with the email and are listed on the letter.',
+    }),
+  ),
 })
 export type ComposeEmailRequest = Static<typeof ComposeEmailRequest>
 const _ComposeEmailRequest: Same<ComposeEmailRequest, components['schemas']['ComposeEmailRequest']> = true
@@ -339,6 +355,7 @@ export const Notice = Type.Object({
     Type.String({ description: "The analyst who composed it; absent for the engine's own notices." }),
   ),
   resendOf: Type.Optional(Type.Integer({ description: 'The notice this one repeats', format: 'int64' })),
+  attachments: Type.Array(Attachment),
 })
 export type Notice = Static<typeof Notice>
 const _Notice: Same<Notice, components['schemas']['Notice']> = true
@@ -473,6 +490,7 @@ export const TemplateField = Type.Object({
   type: FieldType,
   required: Type.Boolean(),
   options: Type.Optional(Type.Array(TemplateOption)),
+  list: Type.Optional(Type.Boolean({ description: 'A TEXTAREA whose lines are items' })),
   default: Type.Optional(Type.String()),
   min: Type.Optional(Type.Integer()),
   max: Type.Optional(Type.Integer()),
@@ -536,6 +554,8 @@ export const ErrorCode = Type.Union(
     Type.Literal('invalid-fields'),
     Type.Literal('unknown-template'),
     Type.Literal('not-resendable'),
+    Type.Literal('attachment-refused'),
+    Type.Literal('attachment-unknown'),
     Type.Literal('concurrent-update'),
     Type.Literal('idempotency-key-reuse'),
     Type.Literal('no-regime'),

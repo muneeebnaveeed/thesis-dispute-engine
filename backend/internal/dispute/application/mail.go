@@ -10,12 +10,20 @@ import (
 	"go.opentelemetry.io/otel/metric"
 )
 
-// Mail is one message to a customer; Text is the body, HTML the same words laid out.
+// Mail is one message to a customer; Text is the body, HTML the same words laid out, Files what travels with it.
 type Mail struct {
 	To      string
 	Subject string
 	Text    string
 	HTML    string
+	Files   []MailFile
+}
+
+// MailFile is one attachment as the mailer needs it.
+type MailFile struct {
+	Name        string
+	ContentType string
+	Content     []byte
 }
 
 // Mailer delivers mail; an error means not delivered and the notice stays in the outbox for another attempt.
@@ -91,7 +99,16 @@ func (d *Dispatcher) pass(ctx context.Context, sent metric.Int64Counter) int {
 	for _, n := range batch {
 		outcome := "sent"
 		failure := ""
-		if m, err := d.render(n); err != nil {
+		m, err := d.render(n)
+		if err == nil {
+			var files []Attachment
+			if files, err = d.store.NoticeAttachments(ctx, n.ID); err == nil {
+				for _, f := range files {
+					m.Files = append(m.Files, MailFile{Name: f.Filename, ContentType: f.ContentType, Content: f.Content})
+				}
+			}
+		}
+		if err != nil {
 			failure, outcome = "render: "+err.Error(), "render-failed"
 		} else if err := d.mailer.Send(ctx, m); err != nil {
 			failure, outcome = err.Error(), "failed"

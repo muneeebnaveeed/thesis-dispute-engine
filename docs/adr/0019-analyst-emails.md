@@ -31,6 +31,12 @@ needs the template engine's rules for facts, and the server never trusts the bro
   automatic notices, with the analyst recorded as the actor and a letter added where the template
   is a letter and the regime requires writing. Tenant keys cannot compose: machines do not write to
   customers.
+- Attachments are uploaded first and claimed by the email that sends them, the two-step shape of
+  comparable tools: a draft belongs to the dispute, a claim binds it to one notice for good, and
+  drafts nobody claimed are swept after a day. Bytes live in the database (5 MB per file, three per
+  email, PDF, PNG or JPEG) so the API stays the only stateful client; the dispatcher reads them
+  across tenants through an owner-defined function and sends `multipart/mixed`; a letter lists them
+  as enclosures. Machine credentials cannot upload.
 - A resend is a new notice chained to the original (`resend_of`), with the original's words, the
   customer's current address and the analyst as author; only an email that was sent can be resent,
   because an email still in the outbox is the engine's to retry. A retry and a resend are
@@ -46,4 +52,6 @@ needs the template engine's rules for facts, and the server never trusts the bro
   with its author; the two-tab shape is what analysts already know from comparable tools.
 - Harder: the substitution language is deliberately tiny (no loops, no conditionals beyond
   presence), and both halves must stay in step, which the unit tests on each side pin; templates
-  are one language and shared by every tenant; a sent email cannot be recalled, only followed by another or resent.
+  are one language and shared by every tenant; attachments in the database cap the sensible size
+  and would move to object storage under real volume; a sent email cannot be recalled, only
+  followed by another or resent.

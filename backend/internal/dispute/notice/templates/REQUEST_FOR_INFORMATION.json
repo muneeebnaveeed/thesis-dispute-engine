@@ -10,17 +10,59 @@
       "type": "MULTISELECT",
       "required": true,
       "options": [
-        { "key": "receipt", "label": "Receipt or invoice", "text": "a copy of the receipt, invoice or order confirmation for the payment" },
-        { "key": "merchant_contact", "label": "Proof of merchant contact", "text": "any correspondence with the merchant about this payment (emails, letters, chat transcripts) and their response" },
-        { "key": "delivery", "label": "Delivery information", "text": "the expected delivery date, the delivery address and any tracking number" },
-        { "key": "cancellation", "label": "Cancellation information", "text": "a copy of the cancellation and the date it was sent to the merchant" },
-        { "key": "return", "label": "Return information", "text": "proof that the item was returned, how it was returned, and the shipping receipt" },
-        { "key": "police_report", "label": "Police report", "text": "the police report or its reference number" },
-        { "key": "statement", "label": "Other bank statement", "text": "a statement showing the same amount paid by another means" }
+        {
+          "key": "receipt",
+          "label": "Receipt or invoice",
+          "text": "a copy of the receipt, invoice or order confirmation for the payment"
+        },
+        {
+          "key": "merchant_contact",
+          "label": "Proof of merchant contact",
+          "text": "any correspondence with the merchant about this payment (emails, letters, chat transcripts) and their response"
+        },
+        {
+          "key": "delivery",
+          "label": "Delivery information",
+          "text": "the expected delivery date, the delivery address and any tracking number"
+        },
+        {
+          "key": "cancellation",
+          "label": "Cancellation information",
+          "text": "a copy of the cancellation and the date it was sent to the merchant"
+        },
+        {
+          "key": "return",
+          "label": "Return information",
+          "text": "proof that the item was returned, how it was returned, and the shipping receipt"
+        },
+        {
+          "key": "police_report",
+          "label": "Police report",
+          "text": "the police report or its reference number"
+        },
+        {
+          "key": "statement",
+          "label": "Other bank statement",
+          "text": "a statement showing the same amount paid by another means"
+        }
       ]
     },
-    { "id": "other", "label": "Anything else (one item per line)", "type": "TEXTAREA", "required": false },
-    { "id": "days", "label": "Days to respond", "type": "NUMBER", "required": true, "default": "10", "min": 1, "max": 60 }
+    {
+      "id": "other",
+      "label": "Anything else (one item per line)",
+      "type": "TEXTAREA",
+      "required": false,
+      "list": true
+    },
+    {
+      "id": "days",
+      "label": "Days to respond",
+      "type": "NUMBER",
+      "required": true,
+      "default": "10",
+      "min": 1,
+      "max": 60
+    }
   ],
   "subject": "We need a little more information about your dispute",
   "paragraphs": [

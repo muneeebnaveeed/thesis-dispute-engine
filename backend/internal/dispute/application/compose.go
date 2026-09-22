@@ -43,10 +43,11 @@ func (s *Service) ListEmailTemplates(ctx context.Context, disputeID uuid.UUID) (
 
 // ComposeEmailInput is what the analyst sends: which template, the form values, and who they are.
 type ComposeEmailInput struct {
-	DisputeID uuid.UUID
-	Template  domain.NoticeKind
-	Fields    map[string]string
-	Actor     string
+	DisputeID   uuid.UUID
+	Template    domain.NoticeKind
+	Fields      map[string]string
+	Attachments []uuid.UUID // drafts uploaded for this dispute
+	Actor       string
 }
 
 // ComposeEmail validates the form against the template, composes the final document server-side and puts it in
@@ -72,30 +73,41 @@ func (s *Service) ComposeEmail(ctx context.Context, in ComposeEmailInput) (Dispu
 			return err
 		}
 		doc := notice.Fill(tpl, factValues(facts.Facts), values)
-		body, err := json.Marshal(doc)
-		if err != nil {
-			return err
-		}
 		rules, err := domain.RulesFor(rec.Regime)
 		if err != nil {
 			return err
 		}
-		channels := []domain.Channel{domain.ChannelEmail}
-		if tpl.Letter && rules.WrittenNotices {
-			channels = append(channels, domain.ChannelLetter)
+		// The email carries the files; the letter, if any, lists them as enclosures. Attachments are claimed by
+		// the email's row, so the claim happens once the row exists and before the letter is composed.
+		emailBody, err := json.Marshal(doc)
+		if err != nil {
+			return err
 		}
-		for _, ch := range channels {
-			n := NoticeRecord{DisputeID: rec.ID, Seq: int(rec.Version), Kind: tpl.Kind, Channel: ch, Subject: doc.Subject, Document: body, CreatedAt: now, Actor: in.Actor}
-			switch ch {
-			case domain.ChannelEmail:
-				n.Recipient = facts.Email
-			case domain.ChannelLetter:
-				n.Recipient, n.SentAt = facts.PostalAddress, &now
+		if facts.Email == "" {
+			return ErrNotResendable.WithDetail("the account has no email address")
+		}
+		email := NoticeRecord{DisputeID: rec.ID, Seq: int(rec.Version), Kind: tpl.Kind, Channel: domain.ChannelEmail, Recipient: facts.Email,
+			Subject: doc.Subject, Document: emailBody, CreatedAt: now, Actor: in.Actor}
+		emailID, err := tx.InsertNotice(ctx, email)
+		if err != nil {
+			return err
+		}
+		files, err := claimAttachments(ctx, tx, rec.ID, emailID, in.Attachments)
+		if err != nil {
+			return err
+		}
+		if tpl.Letter && rules.WrittenNotices && facts.PostalAddress != "" {
+			letterDoc := doc
+			if enc := enclosures(files); enc != "" {
+				letterDoc.Paragraphs = append(append([]string(nil), doc.Paragraphs...), enc)
 			}
-			if n.Recipient == "" {
-				continue
+			letterBody, err := json.Marshal(letterDoc)
+			if err != nil {
+				return err
 			}
-			if _, err := tx.InsertNotice(ctx, n); err != nil {
+			letter := NoticeRecord{DisputeID: rec.ID, Seq: int(rec.Version), Kind: tpl.Kind, Channel: domain.ChannelLetter, Recipient: facts.PostalAddress,
+				Subject: doc.Subject, Document: letterBody, CreatedAt: now, SentAt: &now, Actor: in.Actor}
+			if _, err := tx.InsertNotice(ctx, letter); err != nil {
 				return err
 			}
 		}

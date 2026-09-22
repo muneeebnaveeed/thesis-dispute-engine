@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/textproto"
 	"strconv"
 	"strings"
 	"sync"
@@ -664,4 +666,71 @@ func anyStrings(v any) []string {
 		out = append(out, s)
 	}
 	return out
+}
+
+func TestAttachmentsTravelWithComposedEmails(t *testing.T) {
+	a := newAPI(t, nil)
+	id := txnDispute(t, a)
+	analyst := map[string]string{"Authorization": "", "X-Test-Analyst": "a:analyst"}
+
+	upload := func(name, ctype string, content []byte) (*httptest.ResponseRecorder, map[string]any) {
+		var buf bytes.Buffer
+		w := multipart.NewWriter(&buf)
+		hdr := textproto.MIMEHeader{}
+		hdr.Set("Content-Disposition", `form-data; name="file"; filename="`+name+`"`)
+		hdr.Set("Content-Type", ctype)
+		part, _ := w.CreatePart(hdr)
+		_, _ = part.Write(content)
+		_ = w.Close()
+		req := httptest.NewRequest(http.MethodPost, "/disputes/"+id+"/attachments", &buf)
+		req.Header.Set("Content-Type", w.FormDataContentType())
+		req.Header.Set("X-Test-Analyst", "a:analyst")
+		rec := httptest.NewRecorder()
+		a.h.ServeHTTP(rec, req)
+		var out map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &out)
+		return rec, out
+	}
+	rec, refused := upload("notes.txt", "text/plain", []byte("hello"))
+	if rec.Code != 422 || refused["code"] != "attachment-refused" {
+		t.Fatalf("text file: %d %v", rec.Code, refused)
+	}
+	rec, stored := upload("receipt.pdf", "application/pdf", []byte("%PDF-1.4 fake"))
+	if rec.Code != 201 || stored["filename"] != "receipt.pdf" || stored["size"].(float64) != 13 {
+		t.Fatalf("pdf: %d %v", rec.Code, stored)
+	}
+	attachmentID := stored["id"].(string)
+
+	// Composing with an id that is not this dispute's draft is refused; with the draft it is claimed.
+	rec, problem := a.do(http.MethodPost, "/disputes/"+id+"/notices", map[string]any{"template": "CUSTOM", "fields": map[string]any{"subject": "s", "body": "b"},
+		"attachments": []string{uuid.NewString()}}, analyst)
+	if rec.Code != 422 || problem["code"] != "attachment-unknown" {
+		t.Fatalf("unknown attachment: %d %v", rec.Code, problem)
+	}
+	rec, sent := a.do(http.MethodPost, "/disputes/"+id+"/notices", map[string]any{"template": "CUSTOM", "fields": map[string]any{"subject": "s", "body": "b"},
+		"attachments": []string{attachmentID}}, analyst)
+	if rec.Code != 201 {
+		t.Fatalf("compose with attachment: %d %s", rec.Code, rec.Body.String())
+	}
+	notices := sent["notices"].([]any)
+	last := notices[len(notices)-1].(map[string]any)
+	files := last["attachments"].([]any)
+	if len(files) != 1 || files[0].(map[string]any)["filename"] != "receipt.pdf" {
+		t.Errorf("attachments on the notice = %v", last["attachments"])
+	}
+	// The same draft cannot be attached twice.
+	rec, problem = a.do(http.MethodPost, "/disputes/"+id+"/notices", map[string]any{"template": "CUSTOM", "fields": map[string]any{"subject": "s", "body": "b"},
+		"attachments": []string{attachmentID}}, analyst)
+	if rec.Code != 422 || problem["code"] != "attachment-unknown" {
+		t.Errorf("reusing a claimed attachment: %d %v", rec.Code, problem)
+	}
+
+	// Download serves the bytes under the file's own type and name.
+	req := httptest.NewRequest(http.MethodGet, "/disputes/"+id+"/attachments/"+attachmentID, nil)
+	req.Header.Set("X-Test-Analyst", "a:analyst")
+	rec = httptest.NewRecorder()
+	a.h.ServeHTTP(rec, req)
+	if rec.Code != 200 || rec.Header().Get("Content-Type") != "application/pdf" || !strings.Contains(rec.Header().Get("Content-Disposition"), "receipt.pdf") || rec.Body.String() != "%PDF-1.4 fake" {
+		t.Errorf("download: %d %v %q", rec.Code, rec.Header(), rec.Body.String())
+	}
 }

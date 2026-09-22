@@ -50,6 +50,26 @@ func (q *Queries) BumpTenantRateWindow(ctx context.Context, arg BumpTenantRateWi
 	return count, err
 }
 
+const claimAttachments = `-- name: ClaimAttachments :execrows
+UPDATE attachments SET notice_id = $1
+WHERE dispute_id = $2 AND notice_id IS NULL AND id = ANY($3::uuid[])
+`
+
+type ClaimAttachmentsParams struct {
+	NoticeID  *int64
+	DisputeID uuid.UUID
+	Ids       []uuid.UUID
+}
+
+// Drafts of this dispute only; a claimed attachment belongs to its notice for good.
+func (q *Queries) ClaimAttachments(ctx context.Context, arg ClaimAttachmentsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, claimAttachments, arg.NoticeID, arg.DisputeID, arg.Ids)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const claimNotices = `-- name: ClaimNotices :many
 SELECT id, tenant_id, dispute_id, seq, kind, channel, recipient, subject, document, created_at, attempts FROM claim_notices($1)
 `
@@ -342,6 +362,42 @@ func (q *Queries) GetAccount(ctx context.Context, id uuid.UUID) (GetAccountRow, 
 		&i.Email,
 		&i.PostalAddress,
 		&i.OpenedAt,
+	)
+	return i, err
+}
+
+const getAttachment = `-- name: GetAttachment :one
+SELECT id, notice_id, filename, content_type, size, content, uploaded_by, uploaded_at FROM attachments WHERE id = $1 AND dispute_id = $2
+`
+
+type GetAttachmentParams struct {
+	ID        uuid.UUID
+	DisputeID uuid.UUID
+}
+
+type GetAttachmentRow struct {
+	ID          uuid.UUID
+	NoticeID    *int64
+	Filename    string
+	ContentType string
+	Size        int32
+	Content     []byte
+	UploadedBy  string
+	UploadedAt  time.Time
+}
+
+func (q *Queries) GetAttachment(ctx context.Context, arg GetAttachmentParams) (GetAttachmentRow, error) {
+	row := q.db.QueryRow(ctx, getAttachment, arg.ID, arg.DisputeID)
+	var i GetAttachmentRow
+	err := row.Scan(
+		&i.ID,
+		&i.NoticeID,
+		&i.Filename,
+		&i.ContentType,
+		&i.Size,
+		&i.Content,
+		&i.UploadedBy,
+		&i.UploadedAt,
 	)
 	return i, err
 }
@@ -700,6 +756,36 @@ func (q *Queries) InsertAccount(ctx context.Context, arg InsertAccountParams) er
 	return err
 }
 
+const insertAttachment = `-- name: InsertAttachment :exec
+INSERT INTO attachments (id, dispute_id, filename, content_type, size, content, uploaded_by, uploaded_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+`
+
+type InsertAttachmentParams struct {
+	ID          uuid.UUID
+	DisputeID   uuid.UUID
+	Filename    string
+	ContentType string
+	Size        int32
+	Content     []byte
+	UploadedBy  string
+	UploadedAt  time.Time
+}
+
+func (q *Queries) InsertAttachment(ctx context.Context, arg InsertAttachmentParams) error {
+	_, err := q.db.Exec(ctx, insertAttachment,
+		arg.ID,
+		arg.DisputeID,
+		arg.Filename,
+		arg.ContentType,
+		arg.Size,
+		arg.Content,
+		arg.UploadedBy,
+		arg.UploadedAt,
+	)
+	return err
+}
+
 const insertDeadline = `-- name: InsertDeadline :exec
 INSERT INTO dispute_deadlines (dispute_id, kind, cycle, started_at, due_at, basis)
 VALUES ($1, $2, $3, $4, $5, $6)
@@ -1006,6 +1092,54 @@ func (q *Queries) LatestRiskTiers(ctx context.Context, disputeIds []uuid.UUID) (
 	for rows.Next() {
 		var i LatestRiskTiersRow
 		if err := rows.Scan(&i.DisputeID, &i.Score, &i.Tier); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAttachmentMeta = `-- name: ListAttachmentMeta :many
+SELECT id, notice_id, filename, content_type, size, uploaded_by, uploaded_at FROM attachments
+WHERE dispute_id = $1 AND (notice_id = ANY($2::bigint[]) OR notice_id IS NULL) ORDER BY uploaded_at
+`
+
+type ListAttachmentMetaParams struct {
+	DisputeID uuid.UUID
+	NoticeIds []int64
+}
+
+type ListAttachmentMetaRow struct {
+	ID          uuid.UUID
+	NoticeID    *int64
+	Filename    string
+	ContentType string
+	Size        int32
+	UploadedBy  string
+	UploadedAt  time.Time
+}
+
+func (q *Queries) ListAttachmentMeta(ctx context.Context, arg ListAttachmentMetaParams) ([]ListAttachmentMetaRow, error) {
+	rows, err := q.db.Query(ctx, listAttachmentMeta, arg.DisputeID, arg.NoticeIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAttachmentMetaRow{}
+	for rows.Next() {
+		var i ListAttachmentMetaRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.NoticeID,
+			&i.Filename,
+			&i.ContentType,
+			&i.Size,
+			&i.UploadedBy,
+			&i.UploadedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -1552,6 +1686,55 @@ func (q *Queries) NextDeadlines(ctx context.Context, disputeIds []uuid.UUID) ([]
 		return nil, err
 	}
 	return items, nil
+}
+
+const noticeAttachments = `-- name: NoticeAttachments :many
+SELECT id, filename, content_type, size, content FROM notice_attachments($1)
+`
+
+type NoticeAttachmentsRow struct {
+	ID          uuid.UUID
+	Filename    string
+	ContentType string
+	Size        int32
+	Content     []byte
+}
+
+func (q *Queries) NoticeAttachments(ctx context.Context, nid int64) ([]NoticeAttachmentsRow, error) {
+	rows, err := q.db.Query(ctx, noticeAttachments, nid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []NoticeAttachmentsRow{}
+	for rows.Next() {
+		var i NoticeAttachmentsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Filename,
+			&i.ContentType,
+			&i.Size,
+			&i.Content,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const purgeDraftAttachments = `-- name: PurgeDraftAttachments :one
+SELECT purge_draft_attachments($1)::bigint AS n
+`
+
+func (q *Queries) PurgeDraftAttachments(ctx context.Context, before time.Time) (int64, error) {
+	row := q.db.QueryRow(ctx, purgeDraftAttachments, before)
+	var n int64
+	err := row.Scan(&n)
+	return n, err
 }
 
 const purgeIdempotencyKeys = `-- name: PurgeIdempotencyKeys :one

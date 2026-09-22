@@ -7,6 +7,8 @@ const input =
   'mt-1 block w-full rounded-md border px-2 py-1 text-sm focus:border-neutral-500 focus:outline-none'
 
 type Facts = { customer: string; bank: string; today: string }
+export type Draft = { id: string; filename: string; size: number }
+const NO_DRAFTS: Draft[] = []
 
 /**
  * Create Email: pick a template, fill its fields, watch the message form on the right. The preview is the same
@@ -18,12 +20,19 @@ export function EmailComposer({
   fields: errors,
   busy,
   onSend,
+  drafts = NO_DRAFTS,
+  onUpload,
+  onRemoveDraft,
 }: {
   templates: EmailTemplate[]
   facts: Facts
   fields: Record<string, string>
   busy: boolean
   onSend: (template: EmailTemplate['kind'], inputs: Record<string, string>) => void
+  /** Files already uploaded for this email; sent along with it. */
+  drafts?: Draft[]
+  onUpload?: (file: File) => void
+  onRemoveDraft?: (id: string) => void
 }) {
   const [kind, setKind] = useState<EmailTemplate['kind']>(templates[0]?.kind ?? 'CUSTOM')
   const [inputs, setInputs] = useState<Record<string, string>>({})
@@ -74,6 +83,48 @@ export function EmailComposer({
             onChange={(v) => set(f.id, v)}
           />
         ))}
+        {onUpload && (
+          <div>
+            <label className="block">
+              Attachments{' '}
+              <span className="text-neutral-400">(PDF, PNG or JPEG, at most 5 MB each, up to 3)</span>
+              <input
+                type="file"
+                accept="application/pdf,image/png,image/jpeg"
+                disabled={busy || drafts.length >= 3}
+                className="mt-1 block text-sm"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) onUpload(f)
+                  e.target.value = ''
+                }}
+              />
+            </label>
+            {drafts.length > 0 && (
+              <ul className="mt-2 flex flex-wrap gap-2" aria-label="Attached files">
+                {drafts.map((d) => (
+                  <li
+                    key={d.id}
+                    className="flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-0.5 text-xs"
+                  >
+                    {d.filename} <span className="text-neutral-500">({Math.ceil(d.size / 1024)} KB)</span>
+                    {onRemoveDraft && (
+                      <button
+                        type="button"
+                        aria-label={`Remove ${d.filename}`}
+                        className="ml-1 text-neutral-500 hover:text-neutral-900"
+                        onClick={() => onRemoveDraft(d.id)}
+                      >
+                        x
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <FieldError id="field-attachments-error" message={errors.attachments} />
+          </div>
+        )}
         <button
           type="submit"
           disabled={busy}
@@ -112,6 +163,11 @@ export function EmailComposer({
           Yours sincerely,{'\n'}
           {facts.bank} disputes team
         </p>
+        {drafts.length > 0 && (
+          <p className="mt-6 text-sm text-neutral-600">
+            Attached: {drafts.map((d) => d.filename).join(', ')}
+          </p>
+        )}
       </section>
     </div>
   )
