@@ -1,5 +1,8 @@
+import { useState } from 'react'
+
 import type { Dispute } from '#/api/views'
 import { submitTo, submitting, useAppForm } from '#/forms/app-form'
+import { useQuestionnaireSuggestion } from '#/queries/suggestions'
 
 type Questionnaire = NonNullable<Dispute['questionnaire']>
 
@@ -10,15 +13,20 @@ const YES_NO = [
 
 export const QuestionnairePanel = ({
   questionnaire,
+  disputeId,
   canReceive,
   busy,
   onReceive,
 }: {
   questionnaire: Questionnaire
+  disputeId: string
   canReceive: boolean
   busy: boolean
   onReceive: (answers: Record<string, string>) => Promise<unknown>
 }) => {
+  // ids the model filled in, cleared per field as soon as the analyst touches it
+  const [proposed, setProposed] = useState<string[]>([])
+  const suggestion = useQuestionnaireSuggestion()
   const answersForm = useAppForm({
     defaultValues: {
       answers: Object.fromEntries(questionnaire.questions.map((question) => [question.id, ''])),
@@ -30,6 +38,16 @@ export const QuestionnairePanel = ({
         ),
       ),
   })
+
+  const readReply = async (reply: string) => {
+    const trimmed = reply.trim()
+    if (!trimmed) return
+    const read = await suggestion.mutateAsync({ disputeId, reply: trimmed }).catch(() => null)
+    if (!read) return
+    const filled = Object.entries(read.answers)
+    for (const [id, answer] of filled) answersForm.setFieldValue(`answers.${id}`, answer.value)
+    setProposed(filled.map(([id]) => id))
+  }
 
   if (questionnaire.receivedAt) {
     return (
@@ -64,6 +82,23 @@ export const QuestionnairePanel = ({
       <p className="text-muted-foreground">
         Sent {questionnaire.sentAt.slice(0, 10)}; awaiting the customer. Record the answers as they come in.
       </p>
+      {canReceive && (
+        <label className="field">
+          <span className="field-label">
+            What the customer wrote back
+            <span className="text-muted-foreground"> (optional, fills in the yes and no answers)</span>
+          </span>
+          <span className="field-control">
+            <textarea
+              rows={3}
+              disabled={busy}
+              className="mt-1 block w-full border border-input bg-card px-1 py-[2px] text-[11px] shadow-[inset_1px_1px_2px_rgb(0_0_0/0.12)] focus:border-ring focus:outline-none"
+              placeholder="paste the reply, in any language"
+              onBlur={(event) => void readReply(event.target.value)}
+            />
+          </span>
+        </label>
+      )}
       {questionnaire.questions.map((question) => {
         const label = (
           <>
@@ -78,10 +113,18 @@ export const QuestionnairePanel = ({
               if (question.type === 'YES_NO')
                 return (
                   <field.SelectField
-                    label={label}
+                    label={
+                      <>
+                        {label}
+                        {proposed.includes(question.id) && (
+                          <span className="text-muted-foreground"> (suggested)</span>
+                        )}
+                      </>
+                    }
                     options={YES_NO}
                     placeholder="choose"
                     disabled={disabled}
+                    onChange={() => setProposed((ids) => ids.filter((id) => id !== question.id))}
                   />
                 )
               if (question.type === 'DATE')

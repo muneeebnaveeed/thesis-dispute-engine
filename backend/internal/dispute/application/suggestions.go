@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 
+	"github.com/google/uuid"
+
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 )
 
@@ -99,4 +101,66 @@ func (s *Service) SuggestSearchFilters(ctx context.Context, query string) Search
 		out.Overdue = &yes
 	}
 	return out
+}
+
+// relevanceGate is asked alongside the real questions; its id cannot collide because question ids come from
+// the questionnaire files, which are lower snake case.
+const relevanceGate = "__is_about_this_dispute"
+
+// QuestionnaireProposal is one answer the model offered for one question.
+type QuestionnaireProposal struct {
+	Value       string // "yes" or "no"
+	Probability float64
+}
+
+// SuggestQuestionnaireAnswers reads a customer's reply as answers to this dispute's questionnaire. Only the
+// yes and no questions are asked: the model has no notion of a date, and free text is not a decision. The
+// reply is read and not stored, and every answer is a proposal the analyst confirms (ADR 0024).
+func (s *Service) SuggestQuestionnaireAnswers(ctx context.Context, disputeID uuid.UUID, reply string) (map[string]QuestionnaireProposal, error) {
+	var questions []domain.Question
+	if err := s.store.WithTx(ctx, func(tx Tx) error {
+		rec, err := tx.GetDispute(ctx, disputeID)
+		if err != nil {
+			return err
+		}
+		// the questions actually sent, not the ones the reason would produce today, in case the set has moved
+		if q, err := tx.GetQuestionnaire(ctx, disputeID); err == nil && len(q.Questions) > 0 {
+			questions = q.Questions
+			return nil
+		}
+		questions = domain.QuestionSet(rec.Reason)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	asked := map[string]Question{}
+	for _, q := range questions {
+		if q.Type == domain.AnswerYesNo {
+			asked[q.ID] = Question{Kind: KindYesNo, Ask: q.Text}
+		}
+	}
+	if len(asked) == 0 {
+		return map[string]QuestionnaireProposal{}, nil
+	}
+	// A yes/no question cannot abstain: asked about prose that answers nothing, the model returns a confident
+	// "no" to every one of them. So the batch carries a gate, and nothing is proposed unless the reply is
+	// actually about this dispute.
+	asked[relevanceGate] = Question{
+		Kind: KindYesNo,
+		Ask:  "Is this message a customer answering questions about a disputed card payment?",
+	}
+
+	answers := ProposeAll(ctx, s.decisions, map[string]string{"reply": reply}, asked)
+	out := make(map[string]QuestionnaireProposal, len(answers))
+	if gate, ok := answers[relevanceGate]; !ok || gate.Value != "yes" {
+		return out, nil
+	}
+	for id, answer := range answers {
+		if id == relevanceGate {
+			continue
+		}
+		out[id] = QuestionnaireProposal(answer)
+	}
+	return out, nil
 }

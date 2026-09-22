@@ -98,6 +98,7 @@ const DisputePage = () => {
         <Panel className="mb-6" title="Questionnaire">
           <QuestionnairePanel
             questionnaire={dispute.questionnaire}
+            disputeId={dispute.id}
             canReceive={dispute.allowedEvents.includes('RECEIVE_QUESTIONNAIRE')}
             busy={applyEventMutation.isPending}
             onReceive={(answers) =>

@@ -397,6 +397,32 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+  /disputes/{disputeId}/suggestions/questionnaire:
+    post:
+      operationId: suggestQuestionnaireAnswers
+      summary: Read a customer's reply as questionnaire answers
+      description: >
+        A convenience, never a decision. Only the yes and no questions of this dispute's questionnaire are
+        answered, and only those the model was sure about; dates and free text are left to the analyst, who
+        confirms everything before any answer is recorded. The reply is read and not stored.
+      tags: [suggestions]
+      parameters:
+        - $ref: "#/components/parameters/DisputeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QuestionnaireSuggestionRequest" }
+      responses:
+        "200":
+          description: The answers the reply appears to give, keyed by question id
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QuestionnaireSuggestion" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /suggestions/dispute-reason:
     post:
       operationId: suggestDisputeReason
@@ -816,6 +842,33 @@ components:
     Regime:
       type: string
       enum: [EU_SEPA_DIRECT_DEBIT, EU_PSD2_CARD, US_REG_E, US_REG_Z]
+    QuestionnaireSuggestionRequest:
+      type: object
+      required: [reply]
+      properties:
+        reply:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          description: What the customer wrote back, in any language.
+      additionalProperties: false
+    QuestionnaireSuggestion:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: object
+          description: >
+            Question id to the answer proposed for it. A question the model was unsure about is absent, as
+            is every question that is not a yes or no.
+          additionalProperties:
+            type: object
+            required: [value, probability]
+            properties:
+              value: { type: string, enum: [yes, no] }
+              probability: { type: number, format: double, minimum: 0, maximum: 1 }
+            additionalProperties: false
+      additionalProperties: false
     DisputeReasonSuggestionRequest:
       type: object
       required: [description]

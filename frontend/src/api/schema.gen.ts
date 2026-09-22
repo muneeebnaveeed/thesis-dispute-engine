@@ -264,6 +264,26 @@ export type paths = {
     patch?: never
     trace?: never
   }
+  '/disputes/{disputeId}/suggestions/questionnaire': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Read a customer's reply as questionnaire answers
+     * @description A convenience, never a decision. Only the yes and no questions of this dispute's questionnaire are answered, and only those the model was sure about; dates and free text are left to the analyst, who confirms everything before any answer is recorded. The reply is read and not stored.
+     */
+    post: operations['suggestQuestionnaireAnswers']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/suggestions/dispute-reason': {
     parameters: {
       query?: never
@@ -572,6 +592,21 @@ export type components = {
     }
     /** @enum {string} */
     Regime: 'EU_SEPA_DIRECT_DEBIT' | 'EU_PSD2_CARD' | 'US_REG_E' | 'US_REG_Z'
+    QuestionnaireSuggestionRequest: {
+      /** @description What the customer wrote back, in any language. */
+      reply: string
+    }
+    QuestionnaireSuggestion: {
+      /** @description Question id to the answer proposed for it. A question the model was unsure about is absent, as is every question that is not a yes or no. */
+      answers: {
+        [key: string]: {
+          /** @enum {string} */
+          value: 'yes' | 'no'
+          /** Format: double */
+          probability: number
+        }
+      }
+    }
     DisputeReasonSuggestionRequest: {
       /** @description What the customer said, in any language. */
       description: string
@@ -1548,6 +1583,36 @@ export interface operations {
       }
       400: components['responses']['BadRequest']
       401: components['responses']['Unauthorized']
+      429: components['responses']['TooManyRequests']
+    }
+  }
+  suggestQuestionnaireAnswers: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        disputeId: components['parameters']['DisputeId']
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['QuestionnaireSuggestionRequest']
+      }
+    }
+    responses: {
+      /** @description The answers the reply appears to give, keyed by question id */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['QuestionnaireSuggestion']
+        }
+      }
+      400: components['responses']['BadRequest']
+      401: components['responses']['Unauthorized']
+      404: components['responses']['NotFound']
       429: components['responses']['TooManyRequests']
     }
   }

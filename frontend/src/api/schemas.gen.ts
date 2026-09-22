@@ -707,6 +707,49 @@ export type Problem = Static<typeof Problem>
 const _Problem: Same<Problem, components['schemas']['Problem']> = true
 void _Problem
 
+export const QuestionnaireSuggestion = Type.Object(
+  {
+    answers: Type.Record(
+      Type.String(),
+      Type.Object(
+        {
+          value: Type.Union([Type.Literal('yes'), Type.Literal('no')]),
+          probability: Type.Number({ format: 'double', minimum: 0, maximum: 1 }),
+        },
+        { additionalProperties: false },
+      ),
+      {
+        description:
+          'Question id to the answer proposed for it. A question the model was unsure about is absent, as is every question that is not a yes or no.\n',
+      },
+    ),
+  },
+  { additionalProperties: false },
+)
+export type QuestionnaireSuggestion = Static<typeof QuestionnaireSuggestion>
+const _QuestionnaireSuggestion: Same<
+  QuestionnaireSuggestion,
+  components['schemas']['QuestionnaireSuggestion']
+> = true
+void _QuestionnaireSuggestion
+
+export const QuestionnaireSuggestionRequest = Type.Object(
+  {
+    reply: Type.String({
+      description: 'What the customer wrote back, in any language.',
+      minLength: 1,
+      maxLength: 4000,
+    }),
+  },
+  { additionalProperties: false },
+)
+export type QuestionnaireSuggestionRequest = Static<typeof QuestionnaireSuggestionRequest>
+const _QuestionnaireSuggestionRequest: Same<
+  QuestionnaireSuggestionRequest,
+  components['schemas']['QuestionnaireSuggestionRequest']
+> = true
+void _QuestionnaireSuggestionRequest
+
 export const SearchFilterSuggestion = Type.Object(
   {
     state: Type.Optional(DisputeState),

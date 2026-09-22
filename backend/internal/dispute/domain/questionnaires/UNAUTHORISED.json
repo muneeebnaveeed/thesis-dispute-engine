@@ -9,7 +9,7 @@
     },
     {
       "id": "card_in_possession",
-      "text": "Was your card in your possession at the time?",
+      "text": "Did you have the card with you when the payment was made?",
       "type": "YES_NO",
       "required": true
     },

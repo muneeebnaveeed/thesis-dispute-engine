@@ -1090,3 +1090,26 @@ func (h *Handler) SuggestDisputeReason(ctx context.Context, req oapi.SuggestDisp
 	}
 	return oapi.SuggestDisputeReason200JSONResponse(out), nil
 }
+
+// SuggestQuestionnaireAnswers reads a customer's reply as answers for the analyst to confirm.
+func (h *Handler) SuggestQuestionnaireAnswers(ctx context.Context, req oapi.SuggestQuestionnaireAnswersRequestObject) (oapi.SuggestQuestionnaireAnswersResponseObject, error) {
+	proposals, err := h.svc.SuggestQuestionnaireAnswers(ctx, req.DisputeId, req.Body.Reply)
+	if err != nil {
+		if errors.Is(err, application.ErrNotFound) {
+			p := h.problem(ctx, "/disputes/"+req.DisputeId.String()+"/suggestions/questionnaire", err, req.DisputeId)
+			return oapi.SuggestQuestionnaireAnswers404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: oapi.NotFoundApplicationProblemPlusJSONResponse(p)}, nil
+		}
+		return nil, err
+	}
+	out := oapi.QuestionnaireSuggestion{Answers: map[string]struct {
+		Probability float64                                  `json:"probability"`
+		Value       oapi.QuestionnaireSuggestionAnswersValue `json:"value"`
+	}{}}
+	for id, proposal := range proposals {
+		out.Answers[id] = struct {
+			Probability float64                                  `json:"probability"`
+			Value       oapi.QuestionnaireSuggestionAnswersValue `json:"value"`
+		}{Probability: proposal.Probability, Value: oapi.QuestionnaireSuggestionAnswersValue(proposal.Value)}
+	}
+	return oapi.SuggestQuestionnaireAnswers200JSONResponse(out), nil
+}
