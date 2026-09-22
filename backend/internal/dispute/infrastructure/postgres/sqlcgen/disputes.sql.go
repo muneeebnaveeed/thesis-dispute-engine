@@ -213,6 +213,18 @@ func (q *Queries) CountDisputesByState(ctx context.Context) ([]DisputesByState, 
 	return items, nil
 }
 
+const deleteTenantTemplate = `-- name: DeleteTenantTemplate :execrows
+DELETE FROM tenant_templates WHERE kind = $1
+`
+
+func (q *Queries) DeleteTenantTemplate(ctx context.Context, kind string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteTenantTemplate, kind)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteWebSession = `-- name: DeleteWebSession :execrows
 DELETE FROM web_sessions WHERE id = $1
 `
@@ -1564,6 +1576,42 @@ func (q *Queries) ListTenantKeysByTenant(ctx context.Context, tenantID uuid.UUID
 	return items, nil
 }
 
+const listTenantTemplates = `-- name: ListTenantTemplates :many
+SELECT kind, override, updated_by, updated_at FROM tenant_templates ORDER BY kind
+`
+
+type ListTenantTemplatesRow struct {
+	Kind      string
+	Override  []byte
+	UpdatedBy string
+	UpdatedAt time.Time
+}
+
+func (q *Queries) ListTenantTemplates(ctx context.Context) ([]ListTenantTemplatesRow, error) {
+	rows, err := q.db.Query(ctx, listTenantTemplates)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTenantTemplatesRow{}
+	for rows.Next() {
+		var i ListTenantTemplatesRow
+		if err := rows.Scan(
+			&i.Kind,
+			&i.Override,
+			&i.UpdatedBy,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTenants = `-- name: ListTenants :many
 SELECT id, name, slug, oidc_issuer, disabled_at FROM tenants ORDER BY name
 `
@@ -2045,6 +2093,28 @@ func (q *Queries) UpsertTenant(ctx context.Context, arg UpsertTenantParams) erro
 		arg.Name,
 		arg.Slug,
 		arg.OidcIssuer,
+	)
+	return err
+}
+
+const upsertTenantTemplate = `-- name: UpsertTenantTemplate :exec
+INSERT INTO tenant_templates (kind, override, updated_by, updated_at) VALUES ($1, $2, $3, $4)
+ON CONFLICT (tenant_id, kind) DO UPDATE SET override = EXCLUDED.override, updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at
+`
+
+type UpsertTenantTemplateParams struct {
+	Kind      string
+	Override  []byte
+	UpdatedBy string
+	UpdatedAt time.Time
+}
+
+func (q *Queries) UpsertTenantTemplate(ctx context.Context, arg UpsertTenantTemplateParams) error {
+	_, err := q.db.Exec(ctx, upsertTenantTemplate,
+		arg.Kind,
+		arg.Override,
+		arg.UpdatedBy,
+		arg.UpdatedAt,
 	)
 	return err
 }

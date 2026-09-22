@@ -93,6 +93,14 @@ type Attachment struct {
 	UploadedAt  time.Time
 }
 
+// TenantTemplate is a tenant's wording for one analyst email kind.
+type TenantTemplate struct {
+	Kind      domain.NoticeKind
+	Override  []byte // notice.Override as JSON
+	UpdatedBy string
+	UpdatedAt time.Time
+}
+
 // RiskRecord is one stored assessment of a dispute.
 type RiskRecord struct {
 	Seq        int
@@ -172,6 +180,10 @@ type Tx interface {
 	// ListAttachmentMeta returns, without content, the attachments of the given notices and this dispute's drafts.
 	ListAttachmentMeta(ctx context.Context, disputeID uuid.UUID, noticeIDs []int64) ([]Attachment, error)
 	GetAttachment(ctx context.Context, disputeID, id uuid.UUID) (Attachment, error)
+	// TenantTemplates returns the current tenant's overrides by kind (notice.Override as JSON).
+	TenantTemplates(ctx context.Context) ([]TenantTemplate, error)
+	PutTenantTemplate(ctx context.Context, t TenantTemplate) error
+	DeleteTenantTemplate(ctx context.Context, kind domain.NoticeKind) (bool, error)
 	InsertRisk(ctx context.Context, disputeID uuid.UUID, r RiskRecord) error
 	ListRisk(ctx context.Context, disputeID uuid.UUID) ([]RiskRecord, error)
 	// LatestRisk returns the newest assessment per dispute that has one.

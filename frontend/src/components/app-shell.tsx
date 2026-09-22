@@ -25,13 +25,22 @@ export function AppShell({ title, children }: Props) {
         {viewer ? (
           <span className="text-sm text-neutral-600">
             {viewer.roles.includes('tenant-admin') && (
-              <Link
-                to="/$tenant/keys"
-                params={{ tenant: viewer.tenantSlug }}
-                className="mr-3 underline hover:text-neutral-900"
-              >
-                Keys
-              </Link>
+              <>
+                <Link
+                  to="/$tenant/keys"
+                  params={{ tenant: viewer.tenantSlug }}
+                  className="mr-3 underline hover:text-neutral-900"
+                >
+                  Keys
+                </Link>
+                <Link
+                  to="/$tenant/templates"
+                  params={{ tenant: viewer.tenantSlug }}
+                  className="mr-3 underline hover:text-neutral-900"
+                >
+                  Templates
+                </Link>
+              </>
             )}
             {viewer.name} <span className="text-neutral-400">at</span> {viewer.tenantSlug}{' '}
             <button

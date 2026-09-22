@@ -309,6 +309,68 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+  /tenant-templates:
+    get:
+      operationId: listTenantTemplates
+      summary: The tenant's wording for each analyst email kind
+      description: Tenant admins only. Each kind comes with the base template, the tenant's override if any, and the result analysts see.
+      tags: [tenant-templates]
+      responses:
+        "200":
+          description: One entry per kind.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TemplateSetting" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /tenant-templates/{kind}:
+    put:
+      operationId: putTenantTemplate
+      summary: Set the tenant's wording for one kind
+      description: >-
+        Words only: label, description, subject, paragraphs and option texts by "fieldId.optionKey". The form
+        (field ids and types) stays the base's. Placeholders must name the form's fields or the engine's facts;
+        refused with invalid-template-override, one error per problem.
+      tags: [tenant-templates]
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/NoticeKind" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TemplateOverride" }
+      responses:
+        "200":
+          description: Stored; the entry as analysts now see it.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TemplateSetting" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    delete:
+      operationId: deleteTenantTemplate
+      summary: Revert one kind to the base wording
+      tags: [tenant-templates]
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/NoticeKind" }
+      responses:
+        "204": { description: Reverted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /tenant-keys:
     get:
       operationId: listTenantKeys
@@ -526,6 +588,7 @@ components:
         - not-resendable
         - attachment-refused
         - attachment-unknown
+        - invalid-template-override
         - concurrent-update
         - idempotency-key-reuse
         - no-regime
@@ -930,6 +993,29 @@ components:
             merchant: { type: string }
             dispute: { type: string }
             today: { type: string, format: date }
+    TemplateOverride:
+      type: object
+      description: A tenant's wording; empty members leave the base as it is.
+      properties:
+        label: { type: string }
+        description: { type: string }
+        subject: { type: string }
+        paragraphs:
+          type: array
+          items: { type: string }
+        optionTexts:
+          type: object
+          description: Customer-facing text per option, keyed "fieldId.optionKey".
+          additionalProperties: { type: string }
+    TemplateSetting:
+      type: object
+      required: [base, effective]
+      properties:
+        base: { $ref: "#/components/schemas/EmailTemplate" }
+        override: { $ref: "#/components/schemas/TemplateOverride" }
+        effective: { $ref: "#/components/schemas/EmailTemplate" }
+        updatedBy: { type: string }
+        updatedAt: { type: string, format: date-time }
     ComposeEmailRequest:
       type: object
       required: [template, fields]

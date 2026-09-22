@@ -608,3 +608,24 @@ func (t *txn) GetAttachment(ctx context.Context, disputeID, id uuid.UUID) (appli
 	}
 	return application.Attachment{ID: r.ID, DisputeID: disputeID, NoticeID: r.NoticeID, Filename: r.Filename, ContentType: r.ContentType, Size: int(r.Size), Content: r.Content, UploadedBy: r.UploadedBy, UploadedAt: r.UploadedAt}, nil
 }
+
+func (t *txn) TenantTemplates(ctx context.Context) ([]application.TenantTemplate, error) {
+	rows, err := t.q.ListTenantTemplates(ctx)
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	out := make([]application.TenantTemplate, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, application.TenantTemplate{Kind: domain.NoticeKind(r.Kind), Override: r.Override, UpdatedBy: r.UpdatedBy, UpdatedAt: r.UpdatedAt})
+	}
+	return out, nil
+}
+
+func (t *txn) PutTenantTemplate(ctx context.Context, tt application.TenantTemplate) error {
+	return mapErr(t.q.UpsertTenantTemplate(ctx, sqlcgen.UpsertTenantTemplateParams{Kind: string(tt.Kind), Override: tt.Override, UpdatedBy: tt.UpdatedBy, UpdatedAt: tt.UpdatedAt}))
+}
+
+func (t *txn) DeleteTenantTemplate(ctx context.Context, kind domain.NoticeKind) (bool, error) {
+	n, err := t.q.DeleteTenantTemplate(ctx, string(kind))
+	return n > 0, mapErr(err)
+}

@@ -79,7 +79,8 @@ Customer notices go out through `DISPUTE_SMTP_ADDR` (a relay taking unauthentica
 `localhost:1025` in compose, inbox on http://localhost:8025) from `DISPUTE_MAIL_FROM`; leave the address empty
 to log instead of sending. Letters need no relay: they are ready to print from the workbench. Analysts compose their own emails from the
 templates in `backend/internal/dispute/notice/templates/` (one JSON file per kind, docs/adr/0019) on the dispute's
-communications panel. Recipients come
+communications panel; tenant admins reword them on the Templates page (`/<slug>/templates`), which stores an
+override per tenant and never changes the form. Recipients come
 from the account's email and postal address (docs/adr/0017).
 
 `--core` names the tenant's banking core as JSON (docs/adr/0015): `{"kind":"mock"}` for the simulator, with

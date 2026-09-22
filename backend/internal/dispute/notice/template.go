@@ -359,3 +359,66 @@ func substituteFacts(s string, facts map[string]string) string {
 		return m
 	})
 }
+
+// Override is what a tenant may change on a template: the words. Fields keep the base's ids and types; an
+// option's customer-facing text may be replaced by key. Empty members leave the base as it is.
+type Override struct {
+	Label       string            `json:"label,omitempty"`
+	Description string            `json:"description,omitempty"`
+	Subject     string            `json:"subject,omitempty"`
+	Paragraphs  []string          `json:"paragraphs,omitempty"`
+	OptionTexts map[string]string `json:"optionTexts,omitempty"` // "fieldId.optionKey" -> text
+}
+
+// ErrInvalidOverride means a tenant's wording does not fit the template's form.
+var ErrInvalidOverride = errs.New(errs.Unprocessable, "invalid-template-override", "the template wording is not valid for its form")
+
+// Apply lays an override over the base and checks the result the way a file is checked at start, so a tenant
+// cannot reference a field the form does not have or name an option that does not exist.
+func Apply(base Template, o Override) (Template, error) {
+	t := base
+	t.Fields = make([]Field, len(base.Fields))
+	copy(t.Fields, base.Fields)
+	if o.Label != "" {
+		t.Label = o.Label
+	}
+	if o.Description != "" {
+		t.Description = o.Description
+	}
+	if o.Subject != "" {
+		t.Subject = o.Subject
+	}
+	if len(o.Paragraphs) > 0 {
+		t.Paragraphs = append([]string(nil), o.Paragraphs...)
+	}
+	var fields []errs.FieldError
+	for key, text := range o.OptionTexts {
+		fieldID, optKey, ok := strings.Cut(key, ".")
+		i := slices.IndexFunc(t.Fields, func(f Field) bool { return f.ID == fieldID })
+		if !ok || i < 0 {
+			fields = append(fields, errs.FieldError{Field: "body.optionTexts." + key, Message: "no such field"})
+			continue
+		}
+		opts := make([]Option, len(t.Fields[i].Options))
+		copy(opts, t.Fields[i].Options)
+		j := slices.IndexFunc(opts, func(op Option) bool { return op.Key == optKey })
+		switch {
+		case j < 0:
+			fields = append(fields, errs.FieldError{Field: "body.optionTexts." + key, Message: "no such option"})
+			continue
+		case strings.TrimSpace(text) == "":
+			fields = append(fields, errs.FieldError{Field: "body.optionTexts." + key, Message: "text must not be empty"})
+			continue
+		}
+		opts[j].Text = text
+		t.Fields[i].Options = opts
+	}
+	if err := checkTemplate(t); err != nil {
+		fields = append(fields, errs.FieldError{Field: "body", Message: err.Error()})
+	}
+	if len(fields) > 0 {
+		sort.Slice(fields, func(i, j int) bool { return fields[i].Field < fields[j].Field })
+		return Template{}, ErrInvalidOverride.WithFields(fields...)
+	}
+	return t, nil
+}

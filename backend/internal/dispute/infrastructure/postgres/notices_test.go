@@ -9,6 +9,7 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application/apptest"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 	disputepg "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/notice"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/postgres/pgtest"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
@@ -107,5 +108,44 @@ func TestNoticeOutboxThroughPostgres(t *testing.T) {
 	retry, _ := store.ClaimNotices(context.Background(), 10)
 	if len(retry) != 1 || retry[0].ID != claimed[0].ID || retry[0].Attempts != 2 {
 		t.Errorf("retry claim = %+v", retry)
+	}
+}
+
+// A tenant's wording is its own: B never sees A's override, and reverting deletes only A's row.
+func TestTenantTemplatesAreIsolated(t *testing.T) {
+	owner, schema := pgtest.PoolWithSchema(t)
+	app := pgtest.AppPool(t, schema)
+	svc, err := application.NewService(disputepg.NewStore(app), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctxA := tenant.WithID(context.Background(), apptest.TenantA)
+	ctxB := tenant.WithID(context.Background(), apptest.TenantB)
+	seedFor(t, owner, apptest.TenantA, domain.RailCard, "EUR")
+	seedFor(t, owner, apptest.TenantB, domain.RailCard, "EUR")
+	if _, err := svc.PutTemplateSetting(ctxA, domain.NoticeCustom, notice.Override{Subject: "From A: {{subject}}"}, "admin@a"); err != nil {
+		t.Fatal(err)
+	}
+	a, _ := svc.ListTemplateSettings(ctxA)
+	b, _ := svc.ListTemplateSettings(ctxB)
+	pick := func(list []application.TemplateSetting) application.TemplateSetting {
+		for _, s := range list {
+			if s.Base.Kind == domain.NoticeCustom {
+				return s
+			}
+		}
+		return application.TemplateSetting{}
+	}
+	if pick(a).Override == nil || pick(a).Effective.Subject != "From A: {{subject}}" || pick(a).UpdatedBy != "admin@a" {
+		t.Errorf("A = %+v", pick(a))
+	}
+	if pick(b).Override != nil || pick(b).Effective.Subject != pick(b).Base.Subject {
+		t.Errorf("B sees A's wording: %+v", pick(b))
+	}
+	if err := svc.DeleteTemplateSetting(ctxB, domain.NoticeCustom); !errors.Is(err, application.ErrNotFound) {
+		t.Errorf("B reverting A's override: %v", err)
+	}
+	if err := svc.DeleteTemplateSetting(ctxA, domain.NoticeCustom); err != nil {
+		t.Errorf("A reverting: %v", err)
 	}
 }

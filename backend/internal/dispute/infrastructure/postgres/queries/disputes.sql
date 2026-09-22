@@ -283,3 +283,13 @@ SELECT id, filename, content_type, size, content FROM notice_attachments($1);
 
 -- name: PurgeDraftAttachments :one
 SELECT purge_draft_attachments($1)::bigint AS n;
+
+-- name: ListTenantTemplates :many
+SELECT kind, override, updated_by, updated_at FROM tenant_templates ORDER BY kind;
+
+-- name: UpsertTenantTemplate :exec
+INSERT INTO tenant_templates (kind, override, updated_by, updated_at) VALUES ($1, $2, $3, $4)
+ON CONFLICT (tenant_id, kind) DO UPDATE SET override = EXCLUDED.override, updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at;
+
+-- name: DeleteTenantTemplate :execrows
+DELETE FROM tenant_templates WHERE kind = $1;

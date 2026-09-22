@@ -195,6 +195,14 @@ type TenantRateWindow struct {
 	Count       int32
 }
 
+type TenantTemplate struct {
+	TenantID  uuid.UUID
+	Kind      string
+	Override  []byte
+	UpdatedBy string
+	UpdatedAt time.Time
+}
+
 type Transaction struct {
 	ID         uuid.UUID
 	AccountID  uuid.UUID

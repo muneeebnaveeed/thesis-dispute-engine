@@ -556,6 +556,7 @@ export const ErrorCode = Type.Union(
     Type.Literal('not-resendable'),
     Type.Literal('attachment-refused'),
     Type.Literal('attachment-unknown'),
+    Type.Literal('invalid-template-override'),
     Type.Literal('concurrent-update'),
     Type.Literal('idempotency-key-reuse'),
     Type.Literal('no-regime'),
@@ -682,6 +683,35 @@ export const SessionBlob = Type.Object(
 export type SessionBlob = Static<typeof SessionBlob>
 const _SessionBlob: Same<SessionBlob, components['schemas']['SessionBlob']> = true
 void _SessionBlob
+
+export const TemplateOverride = Type.Object(
+  {
+    label: Type.Optional(Type.String()),
+    description: Type.Optional(Type.String()),
+    subject: Type.Optional(Type.String()),
+    paragraphs: Type.Optional(Type.Array(Type.String())),
+    optionTexts: Type.Optional(
+      Type.Record(Type.String(), Type.String(), {
+        description: 'Customer-facing text per option, keyed "fieldId.optionKey".',
+      }),
+    ),
+  },
+  { description: "A tenant's wording; empty members leave the base as it is." },
+)
+export type TemplateOverride = Static<typeof TemplateOverride>
+const _TemplateOverride: Same<TemplateOverride, components['schemas']['TemplateOverride']> = true
+void _TemplateOverride
+
+export const TemplateSetting = Type.Object({
+  base: EmailTemplate,
+  override: Type.Optional(TemplateOverride),
+  effective: EmailTemplate,
+  updatedBy: Type.Optional(Type.String()),
+  updatedAt: Type.Optional(Type.String({ format: 'date-time' })),
+})
+export type TemplateSetting = Static<typeof TemplateSetting>
+const _TemplateSetting: Same<TemplateSetting, components['schemas']['TemplateSetting']> = true
+void _TemplateSetting
 
 export const TenantSummary = Type.Object({
   id: Type.String({ format: 'uuid' }),

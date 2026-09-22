@@ -39,6 +39,7 @@ type MemStore struct {
 	Notices      []application.NoticeRecord
 	Risk         map[uuid.UUID][]application.RiskRecord
 	Attachments  map[uuid.UUID]application.Attachment
+	Templates    map[uuid.UUID]map[domain.NoticeKind]application.TenantTemplate
 	Accounts     map[uuid.UUID]application.AccountRecord
 	Names        map[uuid.UUID]string
 	nextNotice   int64
@@ -61,6 +62,7 @@ func NewMemStore() *MemStore {
 		Accounts:     map[uuid.UUID]application.AccountRecord{},
 		Risk:         map[uuid.UUID][]application.RiskRecord{},
 		Attachments:  map[uuid.UUID]application.Attachment{},
+		Templates:    map[uuid.UUID]map[domain.NoticeKind]application.TenantTemplate{},
 		Names:        map[uuid.UUID]string{},
 		Calendars:    map[uuid.UUID]domain.Calendar{},
 		Cores:        map[uuid.UUID]application.CoreConfig{},
@@ -648,4 +650,27 @@ func (t *memTx) GetAttachment(_ context.Context, disputeID, id uuid.UUID) (appli
 		return application.Attachment{}, application.ErrNotFound
 	}
 	return a, nil
+}
+
+func (t *memTx) TenantTemplates(_ context.Context) ([]application.TenantTemplate, error) {
+	out := make([]application.TenantTemplate, 0, len(t.s.Templates[t.tenant]))
+	for _, tt := range t.s.Templates[t.tenant] {
+		out = append(out, tt)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Kind < out[j].Kind })
+	return out, nil
+}
+
+func (t *memTx) PutTenantTemplate(_ context.Context, tt application.TenantTemplate) error {
+	if t.s.Templates[t.tenant] == nil {
+		t.s.Templates[t.tenant] = map[domain.NoticeKind]application.TenantTemplate{}
+	}
+	t.s.Templates[t.tenant][tt.Kind] = tt
+	return nil
+}
+
+func (t *memTx) DeleteTenantTemplate(_ context.Context, kind domain.NoticeKind) (bool, error) {
+	_, ok := t.s.Templates[t.tenant][kind]
+	delete(t.s.Templates[t.tenant], kind)
+	return ok, nil
 }
