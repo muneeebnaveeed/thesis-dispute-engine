@@ -6,6 +6,7 @@ import type { components } from '#/api/schema.gen'
 import { CreateTenantKeyRequest } from '#/api/schemas.gen'
 import { AppShell } from '#/components/layout/app-shell'
 import { FailureBanner } from '#/components/layout/failure-banner'
+import { Panel } from '#/components/ui/panel'
 import { TenantMismatch } from '#/components/layout/tenant-mismatch'
 import { Button } from '#/components/ui/button'
 import { submitTo, submitting, useAppForm } from '#/forms/app-form'
@@ -44,12 +45,13 @@ const KeysPage = () => {
   return (
     <AppShell title="Tenant keys">
       {!isAdmin ? (
-        <p className="text-sm text-neutral-600">Only administrators of your organisation can manage keys.</p>
+        <p className="text-sm text-muted-foreground">
+          Only administrators of your organisation can manage keys.
+        </p>
       ) : (
-        <div className="space-y-8">
-          <section>
-            <h2 className="mb-2 text-lg font-medium">Issue a key</h2>
-            <p className="mb-3 text-sm text-neutral-600">
+        <div className="space-y-6">
+          <Panel title="Issue a key">
+            <p className="mb-3 text-sm text-muted-foreground">
               One key per system that calls the API. The key is shown once; store it in that system's
               configuration.
             </p>
@@ -88,9 +90,8 @@ const KeysPage = () => {
                 />
               </div>
             )}
-          </section>
-          <section>
-            <h2 className="mb-2 text-lg font-medium">Keys</h2>
+          </Panel>
+          <Panel title="Keys" bodyClassName="p-0">
             {loadedKeys.failure ? (
               <FailureBanner failure={loadedKeys.failure} />
             ) : (
@@ -100,7 +101,7 @@ const KeysPage = () => {
                 onRevoke={(keyId) => revokeMutation.mutate(keyId)}
               />
             )}
-          </section>
+          </Panel>
         </div>
       )}
     </AppShell>
@@ -118,10 +119,10 @@ const KeyTable = ({
   busy: boolean
   onRevoke: (keyId: string) => void
 }) => {
-  if (keys.length === 0) return <p className="text-sm text-neutral-600">No keys yet.</p>
+  if (keys.length === 0) return <p className="text-sm text-muted-foreground">No keys yet.</p>
   return (
     <table className="w-full text-left text-sm">
-      <thead className="text-neutral-500">
+      <thead className="text-muted-foreground">
         <tr>
           <th className="py-1 pr-4 font-normal">Prefix</th>
           <th className="py-1 pr-4 font-normal">Label</th>
@@ -136,12 +137,12 @@ const KeyTable = ({
       </thead>
       <tbody>
         {keys.map((tenantKey) => (
-          <tr key={tenantKey.id} className="border-t border-neutral-200">
+          <tr key={tenantKey.id} className="border-t border-border">
             <td className="py-1 pr-4 font-mono">{tenantKey.prefix}</td>
             <td className="py-1 pr-4">{tenantKey.label}</td>
-            <td className="py-1 pr-4 text-neutral-500">{dateOnly(tenantKey.createdAt)}</td>
-            <td className="py-1 pr-4 text-neutral-500">{dateOnly(tenantKey.lastUsedAt)}</td>
-            <td className="py-1 pr-4 text-neutral-500">{dateOnly(tenantKey.expiresAt)}</td>
+            <td className="py-1 pr-4 text-muted-foreground">{dateOnly(tenantKey.createdAt)}</td>
+            <td className="py-1 pr-4 text-muted-foreground">{dateOnly(tenantKey.lastUsedAt)}</td>
+            <td className="py-1 pr-4 text-muted-foreground">{dateOnly(tenantKey.expiresAt)}</td>
             <td className="py-1 pr-4">{tenantKey.status}</td>
             <td className="py-1 text-right">
               {tenantKey.status === 'live' && (

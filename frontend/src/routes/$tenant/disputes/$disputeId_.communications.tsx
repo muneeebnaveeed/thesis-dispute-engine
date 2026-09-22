@@ -100,8 +100,8 @@ const CommunicationsPage = () => {
     cn(
       'border-b-2 px-3 py-2 text-sm',
       activeTab === tab
-        ? 'border-neutral-900 font-medium'
-        : 'border-transparent text-neutral-500 hover:text-neutral-900',
+        ? 'border-foreground font-medium'
+        : 'border-transparent text-muted-foreground hover:text-foreground',
     )
 
   return (
@@ -110,11 +110,11 @@ const CommunicationsPage = () => {
         <Link to="/$tenant/disputes/$disputeId" params={{ tenant, disputeId }} className="underline">
           Back to the dispute
         </Link>
-        <span className="ml-3 text-neutral-500">
+        <span className="ml-3 text-muted-foreground">
           {dispute.reason} / {dispute.regime} / {dispute.state}
         </span>
       </p>
-      <div role="tablist" aria-label="Communications" className="mb-6 flex gap-2 border-b border-neutral-200">
+      <div role="tablist" aria-label="Communications" className="mb-6 flex gap-2 border-b border-border">
         <button
           type="button"
           role="tab"

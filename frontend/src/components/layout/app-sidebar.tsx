@@ -151,9 +151,9 @@ export const AppSidebar = ({ viewer }: { viewer: Viewer }) => {
         <span className="truncate text-sm font-medium capitalize">{branding?.name ?? tenant}</span>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
+        <SidebarGroup className="p-0">
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-0">
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname === `/${tenant}`} tooltip="Disputes">
                   <Link to="/$tenant" params={{ tenant }}>
@@ -176,7 +176,7 @@ export const AppSidebar = ({ viewer }: { viewer: Viewer }) => {
       </SidebarContent>
       <SidebarFooter>
         {isAdmin && (
-          <SidebarMenu>
+          <SidebarMenu className="gap-0">
             <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname === `/${tenant}/keys`} tooltip="Tenant keys">
                 <Link to="/$tenant/keys" params={{ tenant }}>

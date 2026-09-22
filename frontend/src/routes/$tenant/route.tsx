@@ -31,7 +31,7 @@ export const Route = createFileRoute('/$tenant')({
   component: Outlet,
   notFoundComponent: () => (
     <AppShell title="Unknown organisation">
-      <p className="text-sm text-neutral-600">
+      <p className="text-sm text-muted-foreground">
         There is no organisation at this address. Check the link you were given.
       </p>
     </AppShell>

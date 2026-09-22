@@ -27,10 +27,10 @@ export const Notices = ({
   tenant: string
   disputeId: string
 }) => {
-  if (notices.length === 0) return <p className="text-sm text-neutral-600">Nothing has been sent yet.</p>
+  if (notices.length === 0) return <p className="text-sm text-muted-foreground">Nothing has been sent yet.</p>
   return (
     <table className="w-full text-left text-sm" aria-label="Communications">
-      <thead className="text-neutral-500">
+      <thead className="text-muted-foreground">
         <tr>
           <th className="py-1 pr-4 font-normal">Notice</th>
           <th className="py-1 pr-4 font-normal">Channel</th>
@@ -43,10 +43,10 @@ export const Notices = ({
       </thead>
       <tbody>
         {notices.map((notice) => (
-          <tr key={notice.id} className="border-t border-neutral-200">
+          <tr key={notice.id} className="border-t border-border">
             <td className="py-1 pr-4">{NOTICE_KIND_LABEL[notice.kind]}</td>
             <td className="py-1 pr-4 font-mono text-xs">{notice.channel}</td>
-            <td className="py-1 pr-4 text-neutral-600">{notice.recipient}</td>
+            <td className="py-1 pr-4 text-muted-foreground">{notice.recipient}</td>
             <td className="py-1 pr-4">
               <NoticeStatusBadge notice={notice} />
             </td>

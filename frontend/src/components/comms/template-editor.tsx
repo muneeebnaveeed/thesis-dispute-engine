@@ -107,8 +107,11 @@ export const TemplateEditor = ({
   const refusal = failure?.kind === 'validation' ? failure.problem.detail : undefined
 
   return (
-    <section className="rounded-md border border-neutral-200" aria-label={base.label}>
-      <header className="flex items-center justify-between px-4 py-3">
+    <section
+      className="rounded-sm border border-border bg-card shadow-[0_1px_1px_rgb(0_0_0/0.05)]"
+      aria-label={base.label}
+    >
+      <header className="flex items-center justify-between rounded-t-sm border-b border-border bg-[image:var(--panel-heading)] px-4 py-2.5">
         <div>
           <h2 className="font-medium">
             {effective.label}
@@ -118,14 +121,14 @@ export const TemplateEditor = ({
               </Badge>
             )}
           </h2>
-          <p className="text-sm text-neutral-600">{effective.description}</p>
+          <p className="text-sm text-muted-foreground">{effective.description}</p>
         </div>
         <Button variant="link" size="bare" onClick={() => setEditing((current) => !current)}>
           {editing ? 'Close' : 'Edit wording'}
         </Button>
       </header>
       {editing && (
-        <div className="grid gap-6 border-t border-neutral-200 p-4 lg:grid-cols-2">
+        <div className="grid gap-6 border-t border-border p-4 lg:grid-cols-2">
           <form className="space-y-3 text-sm" onSubmit={submitting(wordingForm)}>
             <wordingForm.AppField name="label">
               {(field) => <field.TextField label="Name analysts see" />}
@@ -147,7 +150,7 @@ export const TemplateEditor = ({
                 />
               )}
             </wordingForm.AppField>
-            <p className="text-xs text-neutral-500">
+            <p className="text-xs text-muted-foreground">
               Placeholders: {placeholderNames.map((name) => `{{${name}}}`).join(' ')}. Wrap text in{' '}
               {'{{#field}}'}
               ...{'{{/field}}'} to show it only when the field is filled.
@@ -164,7 +167,7 @@ export const TemplateEditor = ({
                       {(boundField) => (
                         <boundField.TextField
                           label={
-                            <span className="text-neutral-600">
+                            <span className="text-muted-foreground">
                               {field.label}: {option.label}
                             </span>
                           }
@@ -189,7 +192,7 @@ export const TemplateEditor = ({
           </form>
           <section
             aria-label={`Preview of ${base.label}`}
-            className="rounded-md border border-neutral-200 bg-white p-6 font-serif text-[12pt] leading-relaxed"
+            className="rounded-md border border-border bg-white p-6 font-serif text-[12pt] leading-relaxed"
           >
             <h3 className="mb-4 text-[14pt] font-semibold">{renderedSample.subject}</h3>
             <p className="mb-4">Dear Kovács Anna,</p>

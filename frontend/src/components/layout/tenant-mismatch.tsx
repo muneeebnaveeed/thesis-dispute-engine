@@ -6,7 +6,7 @@ export const TenantMismatch = ({ wanted: requestedTenantSlug }: { wanted: string
   const { viewer } = useRouteContext({ from: '__root__' })
   return (
     <AppShell title="Different organisation">
-      <p className="text-sm text-neutral-700">
+      <p className="text-sm text-foreground">
         You are signed in to <span className="font-mono">{viewer?.tenantSlug}</span>, but this address belongs
         to <span className="font-mono">{requestedTenantSlug}</span>. Sign out first to continue there.
       </p>

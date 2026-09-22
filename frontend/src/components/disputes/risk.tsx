@@ -21,7 +21,7 @@ export const RiskPanel = ({ risk }: { risk: Risk }) => {
     <div className="space-y-3 text-sm">
       <p className="flex items-center gap-2">
         <RiskBadge tier={risk.tier} score={risk.score} />
-        <span className="text-neutral-600">
+        <span className="text-muted-foreground">
           {risk.tier === 'HIGH'
             ? 'On hold: a credit needs a recorded justification.'
             : risk.tier === 'MEDIUM'
@@ -31,7 +31,7 @@ export const RiskPanel = ({ risk }: { risk: Risk }) => {
         </span>
       </p>
       <table className="w-full text-left" aria-label="Risk signals">
-        <thead className="text-neutral-500">
+        <thead className="text-muted-foreground">
           <tr>
             <th className="py-1 pr-4 font-normal">Signal</th>
             <th className="py-1 pr-4 text-right font-normal">Points</th>
@@ -42,7 +42,7 @@ export const RiskPanel = ({ risk }: { risk: Risk }) => {
           {risk.signals.map((signal) => (
             <tr
               key={signal.name}
-              className={cn('border-t border-neutral-200', signal.points === 0 && 'text-neutral-500')}
+              className={cn('border-t border-border', signal.points === 0 && 'text-muted-foreground')}
             >
               <td className="py-1 pr-4">{signal.name}</td>
               <td className="py-1 pr-4 text-right font-mono">

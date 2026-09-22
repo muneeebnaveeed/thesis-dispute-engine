@@ -24,7 +24,7 @@ const NoticePage = () => {
   }
   const letter = loadedNotice.value
   return (
-    <main className="mx-auto max-w-2xl p-8 font-serif text-[12pt] leading-relaxed text-neutral-900 print:p-0">
+    <main className="mx-auto max-w-2xl p-8 font-serif text-[12pt] leading-relaxed text-foreground print:p-0">
       <nav className="mb-8 flex gap-4 font-sans text-sm print:hidden">
         <Link to="/$tenant/disputes/$disputeId" params={{ tenant, disputeId }} className="underline">
           Back to the dispute
@@ -33,7 +33,7 @@ const NoticePage = () => {
           Print
         </Button>
       </nav>
-      <header className="mb-8 text-neutral-600">
+      <header className="mb-8 text-muted-foreground">
         <p>{letter.bank}</p>
         <p>{letter.date.slice(0, 10)}</p>
         <p className="mt-4 whitespace-pre-line">{letter.recipient}</p>
@@ -47,7 +47,7 @@ const NoticePage = () => {
         </p>
       ))}
       <p className="mb-4 whitespace-pre-line">{letter.closing}</p>
-      {letter.basis && <p className="mt-12 text-[10pt] text-neutral-600">{letter.basis}</p>}
+      {letter.basis && <p className="mt-12 text-[10pt] text-muted-foreground">{letter.basis}</p>}
     </main>
   )
 }

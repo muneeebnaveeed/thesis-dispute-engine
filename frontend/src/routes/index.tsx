@@ -32,7 +32,7 @@ const FrontDoor = () => {
             Sign-in did not complete: {signInError}
           </p>
         )}
-        <p className="text-sm text-neutral-600">
+        <p className="text-sm text-muted-foreground">
           Use the sign-in link your organisation gave you, or enter your work email and we will find it.
         </p>
         <form className="space-y-3" onSubmit={submitting(finder)}>
@@ -51,7 +51,7 @@ const FrontDoor = () => {
             <finder.SubmitButton>Continue</finder.SubmitButton>
           </finder.AppForm>
         </form>
-        {notFoundMessage && <output className="block text-sm text-neutral-700">{notFoundMessage}</output>}
+        {notFoundMessage && <output className="block text-sm text-foreground">{notFoundMessage}</output>}
       </div>
     </AppShell>
   )

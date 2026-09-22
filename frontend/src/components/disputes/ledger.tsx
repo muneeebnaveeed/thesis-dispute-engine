@@ -21,10 +21,10 @@ export const Ledger = ({ ledger, balances, currency }: Pick<Dispute, 'ledger' | 
         <Balance label="Written off" amount={balances.loss} currency={currency} />
       </dl>
       {ledger.length === 0 ? (
-        <p className="text-neutral-600">No money has moved on this dispute.</p>
+        <p className="text-muted-foreground">No money has moved on this dispute.</p>
       ) : (
         <table className="w-full text-left" aria-label="Postings">
-          <thead className="text-neutral-500">
+          <thead className="text-muted-foreground">
             <tr>
               <th className="py-1 pr-4 font-normal">#</th>
               <th className="py-1 pr-4 font-normal">Posting</th>
@@ -37,8 +37,8 @@ export const Ledger = ({ ledger, balances, currency }: Pick<Dispute, 'ledger' | 
           </thead>
           <tbody>
             {ledger.map((posting) => (
-              <tr key={posting.reference} className="border-t border-neutral-200">
-                <td className="py-1 pr-4 font-mono text-neutral-500">{posting.seq}</td>
+              <tr key={posting.reference} className="border-t border-border">
+                <td className="py-1 pr-4 font-mono text-muted-foreground">{posting.seq}</td>
                 <td className="py-1 pr-4">{POSTING_KIND_LABEL[posting.kind]}</td>
                 <td className="py-1 pr-4 font-mono">{posting.debit}</td>
                 <td className="py-1 pr-4 font-mono">{posting.credit}</td>
@@ -46,12 +46,12 @@ export const Ledger = ({ ledger, balances, currency }: Pick<Dispute, 'ledger' | 
                   {formatMoney(posting.amount, posting.currency)}
                 </td>
                 <td
-                  className="py-1 pr-4 font-mono text-xs text-neutral-500"
+                  className="py-1 pr-4 font-mono text-xs text-muted-foreground"
                   title={posting.core ? `response ${posting.core.responseCode}` : undefined}
                 >
                   {posting.core ? posting.core.rrn || 'booked' : 'internal'}
                 </td>
-                <td className="py-1 font-mono text-xs text-neutral-500">{posting.reference}</td>
+                <td className="py-1 font-mono text-xs text-muted-foreground">{posting.reference}</td>
               </tr>
             ))}
           </tbody>
@@ -75,7 +75,7 @@ const Balance = ({
   const stillOutstanding = emphasise && Number(amount) > 0
   return (
     <div>
-      <dt className="text-neutral-500">{label}</dt>
+      <dt className="text-muted-foreground">{label}</dt>
       <dd className={cn('font-mono', stillOutstanding && 'font-medium text-amber-900')}>
         {formatMoney(amount, currency)}
       </dd>

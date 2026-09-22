@@ -7,54 +7,61 @@ import { formatMoney } from '#/lib/money'
 
 type Summary = components['schemas']['DisputeSummary']
 
-const None = () => <span className="text-neutral-400">none</span>
+const None = () => <span className="text-muted-foreground">none</span>
 
 export const DisputeTable = ({ disputes, tenant }: { disputes: Summary[]; tenant: string }) => (
-  <table className="w-full text-left text-sm" aria-label="Disputes">
-    <thead className="text-neutral-500">
-      <tr>
-        <th className="py-1 pr-4 font-normal">Dispute</th>
-        <th className="py-1 pr-4 font-normal">State</th>
-        <th className="py-1 pr-4 font-normal">Reason</th>
-        <th className="py-1 pr-4 font-normal">Regime</th>
-        <th className="py-1 pr-4 font-normal">Amount</th>
-        <th className="py-1 pr-4 font-normal">Risk</th>
-        <th className="py-1 pr-4 font-normal">Next clock</th>
-        <th className="py-1 font-normal">Opened</th>
-      </tr>
-    </thead>
-    <tbody>
-      {disputes.map((dispute) => (
-        <tr key={dispute.id} className="border-t border-neutral-200">
-          <td className="py-1 pr-4 font-mono">
-            <Link
-              to="/$tenant/disputes/$disputeId"
-              params={{ tenant, disputeId: dispute.id }}
-              className="underline"
-            >
-              {dispute.id.slice(0, 8)}
-            </Link>
-          </td>
-          <td className="py-1 pr-4 font-mono">{dispute.state}</td>
-          <td className="py-1 pr-4 font-mono">{dispute.reason}</td>
-          <td className="py-1 pr-4 font-mono">{dispute.regime}</td>
-          <td className="py-1 pr-4">{formatMoney(dispute.disputedAmount, dispute.currency)}</td>
-          <td className="py-1 pr-4">
-            {dispute.riskTier ? <RiskBadge tier={dispute.riskTier} score={dispute.riskScore} /> : <None />}
-          </td>
-          <td className="py-1 pr-4">
-            {dispute.nextDeadline ? (
-              <span className="flex items-center gap-2">
-                <DeadlineBadge status={dispute.nextDeadline.status} />
-                <span className="text-neutral-600">{daysRemaining(dispute.nextDeadline.dueAt)}</span>
-              </span>
-            ) : (
-              <None />
-            )}
-          </td>
-          <td className="py-1 text-neutral-500">{dispute.openedAt.slice(0, 16).replace('T', ' ')}</td>
+  <div className="overflow-x-auto">
+    <table
+      className="w-full border-collapse border border-border text-left text-[12px] [&_td]:border-t [&_td]:border-border [&_td]:px-2 [&_td]:py-1.5 [&_th]:border-b-2 [&_th]:border-border [&_th]:px-2 [&_th]:py-1.5 [&_th]:whitespace-nowrap"
+      aria-label="Disputes"
+    >
+      <thead className="bg-[image:var(--panel-heading)] text-[11px] tracking-wide text-muted-foreground uppercase">
+        <tr>
+          <th className="font-bold">Dispute</th>
+          <th className="font-bold">State</th>
+          <th className="font-bold">Reason</th>
+          <th className="font-bold">Regime</th>
+          <th className="font-bold">Amount</th>
+          <th className="font-bold">Risk</th>
+          <th className="font-bold">Next clock</th>
+          <th className="font-bold">Opened</th>
         </tr>
-      ))}
-    </tbody>
-  </table>
+      </thead>
+      <tbody className="[&_tr:nth-child(odd)]:bg-muted">
+        {disputes.map((dispute) => (
+          <tr key={dispute.id} className="hover:bg-accent">
+            <td className="font-mono">
+              <Link
+                to="/$tenant/disputes/$disputeId"
+                params={{ tenant, disputeId: dispute.id }}
+                className="underline"
+              >
+                {dispute.id.slice(0, 8)}
+              </Link>
+            </td>
+            <td className="font-mono">{dispute.state}</td>
+            <td className="font-mono">{dispute.reason}</td>
+            <td className="font-mono">{dispute.regime}</td>
+            <td className="whitespace-nowrap">{formatMoney(dispute.disputedAmount, dispute.currency)}</td>
+            <td>
+              {dispute.riskTier ? <RiskBadge tier={dispute.riskTier} score={dispute.riskScore} /> : <None />}
+            </td>
+            <td className="whitespace-nowrap">
+              {dispute.nextDeadline ? (
+                <span className="flex items-center gap-2">
+                  <DeadlineBadge status={dispute.nextDeadline.status} />
+                  <span className="text-muted-foreground">{daysRemaining(dispute.nextDeadline.dueAt)}</span>
+                </span>
+              ) : (
+                <None />
+              )}
+            </td>
+            <td className="whitespace-nowrap text-muted-foreground">
+              {dispute.openedAt.slice(0, 16).replace('T', ' ')}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
 )

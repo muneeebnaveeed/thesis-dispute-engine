@@ -1,7 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
-@import '@fontsource-variable/geist';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -21,7 +20,8 @@ body {
 
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', sans-serif;
+  /* the era's stack: whatever the operating system already had */
+  --font-sans: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -63,72 +63,78 @@ body {
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: #ecf0f5;
+  --foreground: #333333;
+  --card: #ffffff;
+  --card-foreground: #333333;
+  --popover: #ffffff;
+  --popover-foreground: #333333;
+  --primary: #337ab7;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f4;
+  --secondary-foreground: #333333;
+  --muted: #f9f9f9;
+  --muted-foreground: #777777;
+  --accent: #eaf1f8;
+  --accent-foreground: #23527c;
+  --destructive: #d9534f;
+  --border: #dddddd;
+  --input: #cccccc;
+  --ring: #66afe9;
+  --chart-1: #3c8dbc;
+  --chart-2: #00a65a;
+  --chart-3: #f39c12;
+  --chart-4: #dd4b39;
+  --chart-5: #605ca8;
+  --radius: 0.1875rem;
+  --sidebar: #222d32;
+  --sidebar-foreground: #b8c7ce;
+  --sidebar-primary: #3c8dbc;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1e282c;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #1a2226;
+  --sidebar-ring: #3c8dbc;
+  --panel-heading: linear-gradient(to bottom, #f5f5f5 0%, #e8e8e8 100%);
+  --raised: linear-gradient(to bottom, #ffffff 0%, #e0e0e0 100%);
+  --raised-primary: linear-gradient(to bottom, #337ab7 0%, #2e6da4 100%);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #1b1f22;
+  --foreground: #e6e6e6;
+  --card: #262c30;
+  --card-foreground: #e6e6e6;
+  --popover: #262c30;
+  --popover-foreground: #e6e6e6;
+  --primary: #3c8dbc;
+  --primary-foreground: #ffffff;
+  --secondary: #2f363a;
+  --secondary-foreground: #e6e6e6;
+  --muted: #2a3034;
+  --muted-foreground: #9aa5ab;
+  --accent: #2c3e4a;
+  --accent-foreground: #ffffff;
+  --destructive: #d9534f;
+  --border: #3a4248;
+  --input: #3a4248;
+  --ring: #3c8dbc;
+  --chart-1: #3c8dbc;
+  --chart-2: #00a65a;
+  --chart-3: #f39c12;
+  --chart-4: #dd4b39;
+  --chart-5: #605ca8;
+  --sidebar: #1a2226;
+  --sidebar-foreground: #b8c7ce;
+  --sidebar-primary: #3c8dbc;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #141b1f;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #141b1f;
+  --sidebar-ring: #3c8dbc;
+  --panel-heading: linear-gradient(to bottom, #2f363a 0%, #272d31 100%);
+  --raised: linear-gradient(to bottom, #333a3f 0%, #272d31 100%);
+  --raised-primary: linear-gradient(to bottom, #3c8dbc 0%, #327ba5 100%);
 }
 
 @layer base {
@@ -137,8 +143,47 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+    font-size: 14px;
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* The chrome of the period: everything is raised a little, bordered, and slightly grey. These ride on the
+   data-slot attributes the registry already emits, so the vendored components stay as the CLI wrote them. */
+@layer components {
+  [data-slot='button'][data-variant='default'] {
+    background-image: var(--raised-primary);
+    border-color: #2b669a;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.15),
+      0 1px 1px rgb(0 0 0 / 0.075);
+    text-shadow: 0 -1px 0 rgb(0 0 0 / 0.2);
+  }
+
+  [data-slot='button'][data-variant='outline'],
+  [data-slot='button'][data-variant='secondary'] {
+    background-image: var(--raised);
+    border-color: var(--input);
+    box-shadow: 0 1px 1px rgb(0 0 0 / 0.075);
+  }
+
+  [data-slot='input'],
+  [data-slot='select-trigger'],
+  [data-slot='textarea'] {
+    box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.075);
+  }
+
+  /* the menu of the period is full-bleed rectangles, and the page you are on wears a coloured bar */
+  [data-slot='sidebar-menu-button'] {
+    border-radius: 0;
+    border-left: 3px solid transparent;
+    padding-left: calc(var(--spacing) * 4);
+  }
+
+  [data-slot='sidebar-menu-button'][data-active='true'] {
+    border-left-color: var(--sidebar-primary);
+    color: var(--sidebar-accent-foreground);
   }
 }

@@ -12,6 +12,7 @@ import type { DisputeState } from '#/api/views'
 import { DisputeTable } from '#/components/disputes/dispute-table'
 import { AppShell } from '#/components/layout/app-shell'
 import { FailureBanner } from '#/components/layout/failure-banner'
+import { Panel } from '#/components/ui/panel'
 import { TenantMismatch } from '#/components/layout/tenant-mismatch'
 import { submitTo, submitting, useAppForm } from '#/forms/app-form'
 import { parsed, schemaValidator } from '#/forms/schema'
@@ -70,23 +71,25 @@ const Workbench = () => {
 
   return (
     <AppShell title="Disputes">
-      <section className="mb-10">
-        <div className="mb-3 flex items-baseline justify-between">
-          <h2 className="text-lg font-medium">Recent disputes</h2>
-          <form className="flex items-end gap-2 text-sm" onSubmit={submitting(filterForm)}>
+      <Panel
+        className="mb-6"
+        bodyClassName="p-0"
+        title="Recent disputes"
+        actions={
+          <form className="flex items-end gap-2 text-[13px]" onSubmit={submitting(filterForm)}>
             <filterForm.AppField name="state">
               {(field) => (
                 <field.SelectField
                   label="State"
                   options={DISPUTE_STATES}
                   placeholder="any"
-                  className="text-neutral-600"
+                  className="text-muted-foreground"
                   inputClassName="mt-0 w-auto"
                 />
               )}
             </filterForm.AppField>
             <filterForm.AppField name="overdue">
-              {(field) => <field.CheckboxField label="overdue only" className="mb-1 text-neutral-600" />}
+              {(field) => <field.CheckboxField label="overdue only" className="mb-1 text-muted-foreground" />}
             </filterForm.AppField>
             <filterForm.AppForm>
               <filterForm.SubmitButton variant="secondary" size="xs">
@@ -94,13 +97,16 @@ const Workbench = () => {
               </filterForm.SubmitButton>
             </filterForm.AppForm>
           </form>
-        </div>
+        }
+      >
         {loadedPage.failure ? (
-          <FailureBanner failure={loadedPage.failure} />
+          <div className="p-4">
+            <FailureBanner failure={loadedPage.failure} />
+          </div>
         ) : loadedPage.value.items.length > 0 ? (
           <>
             <DisputeTable disputes={loadedPage.value.items} tenant={tenant} />
-            <div className="mt-3 flex gap-3 text-sm">
+            <div className="flex gap-3 border-t border-border bg-muted px-4 py-2 text-[13px]">
               {cursor && (
                 <Link to="/$tenant" params={{ tenant }} search={activeFilters} className="underline">
                   Newest
@@ -119,16 +125,15 @@ const Workbench = () => {
             </div>
           </>
         ) : (
-          <p className="text-sm text-neutral-600">
+          <p className="px-4 py-3 text-[13px] text-muted-foreground">
             No {overdue ? 'overdue ' : ''}disputes{state ? ` in ${state}` : ''}
             {overdue ? '.' : ' yet.'}
           </p>
         )}
-      </section>
+      </Panel>
 
-      <div className="grid gap-8 md:grid-cols-2">
-        <section>
-          <h2 className="mb-3 text-lg font-medium">Open a dispute</h2>
+      <div className="grid gap-6 md:grid-cols-2">
+        <Panel title="Open a dispute">
           <form className="space-y-3" onSubmit={submitting(openForm)}>
             <openForm.AppField name="transactionId">
               {(field) => (
@@ -154,7 +159,7 @@ const Workbench = () => {
               <FailureBanner failure={openFailure} />
             </div>
           )}
-        </section>
+        </Panel>
       </div>
     </AppShell>
   )

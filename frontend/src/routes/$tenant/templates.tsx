@@ -39,12 +39,12 @@ const TemplatesPage = () => {
   return (
     <AppShell title="Email templates">
       {!isAdmin ? (
-        <p className="text-sm text-neutral-600">
+        <p className="text-sm text-muted-foreground">
           Only tenant administrators can change the wording of emails.
         </p>
       ) : (
         <div className="space-y-8">
-          <p className="max-w-2xl text-sm text-neutral-600">
+          <p className="max-w-2xl text-sm text-muted-foreground">
             These are the emails analysts compose from the dispute page. You can change the words; the fields
             an analyst fills in stay the same, so use their placeholders where the answer belongs.
           </p>

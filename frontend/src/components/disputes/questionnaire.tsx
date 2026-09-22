@@ -34,13 +34,13 @@ export const QuestionnairePanel = ({
   if (questionnaire.receivedAt) {
     return (
       <div className="space-y-3 text-sm">
-        <p className="text-neutral-600">
+        <p className="text-muted-foreground">
           Sent {questionnaire.sentAt.slice(0, 10)}, received {questionnaire.receivedAt.slice(0, 10)}.
         </p>
         <dl className="space-y-2" aria-label="Answers">
           {questionnaire.questions.map((question) => (
             <div key={question.id}>
-              <dt className="text-neutral-500">{question.text}</dt>
+              <dt className="text-muted-foreground">{question.text}</dt>
               <dd className="font-medium">{questionnaire.answers?.[question.id] || 'not answered'}</dd>
             </div>
           ))}
@@ -61,14 +61,14 @@ export const QuestionnairePanel = ({
 
   return (
     <form className="space-y-3 text-sm" onSubmit={submitting(answersForm)}>
-      <p className="text-neutral-600">
+      <p className="text-muted-foreground">
         Sent {questionnaire.sentAt.slice(0, 10)}; awaiting the customer. Record the answers as they come in.
       </p>
       {questionnaire.questions.map((question) => {
         const label = (
           <>
             {question.text}
-            {question.required && <span className="text-neutral-400"> (required)</span>}
+            {question.required && <span className="text-muted-foreground"> (required)</span>}
           </>
         )
         const disabled = !canReceive || busy
