@@ -19,9 +19,11 @@ How to work in this repo. What the system does is in `README.md` and `docs/adr/`
 - `make e2e`: the Playwright browser suite against the full local stack; in GitHub it is the
   separate `e2e` workflow, informative on PRs and on main, never a required check.
 - `make ci`: everything the `ci` workflow runs (versions, generate-check, fmt, vet, lint, test, tidy, fe-check). Run
-  before every push. `make test-integration` runs the Postgres-backed suites against
-  `make db-up` (CI runs them with a service container); without `DISPUTE_TEST_DATABASE_URL`
-  those tests skip. `make cover` prints the coverage table CI posts on every PR.
+  before every push. Tests are split by build tag: `make test` is unit only (in-memory store,
+  real handlers, no database, no network); `make test-integration` compiles the
+  `//go:build integration` files and runs them against `make db-up` (CI uses a service
+  container), failing loudly if the database is absent. `make cover` prints the coverage
+  table CI posts on every PR.
 - `make generate`: regenerate sqlc queries and the OpenAPI server; commit the output.
 - `make migrate`: apply pending migrations as the schema owner; `make run` does it first. The
   API only checks the schema and refuses to start behind it.

@@ -1,4 +1,7 @@
-// Package pgtest gives integration tests a migrated, isolated schema; tests skip when DISPUTE_TEST_DATABASE_URL is unset.
+// Package pgtest gives integration tests a migrated, isolated schema. Its callers carry the "integration" build
+// tag, so they are compiled only on request (make test-integration, CI's backend test job); once compiled, a
+// missing connection string is a setup mistake and fails rather than skips, so a misconfigured CI cannot pass
+// by testing nothing.
 package pgtest
 
 import (
@@ -33,7 +36,7 @@ func AppPool(t *testing.T, schema string) *pgxpool.Pool {
 	t.Helper()
 	url := os.Getenv(AppEnvVar)
 	if url == "" {
-		t.Skipf("%s not set", AppEnvVar)
+		t.Fatalf("%s not set: integration tests need PostgreSQL (make db-up, then make test-integration)", AppEnvVar)
 	}
 	cfg, err := pgxpool.ParseConfig(url)
 	if err != nil {
@@ -67,7 +70,7 @@ func EmptyPool(t *testing.T) (*pgxpool.Pool, string) {
 	t.Helper()
 	url := os.Getenv(EnvVar)
 	if url == "" {
-		t.Skipf("%s not set", EnvVar)
+		t.Fatalf("%s not set: integration tests need PostgreSQL (make db-up, then make test-integration)", EnvVar)
 	}
 	ctx := context.Background()
 

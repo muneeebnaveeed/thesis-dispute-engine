@@ -27,19 +27,19 @@ dev: ## Run the API natively with live reload (air, pinned in mise.toml; config 
 build: ## Build the api, migrate and seed binaries into backend/bin/
 	$(GO) build -o bin/ ./cmd/...
 
-test: ## Unit tests
+test: ## Unit tests: no database, no network (in-memory store, real handlers)
 	$(GO) test ./...
 
-test-race: ## Unit tests with the race detector (what CI runs; needs a C compiler for cgo)
+test-race: ## Unit tests with the race detector (needs a C compiler for cgo)
 	$(GO) test -race -count=1 ./...
 
 TEST_DB_URL ?= postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable
 TEST_APP_DB_URL ?= postgres://dispute_api:dispute_api@localhost:5432/dispute?sslmode=disable
-test-integration: ## Tests that need PostgreSQL (make db-up first); each test gets its own schema
-	cd $(BACKEND) && DISPUTE_TEST_DATABASE_URL="$(TEST_DB_URL)" DISPUTE_TEST_APP_DATABASE_URL="$(TEST_APP_DB_URL)" go test -count=1 ./...
+test-integration: ## Postgres-backed tests behind the integration build tag (make db-up first); each test gets its own schema
+	cd $(BACKEND) && DISPUTE_TEST_DATABASE_URL="$(TEST_DB_URL)" DISPUTE_TEST_APP_DATABASE_URL="$(TEST_APP_DB_URL)" go test -tags integration -count=1 ./...
 
 cover: ## Coverage table as CI reports it (uses PostgreSQL if make db-up is running); coverage.html for line detail
-	cd $(BACKEND) && DISPUTE_TEST_DATABASE_URL="$(TEST_DB_URL)" DISPUTE_TEST_APP_DATABASE_URL="$(TEST_APP_DB_URL)" go test -count=1 -coverprofile=coverage.out -covermode=atomic ./... > /dev/null
+	cd $(BACKEND) && DISPUTE_TEST_DATABASE_URL="$(TEST_DB_URL)" DISPUTE_TEST_APP_DATABASE_URL="$(TEST_APP_DB_URL)" go test -tags integration -count=1 -coverprofile=coverage.out -covermode=atomic ./... > /dev/null
 	cd $(BACKEND) && go tool cover -html=coverage.out -o coverage.html
 	scripts/coverage-report $(BACKEND)/coverage.out
 
@@ -60,8 +60,8 @@ lint: ## golangci-lint (config in backend/.golangci.yml)
 versions: ## Check go.mod, Dockerfile and CI agree with mise.toml
 	scripts/check-runtime-versions.sh
 
-vet: ## go vet
-	$(GO) vet ./...
+vet: ## go vet, including the integration-tagged tests
+	$(GO) vet -tags integration ./...
 
 fmt: ## Format check via golangci-lint (gofmt + goimports); fails if anything would change
 	cd $(BACKEND) && golangci-lint fmt --diff
