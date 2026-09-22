@@ -77,6 +77,94 @@ refused or threw, each with the active trace's ids and never a token or a body. 
 `[redacted]` before either sink sees them. `DISPUTE_LOG_LEVEL` sets the floor (`debug`, `info`,
 `warn`, `error`).
 
+## Interpreting the dashboards
+
+The three signals answer different questions and are used in that order: metrics say whether something is
+wrong and for how many, traces say where the time or the error was, logs say what exactly happened in one
+case. Counting with traces is wrong (they are sampled in any real deployment) and counting with logs is
+expensive; debugging one request with metrics is impossible, because aggregation has already discarded it.
+
+### Percentiles
+
+p95 = 21 ms means 95 requests in 100 finished within 21 ms and says nothing about the other five, so read
+three numbers together. p50 is the typical path and moves when the work itself changes; p95 is what to set
+expectations and alerts on, because it reacts to contention while staying stable; p99 is where saturation
+shows first, and a flat p50 under a climbing p99 is the signature of queueing. Averages hide all of this and
+are not on these dashboards on purpose.
+
+Two traps. Percentiles are interpolated inside histogram buckets, so if several unrelated routes report the
+same number, suspect the buckets: every API read reported 2.5 ms p50 until `telemetry.LatencyBuckets` gained
+1 ms and 2.5 ms boundaries. And percentiles neither average across instances nor add across calls: a page
+making two 9 ms calls is slower than 18 ms at p95, because the chance of hitting one slow call compounds.
+
+### Where the milliseconds are
+
+The same dispute page at p95 in run `docs/thesis/data/2026-09-22_1257`:
+
+| Layer | p95 | What it adds |
+| --- | --- | --- |
+| `GET /disputes/{disputeId}` (API) | 4.5 ms | query, row-level security, serialisation |
+| `serverFn getDispute` (workbench) | 9.2 ms | the hop to the API, session token, deserialisation |
+| `GET /otp/disputes/:id` (page) | 20.6 ms | SSR, session lookup, the other loaders |
+
+Each layer roughly doubles the one below. Comparing the three converts "the page is slow" into "which layer
+added the milliseconds" before anyone opens a trace.
+
+### Request panels: rate, errors, duration
+
+Rate is context, not health: a latency rise with a rate rise is load, without one it is contention or a
+dependency. Errors are business outcomes here, not just 5xx: `http.server.problems` by `code` on the API and
+`workbench.outcome` on the workbench name the cause, and the difference between `invalid-transition` (clients
+are confused or retrying wrongly), `rate-limited` (one tenant is hammering) and `core-declined` (the banking
+core refuses) decides whether anyone is woken up. On the workbench, `sign-in` rising means sessions are dying
+(Keycloak, or a rotated `SESSION_SECRET`) and `threw` means a bug.
+
+### Runtime panels
+
+These are never the first place to look; they answer whether the process itself is the problem.
+
+The workbench runs on one thread, so its health is that thread. **Event loop delay** is how long a callback
+waited to run and is the saturation signal: under 10 ms p99 is healthy, 50 ms is felt by users, hundreds of
+ms means the thread is blocked and every concurrent request pays it. **Event loop utilisation** is the
+fraction of wall time that thread worked, 0 to 1; under 0.5 there is headroom, above 0.7 delay climbs
+non-linearly. The load run sat at 11.5 ms and 0.03, meaning the workbench spends its time waiting on the API,
+which is what a proxy-shaped service should do. **Heap used** matters by shape: a sawtooth is healthy, a
+staircase that never falls is a leak, and heap high together with GC duration rising is the chain that ends
+as event loop delay and then as page latency.
+
+The API is multi-threaded and shows different signals. **Goroutines** is the leak detector and the
+backpressure signal: stable and proportional to concurrency is healthy (62 at 20 requests/s), a slow
+monotonic rise means something never returns, a spike means requests are piling up behind Postgres, the core
+or SMTP. **Memory used against the GC goal** is the Go sawtooth; a band rising under flat load is a leak.
+**Postgres p95** from the pgx histogram is the "is it me or the database" panel: it was under 1 ms while
+`POST /disputes` was 21 ms, which places those milliseconds in the six domain components, not the database.
+
+### The outbox panels
+
+Nobody waits on an HTTP response here, so read the pair. Backlog is queue depth and is a leading indicator:
+flat and non-zero is steady state, rising is the alarm, minutes before anyone notices a missing email.
+Backlog rising with flat delivery delay means more work arrived; both rising means the drain is broken.
+
+### Four situations
+
+- The page feels slow: workbench p95 by route, then the three-layer comparison above, then one trace from
+  that route. All routes slow at once points at event loop delay instead.
+- Users are getting errors: problems by code and outcomes by function, then Loki filtered to that code, then
+  the trace id on the line.
+- Memory grew overnight: heap and goroutines over 24 hours. Rising together is a leaked goroutine holding
+  memory; heap alone is a cache or a buffer. Neither shows in request panels until the latency cliff.
+- An email never arrived: Loki for the dispute id, or Tempo `{ name = "notice.deliver" &&
+  span.notice.outcome != "sent" }`, then the link back to the request that queued it.
+
+### Principles
+
+Alert on symptoms (5xx share, p99), never on causes (CPU, heap), which are diagnostics and are often high for
+benign reasons. There is no universal good number; the honest statement is always "this route was 4.8 ms in
+the last run and is 40 ms now", which is why the load runs under `docs/thesis/data/` are committed. Every
+panel should match a sentence someone says during an incident: the request body-size histograms were real
+data answering no question and were dropped, while the backlog gauge answers "will the emails go out".
+Keep labels and span names bounded; unbounded cardinality is the one mistake that takes the stack down.
+
 ## Typical questions
 
 - Why is this request slow: dashboard latency panel > click an exemplar dot > trace, or Explore >
