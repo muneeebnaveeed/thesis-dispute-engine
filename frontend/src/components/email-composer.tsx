@@ -123,9 +123,10 @@ function Marked({ line }: { line: string }) {
     <>
       {segments(line).map((s, i) =>
         s.missing ? (
-          // eslint-disable-next-line react/no-array-index-key
           <mark
-            key={i}
+            // Segments are positional runs of one line; index plus text is their identity.
+            // eslint-disable-next-line react/no-array-index-key
+            key={`${i}-${s.text}`}
             className="rounded bg-amber-100 px-1 font-sans text-xs text-amber-900"
             data-missing={s.text}
           >
