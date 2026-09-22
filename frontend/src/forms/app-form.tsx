@@ -227,9 +227,9 @@ export const submitting =
 // runs a mutation from a form's onSubmit: a validation refusal lands on the fields it names, every other failure
 // stays in the mutation's `failure` for the banner
 export const submitTo = async (form: AnyFormApi, run: () => Promise<unknown>): Promise<void> => {
-  form.setErrorMap({ onSubmit: undefined })
   try {
     await run()
+    form.setErrorMap({ onSubmit: undefined })
   } catch (thrown) {
     const fieldErrors = asFieldErrors(thrown)
     if (fieldErrors) form.setErrorMap({ onSubmit: fieldErrors })
