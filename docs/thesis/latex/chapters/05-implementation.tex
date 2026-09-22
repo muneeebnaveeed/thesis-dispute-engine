@@ -3,3 +3,88 @@
 
 % Budget and sources: docs/thesis/outline.md. Every claim about behaviour points at a test, a figure or a number in data/.
 
+% Sections are written as the work lands; order follows the outline, so earlier sections are filled in later.
+\section{The service and its persistence}
+\label{sec:impl-service}
+% To write: ADR 0001, 0005. Kept as a stub so the cross-references from later sections resolve.
+
+\section{One contract, two generated sides}
+\label{sec:impl-contract}
+% To write: ADR 0006 as it is realised in code generation on both sides.
+
+\section{Sessions and sign-in}
+\label{sec:impl-sessions}
+% To write: ADR 0011, docs/authentication.md.
+
+\section{The analyst workbench}
+\label{sec:impl-workbench}
+
+The workbench is the only part of the system a person touches, and the decision that shapes it is
+that the browser is never given a credential. Every call the interface makes is a
+\emph{server function}: the code is written beside the component that needs it, but it executes on
+the workbench's own server, which reads the sealed session cookie, exchanges it for the analyst's
+access token and calls the service. A token therefore never reaches a script, and no bearer value
+is available to be read out of storage; the browser suite asserts exactly that, failing if
+anything resembling a token appears in \code{localStorage} or \code{sessionStorage}. The cost is
+one network hop that a direct client would not pay, and the benefit is that the credential surface
+of the service stays the two kinds described in section~\ref{sec:design-tenancy}: a key for a
+tenant's own systems, and a realm token for a person.
+
+Data is fetched through one query definition per domain, keyed by the arguments it was given, so
+that the key is the single place a cache entry is named. Each definition ends with the same
+transformation, which maps the contract's problem document onto the client failure taxonomy of
+section~\ref{sec:design-failures}; a page therefore renders a refusal rather than discovering an
+exception. Writing follows the same route in reverse. Forms are built from the TypeBox schemas
+that the contract already generates, so the structural rules the service enforces are the rules
+the form applies before it submits, and a validation refusal that names a field is placed back on
+that field, indistinguishable to the analyst from one the browser found itself. Every other kind
+of failure stays in the mutation and is rendered once, as a banner.
+
+What the analyst sees is a grid and a small number of panels (figure~\ref{fig:workbench}). The
+dispute list carries the actions and the filter on a toolbar above it and its paging controls
+below, and the page that a dispute opens onto is a stack of panels, one per concern: the summary,
+the fraud score and its signals, the regulatory clocks with their legal basis, the actions the
+state machine currently allows, the ledger, the letters and emails sent, and the event log
+(figure~\ref{fig:dispute}). The actions offered are not a fixed menu; they are the transitions the
+service reports as allowed for that dispute in that state, so the interface cannot offer a move
+the domain would refuse.
+
+Paging is worth one honest note. The list is keyed on a cursor rather than an offset, which keeps
+the query cheap and stable while rows are being inserted, but a cursor carries no notion of how
+many rows exist. The pager therefore counts the pages it has walked and can always return to the
+first, and it deliberately offers no jump to the last page and no total, because the only way to
+show either would be a counting query over the whole tenant's disputes on every page turn.
+
+An organisation and a person are both allowed a picture. The tenant's logo and the analyst's own
+are stored in tenant-scoped tables under the same row-level security policy as every other
+tenant-owned row, capped at 256 kB, and accepted only as PNG, JPEG or WebP. SVG is refused on
+purpose: it is a document that can carry script, and it would be served from the service's own
+origin. A tenant administrator may replace the organisation's logo, whereas a picture belongs to
+whoever is signed in and needs no role at all; a tenant key is refused, since there is no person
+behind it.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{workbench.jpg}
+\caption{The workbench: the organisation and the signed-in analyst on the left, the dispute grid
+with its toolbar and pager on the right. Captured against the local stack by
+\code{pnpm screenshot}, so it can be retaken after a change rather than going stale.}
+\label{fig:workbench}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{dispute.jpg}
+\caption{One dispute: the summary, the fraud score with the signals that produced it, the
+regulatory clocks with their legal basis, and the transitions the state machine allows from the
+current state.}
+\label{fig:dispute}
+\end{figure}
+
+\section{Observability from day one}
+\label{sec:impl-observability}
+% To write: ADR 0003, 0022, docs/observability.md.
+
+\section{Review and release discipline}
+\label{sec:impl-ci}
+% To write: the workflows, the required checks, the release path.

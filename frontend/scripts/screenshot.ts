@@ -1,4 +1,4 @@
-// Captures the workbench figures the thesis register asks for, reproducibly, into docs/thesis/figures.
+// Captures the workbench figures the thesis register asks for, reproducibly, into docs/thesis/latex/figures.
 // Needs the stack up (make auth-up and the workbench on :3002). Usage: pnpm screenshot [name...]
 import { mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -8,10 +8,10 @@ import { chromium, type Page } from '@playwright/test'
 
 const BASE = process.env.APP_URL ?? 'http://localhost:3002'
 const TENANT = process.env.SCREENSHOT_TENANT ?? 'otp'
-const OUT = join(dirname(fileURLToPath(import.meta.url)), '../../docs/thesis/figures')
-// WebP at this quality is about half the JPEG and a fifth of the PNG, with the small text still sharp; these are
-// read on screen and printed small, never zoomed into
-const QUALITY = 60
+const OUT = join(dirname(fileURLToPath(import.meta.url)), '../../docs/thesis/latex/figures')
+// JPEG rather than the smaller WebP because pdflatex cannot include WebP and the thesis is the main reader;
+// at this quality the small text stays sharp and a figure is about a tenth of the PNG
+const QUALITY = 72
 
 type Figure = { path: string; height?: number; element?: string; prepare?: (page: Page) => Promise<void> }
 
@@ -55,10 +55,10 @@ for (const [name, figure] of chosen) {
   await page.goto(BASE + figure.path, { waitUntil: 'networkidle' })
   await figure.prepare?.(page)
   await page.waitForLoadState('networkidle')
-  const file = join(OUT, `${name}.webp`)
+  const file = join(OUT, `${name}.jpg`)
   const shot = figure.element ? page.locator(figure.element).first() : page
-  await shot.screenshot({ path: file, type: 'webp', quality: QUALITY })
-  console.log(`docs/thesis/figures/${name}.webp`)
+  await shot.screenshot({ path: file, type: 'jpeg', quality: QUALITY })
+  console.log(`docs/thesis/latex/figures/${name}.jpg`)
 }
 
 await browser.close()
