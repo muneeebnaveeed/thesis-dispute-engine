@@ -2,17 +2,20 @@
 # Opens a PR for the current branch with a conventional-commit title and the repo template filled in.
 #
 #   scripts/create-pr --description "..." [--type feat] [--tests yes|no] [--rollout "..."] [--adr "..."] \
-#                     [--title "type(scope): subject"] [--base main] [--draft] [--dry-run]
+#                     [--screenshot path ...] [--title "type(scope): subject"] [--base main] [--draft] [--dry-run]
 #
 # Title defaults to the subject of the branch's only commit; with several commits it is required.
 # Type defaults to the title's prefix, --tests to whether the diff touches *_test.go, --adr to ADR files in the
 # diff, --rollout to "direct deploy" unless the diff touches migrations (then it must be given).
 # Description: at most 3 sentences about scope and impact, never a diff summary; identifiers are rejected.
+# Screenshots: repeatable; each must be committed on the branch (capture with pnpm screenshot). They are linked at
+# this commit's sha, so the picture in the body keeps matching the code it was taken from.
 set -euo pipefail
 source "$(dirname "$0")/lib/common.sh"
 require_gh_account
 
 title="" description="" type="" tests="" rollout="" adr="" base="" draft=0 dry=0
+screenshots=()
 while (($#)); do
   case "$1" in
     --title) title="$2"; shift 2 ;;
@@ -21,6 +24,7 @@ while (($#)); do
     --tests) tests="$2"; shift 2 ;;
     --rollout) rollout="$2"; shift 2 ;;
     --adr) adr="$2"; shift 2 ;;
+    --screenshot) screenshots+=("$2"); shift 2 ;;
     --base) base="$2"; shift 2 ;;
     --draft) draft=1; shift ;;
     --dry-run|-n) dry=1; shift ;;
@@ -78,6 +82,18 @@ body=$(cat <<BODY
 **ADR**: $adr
 BODY
 )
+
+if ((${#screenshots[@]})); then
+  repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+  sha=$(git rev-parse HEAD)
+  shots=""
+  for shot in "${screenshots[@]}"; do
+    [[ -f "$shot" ]] || die "no such screenshot: $shot"
+    git ls-files --error-unmatch "$shot" >/dev/null 2>&1 || die "screenshot is not committed: $shot"
+    shots+=$'\n'"<img width=\"900\" alt=\"$(basename "$shot")\" src=\"https://raw.githubusercontent.com/$repo/$sha/$shot\">"
+  done
+  body+=$'\n**Screenshots**:\n'"$shots"
+fi
 
 if ((dry)); then
   printf 'branch: %s -> %s\ntitle: %s\n\n%s\n' "$branch" "$base" "$title" "$body"
