@@ -80,6 +80,19 @@ type AccountRecord struct {
 	OpenedAt      time.Time
 }
 
+// Attachment is a file an analyst attached to an email; Content is loaded only when the bytes are needed.
+type Attachment struct {
+	ID          uuid.UUID
+	DisputeID   uuid.UUID
+	NoticeID    *int64 // nil while a draft
+	Filename    string
+	ContentType string
+	Size        int
+	Content     []byte
+	UploadedBy  string
+	UploadedAt  time.Time
+}
+
 // RiskRecord is one stored assessment of a dispute.
 type RiskRecord struct {
 	Seq        int
@@ -153,6 +166,12 @@ type Tx interface {
 	GetNotice(ctx context.Context, disputeID uuid.UUID, id int64) (NoticeRecord, error)
 	// AccountHistory counts the account's other disputes since a date and the ones lost at the network, for scoring.
 	AccountHistory(ctx context.Context, accountID, excludeDispute uuid.UUID, since time.Time) (disputes, lostChargebacks int, err error)
+	InsertAttachment(ctx context.Context, disputeID uuid.UUID, a Attachment) error
+	// ClaimAttachments binds this dispute's drafts to a notice; it reports how many it found.
+	ClaimAttachments(ctx context.Context, disputeID uuid.UUID, noticeID int64, ids []uuid.UUID) (int, error)
+	// ListAttachmentMeta returns, without content, the attachments of the given notices and this dispute's drafts.
+	ListAttachmentMeta(ctx context.Context, disputeID uuid.UUID, noticeIDs []int64) ([]Attachment, error)
+	GetAttachment(ctx context.Context, disputeID, id uuid.UUID) (Attachment, error)
 	InsertRisk(ctx context.Context, disputeID uuid.UUID, r RiskRecord) error
 	ListRisk(ctx context.Context, disputeID uuid.UUID) ([]RiskRecord, error)
 	// LatestRisk returns the newest assessment per dispute that has one.
@@ -232,6 +251,10 @@ type Store interface {
 	ClaimNotices(ctx context.Context, batch int) ([]NoticeRecord, error)
 	// FinishNotice records the outcome of an attempt: sent when failure is empty, otherwise the error for the next try.
 	FinishNotice(ctx context.Context, id int64, failure string) error
+	// NoticeAttachments loads a notice's files with content, across tenants, for the dispatcher.
+	NoticeAttachments(ctx context.Context, noticeID int64) ([]Attachment, error)
+	// PurgeDraftAttachments deletes uploads never attached to a notice, older than before.
+	PurgeDraftAttachments(ctx context.Context, before time.Time) (int64, error)
 	// PurgeIdempotencyKeys deletes stored responses older than before and reports how many went; when another
 	// replica holds the sweep it returns 0 and no error.
 	PurgeIdempotencyKeys(ctx context.Context, before time.Time) (int64, error)

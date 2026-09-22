@@ -195,6 +195,63 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/Unprocessable" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+  /disputes/{disputeId}/attachments:
+    post:
+      operationId: uploadAttachment
+      summary: Upload a file to attach to an email
+      description: >-
+        A draft until an email claims it through ComposeEmailRequest.attachments; drafts older than a day are
+        swept. PDF, PNG or JPEG, at most 5 MB. Analysts only.
+      tags: [disputes]
+      parameters:
+        - name: disputeId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "201":
+          description: Stored as a draft.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Attachment" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /disputes/{disputeId}/attachments/{attachmentId}:
+    get:
+      operationId: getAttachment
+      summary: Download an attachment
+      tags: [disputes]
+      parameters:
+        - name: disputeId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: attachmentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The file, with its own content type and a Content-Disposition naming it.
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /disputes/{disputeId}/notices/{noticeId}/resend:
     post:
       operationId: resendNotice
@@ -467,6 +524,8 @@ components:
         - invalid-fields
         - unknown-template
         - not-resendable
+        - attachment-refused
+        - attachment-unknown
         - concurrent-update
         - idempotency-key-reuse
         - no-regime
@@ -785,7 +844,7 @@ components:
       enum: [EMAIL, LETTER]
     Notice:
       type: object
-      required: [id, seq, kind, channel, recipient, subject, createdAt]
+      required: [id, seq, kind, channel, recipient, subject, createdAt, attachments]
       properties:
         id: { type: integer, format: int64 }
         seq: { type: integer, description: The event that caused it. }
@@ -798,6 +857,17 @@ components:
         error: { type: string, description: The last delivery failure, if the email is still waiting. }
         actor: { type: string, description: The analyst who composed it; absent for the engine's own notices. }
         resendOf: { type: integer, format: int64, description: The notice this one repeats, for a resend. }
+        attachments:
+          type: array
+          items: { $ref: "#/components/schemas/Attachment" }
+    Attachment:
+      type: object
+      required: [id, filename, contentType, size]
+      properties:
+        id: { type: string, format: uuid }
+        filename: { type: string }
+        contentType: { type: string }
+        size: { type: integer }
     FieldType:
       type: string
       description: TEXT and TEXTAREA are free text; NUMBER a whole number; DATE YYYY-MM-DD; SELECT one option key; MULTISELECT comma-separated option keys.
@@ -820,6 +890,7 @@ components:
         options:
           type: array
           items: { $ref: "#/components/schemas/TemplateOption" }
+        list: { type: boolean, description: A TEXTAREA whose lines are items, rendered as bullet lines. }
         default: { type: string }
         min: { type: integer }
         max: { type: integer }
@@ -868,6 +939,10 @@ components:
           type: object
           description: Field id to value; MULTISELECT values are comma-separated option keys.
           additionalProperties: { type: string }
+        attachments:
+          type: array
+          description: Draft attachment ids uploaded for this dispute, at most 3; they travel with the email and are listed on the letter.
+          items: { type: string, format: uuid }
     NoticeDocument:
       type: object
       required: [id, kind, channel, recipient, bank, date, subject, greeting, paragraphs, closing]

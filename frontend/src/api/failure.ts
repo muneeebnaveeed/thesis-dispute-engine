@@ -77,6 +77,13 @@ export function fromProblem(p: Problem): Failure {
     case 'invalid-fields':
     case 'unknown-template':
       return { kind: 'validation', problem: p, fields: fieldErrors(p) }
+    case 'attachment-refused':
+    case 'attachment-unknown':
+      return {
+        kind: 'validation',
+        problem: p,
+        fields: { attachments: p.detail ?? p.title, ...fieldErrors(p) },
+      }
     // The ledger's refusals name the payload fact they are about, so the form can point at the input.
     case 'invalid-liability':
     case 'invalid-settlement':

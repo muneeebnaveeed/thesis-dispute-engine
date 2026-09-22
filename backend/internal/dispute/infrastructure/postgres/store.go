@@ -109,6 +109,25 @@ func (s *Store) FinishNotice(ctx context.Context, id int64, failure string) erro
 	return mapErr(sqlcgen.New(s.pool).FinishNotice(ctx, sqlcgen.FinishNoticeParams{NoticeID: id, Failure: f}))
 }
 
+// NoticeAttachments implements application.Store through the owner-defined notice_attachments function.
+func (s *Store) NoticeAttachments(ctx context.Context, noticeID int64) ([]application.Attachment, error) {
+	rows, err := sqlcgen.New(s.pool).NoticeAttachments(ctx, noticeID)
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	out := make([]application.Attachment, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, application.Attachment{ID: r.ID, Filename: r.Filename, ContentType: r.ContentType, Size: int(r.Size), Content: r.Content})
+	}
+	return out, nil
+}
+
+// PurgeDraftAttachments implements application.Store.
+func (s *Store) PurgeDraftAttachments(ctx context.Context, before time.Time) (int64, error) {
+	n, err := sqlcgen.New(s.pool).PurgeDraftAttachments(ctx, before)
+	return n, mapErr(err)
+}
+
 // PurgeLockID is the advisory lock the idempotency sweep takes; arbitrary but fixed, distinct from the migration lock.
 const PurgeLockID = 72040002
 
@@ -558,4 +577,34 @@ func (t *txn) LatestRisk(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]do
 		out[r.DisputeID] = domain.Assessment{Score: int(r.Score), Tier: domain.RiskTier(r.Tier)}
 	}
 	return out, nil
+}
+
+func (t *txn) InsertAttachment(ctx context.Context, disputeID uuid.UUID, a application.Attachment) error {
+	return mapErr(t.q.InsertAttachment(ctx, sqlcgen.InsertAttachmentParams{ID: a.ID, DisputeID: disputeID, Filename: a.Filename, ContentType: a.ContentType,
+		Size: int32Of(a.Size), Content: a.Content, UploadedBy: a.UploadedBy, UploadedAt: a.UploadedAt}))
+}
+
+func (t *txn) ClaimAttachments(ctx context.Context, disputeID uuid.UUID, noticeID int64, ids []uuid.UUID) (int, error) {
+	n, err := t.q.ClaimAttachments(ctx, sqlcgen.ClaimAttachmentsParams{NoticeID: &noticeID, DisputeID: disputeID, Ids: ids})
+	return int(n), mapErr(err)
+}
+
+func (t *txn) ListAttachmentMeta(ctx context.Context, disputeID uuid.UUID, noticeIDs []int64) ([]application.Attachment, error) {
+	rows, err := t.q.ListAttachmentMeta(ctx, sqlcgen.ListAttachmentMetaParams{DisputeID: disputeID, NoticeIds: noticeIDs})
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	out := make([]application.Attachment, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, application.Attachment{ID: r.ID, DisputeID: disputeID, NoticeID: r.NoticeID, Filename: r.Filename, ContentType: r.ContentType, Size: int(r.Size), UploadedBy: r.UploadedBy, UploadedAt: r.UploadedAt})
+	}
+	return out, nil
+}
+
+func (t *txn) GetAttachment(ctx context.Context, disputeID, id uuid.UUID) (application.Attachment, error) {
+	r, err := t.q.GetAttachment(ctx, sqlcgen.GetAttachmentParams{ID: id, DisputeID: disputeID})
+	if err != nil {
+		return application.Attachment{}, mapErr(err)
+	}
+	return application.Attachment{ID: r.ID, DisputeID: disputeID, NoticeID: r.NoticeID, Filename: r.Filename, ContentType: r.ContentType, Size: int(r.Size), Content: r.Content, UploadedBy: r.UploadedBy, UploadedAt: r.UploadedAt}, nil
 }

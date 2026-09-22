@@ -57,7 +57,9 @@ export function longDate(d: Date): string {
 }
 
 const listy = (fields: TemplateField[]) =>
-  new Set(fields.filter((f) => f.type === 'MULTISELECT' || f.type === 'TEXTAREA').map((f) => f.id))
+  new Set(
+    fields.filter((f) => f.type === 'MULTISELECT' || (f.type === 'TEXTAREA' && f.list)).map((f) => f.id),
+  )
 
 /** Renders one line with the display values; unfilled placeholders stay as {{id}} so the preview can mark them. */
 export function substitute(

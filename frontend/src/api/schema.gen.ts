@@ -126,6 +126,43 @@ export type paths = {
     patch?: never
     trace?: never
   }
+  '/disputes/{disputeId}/attachments': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Upload a file to attach to an email
+     * @description A draft until an email claims it through ComposeEmailRequest.attachments; drafts older than a day are swept. PDF, PNG or JPEG, at most 5 MB. Analysts only.
+     */
+    post: operations['uploadAttachment']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/disputes/{disputeId}/attachments/{attachmentId}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Download an attachment */
+    get: operations['getAttachment']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/disputes/{disputeId}/notices/{noticeId}/resend': {
     parameters: {
       query?: never
@@ -297,6 +334,8 @@ export type components = {
       | 'invalid-fields'
       | 'unknown-template'
       | 'not-resendable'
+      | 'attachment-refused'
+      | 'attachment-unknown'
       | 'concurrent-update'
       | 'idempotency-key-reuse'
       | 'no-regime'
@@ -643,6 +682,14 @@ export type components = {
        * @description The notice this one repeats
        */
       resendOf?: number
+      attachments: components['schemas']['Attachment'][]
+    }
+    Attachment: {
+      /** Format: uuid */
+      id: string
+      filename: string
+      contentType: string
+      size: number
     }
     /**
      * @description TEXT and TEXTAREA are free text; NUMBER a whole number; DATE YYYY-MM-DD; SELECT one option key; MULTISELECT comma-separated option keys.
@@ -662,6 +709,8 @@ export type components = {
       type: components['schemas']['FieldType']
       required: boolean
       options?: components['schemas']['TemplateOption'][]
+      /** @description A TEXTAREA whose lines are items */
+      list?: boolean
       default?: string
       min?: number
       max?: number
@@ -697,6 +746,8 @@ export type components = {
       fields: {
         [key: string]: string
       }
+      /** @description Draft attachment ids uploaded for this dispute, at most 3; they travel with the email and are listed on the letter. */
+      attachments?: string[]
     }
     NoticeDocument: {
       /** Format: int64 */
@@ -1076,6 +1127,67 @@ export interface operations {
       403: components['responses']['Forbidden']
       404: components['responses']['NotFound']
       422: components['responses']['Unprocessable']
+      429: components['responses']['TooManyRequests']
+    }
+  }
+  uploadAttachment: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        disputeId: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': {
+          /** Format: binary */
+          file: string
+        }
+      }
+    }
+    responses: {
+      /** @description Stored as a draft. */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Attachment']
+        }
+      }
+      400: components['responses']['BadRequest']
+      401: components['responses']['Unauthorized']
+      403: components['responses']['Forbidden']
+      404: components['responses']['NotFound']
+      422: components['responses']['Unprocessable']
+      429: components['responses']['TooManyRequests']
+    }
+  }
+  getAttachment: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        disputeId: string
+        attachmentId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The file, with its own content type and a Content-Disposition naming it. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/octet-stream': string
+        }
+      }
+      401: components['responses']['Unauthorized']
+      404: components['responses']['NotFound']
       429: components['responses']['TooManyRequests']
     }
   }

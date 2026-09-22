@@ -22,6 +22,19 @@ type Account struct {
 	PostalAddress *string
 }
 
+type Attachment struct {
+	ID          uuid.UUID
+	TenantID    uuid.UUID
+	DisputeID   uuid.UUID
+	NoticeID    *int64
+	Filename    string
+	ContentType string
+	Size        int32
+	Content     []byte
+	UploadedBy  string
+	UploadedAt  time.Time
+}
+
 type DeadlinesOverdue struct {
 	TenantID uuid.UUID
 	Regime   string

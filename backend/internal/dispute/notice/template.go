@@ -44,6 +44,7 @@ type Field struct {
 	Type     FieldType `json:"type"`
 	Required bool      `json:"required"`
 	Options  []Option  `json:"options,omitempty"`
+	List     bool      `json:"list,omitempty"` // a textarea whose lines are items, rendered as bullets
 	Default  string    `json:"default,omitempty"`
 	Min      *int      `json:"min,omitempty"`
 	Max      *int      `json:"max,omitempty"`
@@ -291,7 +292,7 @@ func Fill(t Template, facts FactValues, values map[string]string) Document {
 		Closing: "Yours sincerely,\n" + facts.Bank + " disputes team"}
 	listy := map[string]bool{}
 	for _, f := range t.Fields {
-		listy[f.ID] = f.Type == FieldMultiselect || f.Type == FieldTextarea
+		listy[f.ID] = f.Type == FieldMultiselect || (f.Type == FieldTextarea && f.List)
 	}
 	for _, p := range t.Paragraphs {
 		out := strings.TrimSpace(substitute(p, all, listy))

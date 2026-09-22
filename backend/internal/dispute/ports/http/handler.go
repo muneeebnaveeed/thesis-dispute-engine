@@ -7,7 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"mime"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -383,6 +386,10 @@ func (h *Handler) ListEmailTemplates(ctx context.Context, req oapi.ListEmailTemp
 		fields := make([]oapi.TemplateField, 0, len(t.Fields))
 		for _, f := range t.Fields {
 			tf := oapi.TemplateField{Id: f.ID, Label: f.Label, Type: oapi.FieldType(f.Type), Required: f.Required, Min: f.Min, Max: f.Max}
+			if f.List {
+				list := true
+				tf.List = &list
+			}
 			if f.Default != "" {
 				d := f.Default
 				tf.Default = &d
@@ -412,8 +419,12 @@ func (h *Handler) ComposeEmail(ctx context.Context, req oapi.ComposeEmailRequest
 	if actor == "" {
 		actor = principal.Subject
 	}
+	var attachments []uuid.UUID
+	if req.Body.Attachments != nil {
+		attachments = *req.Body.Attachments
+	}
 	view, err := h.svc.ComposeEmail(ctx, application.ComposeEmailInput{DisputeID: req.DisputeId, Template: domain.NoticeKind(req.Body.Template),
-		Fields: req.Body.Fields, Actor: actor})
+		Fields: req.Body.Fields, Attachments: attachments, Actor: actor})
 	if err != nil {
 		p := h.problem(ctx, "/disputes/"+req.DisputeId.String()+"/notices", err, req.DisputeId)
 		switch p.Status {
@@ -427,6 +438,73 @@ func (h *Handler) ComposeEmail(ctx context.Context, req oapi.ComposeEmailRequest
 		return nil, err
 	}
 	return oapi.ComposeEmail201JSONResponse(toAPI(view)), nil
+}
+
+// UploadAttachment stores one file from a multipart form as a draft for the dispute.
+func (h *Handler) UploadAttachment(ctx context.Context, req oapi.UploadAttachmentRequestObject) (oapi.UploadAttachmentResponseObject, error) {
+	principal, ok := auth.PrincipalFrom(ctx)
+	if !ok {
+		return nil, auth.ErrForbidden.WithDetail("attachments are added by analysts, not by tenant keys")
+	}
+	var in application.UploadInput
+	in.DisputeID, in.Actor = req.DisputeId, principal.Email
+	for {
+		part, err := req.Body.NextPart()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, errs.New(errs.Invalid, "malformed-request", "the upload is not a valid multipart form").WithFields(errs.FieldError{Field: "body", Message: err.Error()})
+		}
+		if part.FormName() != "file" {
+			continue
+		}
+		content, err := io.ReadAll(io.LimitReader(part, application.MaxAttachmentBytes+1))
+		if err != nil {
+			return nil, err
+		}
+		in.Filename, in.ContentType, in.Content = part.FileName(), part.Header.Get("Content-Type"), content
+	}
+	a, err := h.svc.Upload(ctx, in)
+	if err != nil {
+		p := h.problem(ctx, "/disputes/"+req.DisputeId.String()+"/attachments", err, req.DisputeId)
+		switch p.Status {
+		case http.StatusNotFound:
+			return oapi.UploadAttachment404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: oapi.NotFoundApplicationProblemPlusJSONResponse(p)}, nil
+		case http.StatusUnprocessableEntity:
+			return oapi.UploadAttachment422ApplicationProblemPlusJSONResponse{UnprocessableApplicationProblemPlusJSONResponse: oapi.UnprocessableApplicationProblemPlusJSONResponse(p)}, nil
+		case http.StatusBadRequest:
+			return oapi.UploadAttachment400ApplicationProblemPlusJSONResponse{BadRequestApplicationProblemPlusJSONResponse: oapi.BadRequestApplicationProblemPlusJSONResponse(p)}, nil
+		}
+		return nil, err
+	}
+	return oapi.UploadAttachment201JSONResponse(oapi.Attachment{Id: a.ID, Filename: a.Filename, ContentType: a.ContentType, Size: a.Size}), nil
+}
+
+// fileResponse serves an attachment with its own content type and name rather than the generic octet stream.
+type fileResponse struct{ a application.Attachment }
+
+func (r fileResponse) VisitGetAttachmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", r.a.ContentType)
+	w.Header().Set("Content-Length", strconv.Itoa(len(r.a.Content)))
+	w.Header().Set("Content-Disposition", mime.FormatMediaType("inline", map[string]string{"filename": r.a.Filename}))
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(http.StatusOK)
+	_, err := w.Write(r.a.Content)
+	return err
+}
+
+// GetAttachment returns a file of the dispute.
+func (h *Handler) GetAttachment(ctx context.Context, req oapi.GetAttachmentRequestObject) (oapi.GetAttachmentResponseObject, error) {
+	a, err := h.svc.GetAttachment(ctx, req.DisputeId, req.AttachmentId)
+	if err != nil {
+		if errors.Is(err, application.ErrNotFound) {
+			p := h.problem(ctx, fmt.Sprintf("/disputes/%s/attachments/%s", req.DisputeId, req.AttachmentId), err, uuid.Nil)
+			return oapi.GetAttachment404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: oapi.NotFoundApplicationProblemPlusJSONResponse(p)}, nil
+		}
+		return nil, err
+	}
+	return fileResponse{a: a}, nil
 }
 
 // ResendNotice queues an email again as the signed-in analyst.
@@ -706,6 +784,10 @@ func toAPI(v application.DisputeView) oapi.Dispute {
 			nv.Actor = &actor
 		}
 		nv.ResendOf = n.ResendOf
+		nv.Attachments = make([]oapi.Attachment, 0, len(n.Attachments))
+		for _, a := range n.Attachments {
+			nv.Attachments = append(nv.Attachments, oapi.Attachment{Id: a.ID, Filename: a.Filename, ContentType: a.ContentType, Size: a.Size})
+		}
 		out.Notices = append(out.Notices, nv)
 	}
 	if r := v.Risk; r != nil {

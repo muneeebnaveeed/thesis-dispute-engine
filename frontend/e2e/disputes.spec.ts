@@ -367,3 +367,47 @@ test('a sent email can be resent as a new notice chained to the original', async
   await expect(resent).toContainText('analyst')
   await expect(resent).toContainText(/sent|queued/)
 })
+
+test('an email can carry attachments, which the sent view offers back and the relay receives', async ({
+  page,
+  request,
+}) => {
+  const id = await openDisputeViaApi(request, 'otp')
+  await page.goto(`/otp/disputes/${id}/communications`)
+  await page.getByLabel(/Email template/).selectOption('CUSTOM')
+  await page.getByLabel(/^Subject/).fill('Your statement')
+  await page.getByLabel(/^Message/).fill('Please find the statement attached.')
+
+  // A text file is refused under the field; a PDF is accepted and shown as a chip and in the preview.
+  await page
+    .getByLabel(/Attachments/)
+    .setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hi') })
+  await expect(page.locator('#field-attachments-error')).toContainText(/PDF, PNG or JPEG/)
+  await page.getByLabel(/Attachments/).setInputFiles({
+    name: 'statement.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.4 e2e'),
+  })
+  const chips = page.getByRole('list', { name: 'Attached files' })
+  await expect(chips).toContainText('statement.pdf')
+  await expect(page.getByRole('region', { name: 'Preview' })).toContainText('Attached: statement.pdf')
+
+  await page.getByRole('button', { name: 'Send email' }).click()
+  await expect(page).toHaveURL(/tab=sent/)
+  const shown = page.getByRole('region', { name: 'Sent email preview' })
+  await expect(shown.getByRole('list', { name: 'Attachments' })).toContainText('statement.pdf')
+
+  // The relay got the file: Mailpit reports one attachment on the message.
+  await expect
+    .poll(
+      async () => {
+        const res = await request.get('http://localhost:8025/api/v1/search', {
+          params: { query: `subject:"Your statement" ${id}` },
+        })
+        const body = (await res.json()) as { messages?: { Attachments?: number }[] }
+        return body.messages?.[0]?.Attachments ?? 0
+      },
+      { timeout: 20_000 },
+    )
+    .toBe(1)
+})

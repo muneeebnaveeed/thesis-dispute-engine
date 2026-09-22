@@ -88,6 +88,7 @@ func run(cfg config.Config, logger *slog.Logger) error {
 		return err
 	}
 	go dispatcher.Run(ctx)
+	go application.RunDraftAttachmentPurge(ctx, store, logger)
 	go application.RunIdempotencyPurge(ctx, store, cfg.IdempotencyTTL, logger)
 
 	mux := http.NewServeMux()

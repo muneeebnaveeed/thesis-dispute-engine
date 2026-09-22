@@ -6,7 +6,7 @@ import { call } from '#/api/call'
 import { classify, type Failure } from '#/api/failure'
 import type { components } from '#/api/schema.gen'
 import { AppShell } from '#/components/app-shell'
-import { EmailComposer } from '#/components/email-composer'
+import { EmailComposer, type Draft } from '#/components/email-composer'
 import { FailureBanner } from '#/components/failure-banner'
 import { SentEmails } from '#/components/sent-emails'
 import { TenantMismatch } from '#/components/tenant-mismatch'
@@ -39,6 +39,7 @@ function CommunicationsPage() {
   const [failure, setFailure] = useState<Failure | null>(null)
   const [busy, setBusy] = useState(false)
   const [sentNote, setSentNote] = useState<string | null>(null)
+  const [drafts, setDrafts] = useState<Draft[]>([])
 
   useEffect(() => {
     let live = true
@@ -80,7 +81,7 @@ function CommunicationsPage() {
     const res = await call(() =>
       api.POST('/disputes/{disputeId}/notices', {
         params: { path: { disputeId } },
-        body: { template, fields: inputs },
+        body: { template, fields: inputs, attachments: drafts.map((draft) => draft.id) },
       }),
     )
     setBusy(false)
@@ -89,8 +90,29 @@ function CommunicationsPage() {
       return
     }
     setSentNote('Email queued; it appears under Sent Emails as it goes out.')
+    setDrafts([])
     await router.invalidate()
     showTab('sent')
+  }
+
+  async function upload(file: File) {
+    setBusy(true)
+    setFailure(null)
+    const form = new FormData()
+    form.append('file', file, file.name)
+    const res = await call(() =>
+      api.POST('/disputes/{disputeId}/attachments', {
+        params: { path: { disputeId } },
+        body: { file: file.name },
+        bodySerializer: () => form,
+      }),
+    )
+    setBusy(false)
+    if (res.failure) {
+      setFailure(res.failure)
+      return
+    }
+    setDrafts((cur) => [...cur, { id: res.data.id, filename: res.data.filename, size: res.data.size }])
   }
 
   async function resend(noticeId: number) {
@@ -163,6 +185,9 @@ function CommunicationsPage() {
             fields={fields}
             busy={busy}
             onSend={(t, i) => void send(t, i)}
+            drafts={drafts}
+            onUpload={(f) => void upload(f)}
+            onRemoveDraft={(id) => setDrafts((cur) => cur.filter((draft) => draft.id !== id))}
           />
         ) : (
           <p className="text-sm text-neutral-500">Loading templates...</p>
