@@ -125,3 +125,37 @@ func TestDispatcherDrainsTheOutboxAndRetriesFailures(t *testing.T) {
 		t.Errorf("mail = %+v", mailer.sent)
 	}
 }
+
+func TestResendIsANewNoticeChainedToTheOriginal(t *testing.T) {
+	svc, store, _ := clockService(t)
+	txn := store.AddTransaction(domain.RailCard, "EUR", "EUR", "10")
+	created, _ := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn})
+	ack := created.View.Notices[0]
+
+	// Not yet sent: the outbox owns it; a resend would double it.
+	_, err := svc.Resend(apptest.Ctx(), application.ResendInput{DisputeID: created.View.ID, NoticeID: ack.ID, Actor: "a@otp"})
+	if !errors.Is(err, application.ErrNotResendable) {
+		t.Fatalf("resend of an unsent email: %v", err)
+	}
+	if err := store.FinishNotice(context.Background(), ack.ID, ""); err != nil {
+		t.Fatal(err)
+	}
+	view, err := svc.Resend(apptest.Ctx(), application.ResendInput{DisputeID: created.View.ID, NoticeID: ack.ID, Actor: "a@otp"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(view.Notices) != 2 {
+		t.Fatalf("notices = %+v", view.Notices)
+	}
+	copyN := view.Notices[1]
+	if copyN.ResendOf == nil || *copyN.ResendOf != ack.ID || copyN.Actor != "a@otp" || copyN.SentAt != nil || copyN.Kind != ack.Kind || copyN.Subject != ack.Subject {
+		t.Errorf("resend = %+v", copyN)
+	}
+	// Letters are printed, not resent.
+	usd := store.AddTransaction(domain.RailCard, "USD", "USD", "10")
+	regE, _ := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: usd})
+	letter := regE.View.Notices[1]
+	if _, err := svc.Resend(apptest.Ctx(), application.ResendInput{DisputeID: regE.View.ID, NoticeID: letter.ID}); !errors.Is(err, application.ErrNotResendable) {
+		t.Errorf("resend of a letter: %v", err)
+	}
+}

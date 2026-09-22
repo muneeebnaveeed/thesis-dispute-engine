@@ -472,7 +472,7 @@ func (t *txn) InsertNotice(ctx context.Context, n application.NoticeRecord) (int
 		actor = &n.Actor
 	}
 	id, err := t.q.InsertNotice(ctx, sqlcgen.InsertNoticeParams{DisputeID: n.DisputeID, Seq: int32Of(n.Seq), Kind: string(n.Kind), Channel: string(n.Channel),
-		Recipient: n.Recipient, Subject: n.Subject, Document: n.Document, CreatedAt: n.CreatedAt, SentAt: sentAt, Actor: actor})
+		Recipient: n.Recipient, Subject: n.Subject, Document: n.Document, CreatedAt: n.CreatedAt, SentAt: sentAt, Actor: actor, ResendOf: n.ResendOf})
 	return id, mapErr(err)
 }
 
@@ -483,7 +483,9 @@ func (t *txn) ListNotices(ctx context.Context, disputeID uuid.UUID) ([]applicati
 	}
 	out := make([]application.NoticeRecord, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, noticeOf(r.ID, r.DisputeID, r.Seq, r.Kind, r.Channel, r.Recipient, r.Subject, r.Document, r.CreatedAt, r.SentAt, r.Attempts, r.LastError, r.Actor))
+		n := noticeOf(r.ID, r.DisputeID, r.Seq, r.Kind, r.Channel, r.Recipient, r.Subject, r.Document, r.CreatedAt, r.SentAt, r.Attempts, r.LastError, r.Actor)
+		n.ResendOf = r.ResendOf
+		out = append(out, n)
 	}
 	return out, nil
 }
@@ -493,7 +495,9 @@ func (t *txn) GetNotice(ctx context.Context, disputeID uuid.UUID, id int64) (app
 	if err != nil {
 		return application.NoticeRecord{}, mapErr(err)
 	}
-	return noticeOf(r.ID, r.DisputeID, r.Seq, r.Kind, r.Channel, r.Recipient, r.Subject, r.Document, r.CreatedAt, r.SentAt, r.Attempts, r.LastError, r.Actor), nil
+	n := noticeOf(r.ID, r.DisputeID, r.Seq, r.Kind, r.Channel, r.Recipient, r.Subject, r.Document, r.CreatedAt, r.SentAt, r.Attempts, r.LastError, r.Actor)
+	n.ResendOf = r.ResendOf
+	return n, nil
 }
 
 func noticeOf(id int64, disputeID uuid.UUID, seq int32, kind, channel, recipient, subject string, document []byte, createdAt time.Time,

@@ -195,6 +195,39 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/Unprocessable" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+  /disputes/{disputeId}/notices/{noticeId}/resend:
+    post:
+      operationId: resendNotice
+      summary: Send an email again
+      description: >-
+        Queues a new email with the original's words to the customer's current address, chained to the original
+        and authored by the analyst. Only an email that has been sent can be resent (not-resendable otherwise);
+        an email still in the outbox is retried by the engine on its own. Analysts only.
+      tags: [disputes]
+      parameters:
+        - name: disputeId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: noticeId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "201":
+          description: Queued; the dispute with its communications.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Dispute" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: The notice is a letter or was never sent.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /disputes/{disputeId}/notices/{noticeId}:
     get:
       operationId: getNotice
@@ -433,6 +466,7 @@ components:
         - risk-hold
         - invalid-fields
         - unknown-template
+        - not-resendable
         - concurrent-update
         - idempotency-key-reuse
         - no-regime
@@ -763,6 +797,7 @@ components:
         sentAt: { type: string, format: date-time, description: Absent while an email waits in the outbox. }
         error: { type: string, description: The last delivery failure, if the email is still waiting. }
         actor: { type: string, description: The analyst who composed it; absent for the engine's own notices. }
+        resendOf: { type: integer, format: int64, description: The notice this one repeats, for a resend. }
     FieldType:
       type: string
       description: TEXT and TEXTAREA are free text; NUMBER a whole number; DATE YYYY-MM-DD; SELECT one option key; MULTISELECT comma-separated option keys.

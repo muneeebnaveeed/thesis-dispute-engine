@@ -338,6 +338,7 @@ export const Notice = Type.Object({
   actor: Type.Optional(
     Type.String({ description: "The analyst who composed it; absent for the engine's own notices." }),
   ),
+  resendOf: Type.Optional(Type.Integer({ description: 'The notice this one repeats', format: 'int64' })),
 })
 export type Notice = Static<typeof Notice>
 const _Notice: Same<Notice, components['schemas']['Notice']> = true
@@ -534,6 +535,7 @@ export const ErrorCode = Type.Union(
     Type.Literal('risk-hold'),
     Type.Literal('invalid-fields'),
     Type.Literal('unknown-template'),
+    Type.Literal('not-resendable'),
     Type.Literal('concurrent-update'),
     Type.Literal('idempotency-key-reuse'),
     Type.Literal('no-regime'),

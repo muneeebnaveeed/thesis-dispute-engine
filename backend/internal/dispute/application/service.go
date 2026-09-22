@@ -204,6 +204,7 @@ type NoticeView struct {
 	SentAt    *time.Time        `json:"sentAt,omitempty"`
 	Error     *string           `json:"error,omitempty"`
 	Actor     string            `json:"actor,omitempty"`
+	ResendOf  *int64            `json:"resendOf,omitempty"`
 }
 
 // QuestionnaireView is the questionnaire as exposed by the API, with the contradictions found in the answers.
@@ -955,7 +956,7 @@ func (s *Service) view(ctx context.Context, tx Tx, rec DisputeRecord) (DisputeVi
 	view.Notices = make([]NoticeView, 0, len(notices))
 	for _, n := range notices {
 		view.Notices = append(view.Notices, NoticeView{ID: n.ID, Seq: n.Seq, Kind: n.Kind, Channel: n.Channel, Recipient: n.Recipient, Subject: n.Subject,
-			CreatedAt: n.CreatedAt, SentAt: n.SentAt, Error: n.LastError, Actor: n.Actor})
+			CreatedAt: n.CreatedAt, SentAt: n.SentAt, Error: n.LastError, Actor: n.Actor, ResendOf: n.ResendOf})
 	}
 	if risk, err := tx.ListRisk(ctx, rec.ID); err != nil {
 		return DisputeView{}, err

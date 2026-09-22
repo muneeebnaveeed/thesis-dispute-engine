@@ -424,7 +424,7 @@ func (q *Queries) GetIdempotencyKey(ctx context.Context, arg GetIdempotencyKeyPa
 }
 
 const getNotice = `-- name: GetNotice :one
-SELECT id, dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at, attempts, last_error, actor
+SELECT id, dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at, attempts, last_error, actor, resend_of
 FROM notices WHERE id = $1 AND dispute_id = $2
 `
 
@@ -447,6 +447,7 @@ type GetNoticeRow struct {
 	Attempts  int32
 	LastError *string
 	Actor     *string
+	ResendOf  *int64
 }
 
 func (q *Queries) GetNotice(ctx context.Context, arg GetNoticeParams) (GetNoticeRow, error) {
@@ -466,6 +467,7 @@ func (q *Queries) GetNotice(ctx context.Context, arg GetNoticeParams) (GetNotice
 		&i.Attempts,
 		&i.LastError,
 		&i.Actor,
+		&i.ResendOf,
 	)
 	return i, err
 }
@@ -861,8 +863,8 @@ func (q *Queries) InsertLedgerEntry(ctx context.Context, arg InsertLedgerEntryPa
 }
 
 const insertNotice = `-- name: InsertNotice :one
-INSERT INTO notices (dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at, actor)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+INSERT INTO notices (dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at, actor, resend_of)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 RETURNING id
 `
 
@@ -877,6 +879,7 @@ type InsertNoticeParams struct {
 	CreatedAt time.Time
 	SentAt    pgtype.Timestamptz
 	Actor     *string
+	ResendOf  *int64
 }
 
 func (q *Queries) InsertNotice(ctx context.Context, arg InsertNoticeParams) (int64, error) {
@@ -891,6 +894,7 @@ func (q *Queries) InsertNotice(ctx context.Context, arg InsertNoticeParams) (int
 		arg.CreatedAt,
 		arg.SentAt,
 		arg.Actor,
+		arg.ResendOf,
 	)
 	var id int64
 	err := row.Scan(&id)
@@ -1242,7 +1246,7 @@ func (q *Queries) ListLedgerEntries(ctx context.Context, disputeID uuid.UUID) ([
 }
 
 const listNotices = `-- name: ListNotices :many
-SELECT id, dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at, attempts, last_error, actor
+SELECT id, dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at, attempts, last_error, actor, resend_of
 FROM notices WHERE dispute_id = $1 ORDER BY id
 `
 
@@ -1260,6 +1264,7 @@ type ListNoticesRow struct {
 	Attempts  int32
 	LastError *string
 	Actor     *string
+	ResendOf  *int64
 }
 
 func (q *Queries) ListNotices(ctx context.Context, disputeID uuid.UUID) ([]ListNoticesRow, error) {
@@ -1285,6 +1290,7 @@ func (q *Queries) ListNotices(ctx context.Context, disputeID uuid.UUID) ([]ListN
 			&i.Attempts,
 			&i.LastError,
 			&i.Actor,
+			&i.ResendOf,
 		); err != nil {
 			return nil, err
 		}

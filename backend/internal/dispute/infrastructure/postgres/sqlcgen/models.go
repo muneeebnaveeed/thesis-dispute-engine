@@ -122,6 +122,7 @@ type Notice struct {
 	NextAttemptAt time.Time
 	LastError     *string
 	Actor         *string
+	ResendOf      *int64
 }
 
 type Questionnaire struct {

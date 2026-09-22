@@ -353,3 +353,17 @@ test('the communications panel composes an email from a template with a live pre
   await page.getByRole('button', { name: 'Send email' }).click()
   await expect(page.locator('#field-subject-error')).toContainText(/200/)
 })
+
+test('a sent email can be resent as a new notice chained to the original', async ({ page, request }) => {
+  const id = await openDisputeViaApi(request, 'otp')
+  await page.goto(`/otp/disputes/${id}/communications?tab=sent`)
+  const table = page.getByRole('table', { name: 'Sent emails' })
+  const ack = table.getByRole('row').filter({ hasText: 'Acknowledgement' }).first()
+  await expect(ack).toContainText(/sent/, { timeout: 20_000 })
+  await ack.getByRole('button', { name: 'Resend' }).click()
+  await expect(page.getByRole('tab', { name: /Sent Emails/ })).toContainText('2')
+  const resent = table.getByRole('row').filter({ hasText: 'Resent: Acknowledgement' })
+  await expect(resent).toBeVisible()
+  await expect(resent).toContainText('analyst')
+  await expect(resent).toContainText(/sent|queued/)
+})
