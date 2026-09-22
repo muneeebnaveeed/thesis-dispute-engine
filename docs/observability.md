@@ -1,14 +1,16 @@
 # Observability cheat sheet
 
-Everything below assumes `make otel-up` (Postgres, API, Grafana LGTM, synthetic probe; all on host
-networking). Stop with `make otel-down`; `make otel-reset` also drops the LGTM volume.
+Everything below assumes `make otel-up` (Postgres, API, workbench, Grafana LGTM, synthetic probe; all on
+host networking). Stop with `make otel-down`; `make otel-reset` also drops the LGTM volume. Two services
+report: `dispute-engine` (the Go API) and `dispute-workbench` (the frontend server); one trace spans both
+and continues into the outbox (ADR 0022).
 
 ## Where things are
 
 | What | Where | Notes |
 | --- | --- | --- |
 | Grafana | http://localhost:3001 | `admin` / `GRAFANA_ADMIN_PASSWORD` (`deploy/otel.env`); anonymous access is off |
-| Dashboard | Dashboards > Dispute Engine > Dispute Engine | provisioned from `deploy/grafana/dashboards/dispute-engine.json`, UI edits are not persisted |
+| Dashboards | Dashboards > Dispute Engine > Dispute Engine, Dispute Workbench | provisioned from `deploy/grafana/dashboards/*.json`, UI edits are not persisted |
 | Alert rules | Alerting > Alert rules | provisioned from `deploy/grafana/provisioning/alerting/dispute-engine.yaml` |
 | OTLP intake | 127.0.0.1:4317 (gRPC), 127.0.0.1:4318 (HTTP) | loopback only, see `OTELCOL_EXTRA_ARGS` in `deploy/compose.yml` |
 | Prometheus API | http://localhost:9090 | `curl localhost:9090/api/v1/query --data-urlencode 'query=dispute_by_state'` |
@@ -32,13 +34,31 @@ Metrics (OTel names; Prometheus flattens dots to underscores and adds `_total` t
 | `dispute.idempotent_replays` | counter | `route` | requests answered from the idempotency store |
 | `dispute.time_in_state` | histogram | `regime`, `state` | seconds a dispute spent in the state it just left |
 | `dispute.by_state` | gauge | `tenant`, `regime`, `state` | current population, read from Postgres on each scrape |
+| `dispute.notices_sent` | counter | `kind`, `outcome` | every outbox attempt handed to the mailer: `sent`, `failed`, `render-failed` |
+| `dispute.notice_delivery_delay` | histogram | `kind`, `outcome` | seconds from a notice being queued to the relay accepting it |
+| `dispute.outbox_backlog` | gauge | | emails queued and not yet sent, read from Postgres on each scrape |
 
-Traces: one server span per request named by route (`POST /disputes/{disputeId}/events`), an
-application span per use case (`dispute.apply_event`), and one `otelpgx` span per statement named
-after the sqlc query (`GetDisputeForUpdate`, `AppendEvent`, `BEGIN`, `COMMIT`).
+Signals the workbench server emits (`service_name="dispute-workbench"`):
+
+| Metric | Type | Labels | Meaning |
+| --- | --- | --- | --- |
+| `http.server.request.duration` | histogram | `http.request.method`, `http.route`, `http.response.status_code` | every request the frontend server answers; `http.route` has ids masked (`/otp/disputes/:id`) and every RPC is `/_serverFn/:fn` |
+| `workbench.server_fn.duration` | histogram | `workbench.server_fn`, `workbench.outcome` | one series per server function; outcome is `ok`, the API's problem code, `sign-in` (session gone) or `threw` |
+
+Traces, from the browser inwards: the workbench's server span per request (`GET /otp/disputes/:id`,
+`POST /_serverFn/:fn`), one span per server function it runs (`serverFn applyEvent`, with the outcome as
+an attribute), an undici client span per call to the API or Keycloak (`url.full` with ids masked; the
+session id never reaches a trace), then the API's server span named by route (`POST
+/disputes/{disputeId}/events`), an application span per use case (`dispute.apply_event`), and one
+`otelpgx` span per statement named after the sqlc query. `traceparent` crosses the workbench-to-API
+hop automatically. Work that outlives the request is its own trace, linked: every notice row stores
+the queuing request's traceparent, and the dispatcher's `notice.deliver` span (kind, attempt, outcome)
+carries a link to it and a child `smtp.send` span for the relay.
 
 Logs: JSON on stdout and, via `otelslog`, in Loki with `trace_id`, `span_id`, `request_id`, `route`
-and `status` as labels. Keys listed in `internal/platform/telemetry/redact.go` are replaced with
+and `status` as labels. The workbench logs the same way (`src/server/telemetry/log.ts`): sign-in,
+sign-out, back-channel logout, a session whose refresh was refused, and a server function that was
+refused or threw, each with the active trace's ids and never a token or a body. Keys listed in `internal/platform/telemetry/redact.go` are replaced with
 `[redacted]` before either sink sees them. `DISPUTE_LOG_LEVEL` sets the floor (`debug`, `info`,
 `warn`, `error`).
 
@@ -52,6 +72,13 @@ and `status` as labels. Keys listed in `internal/platform/telemetry/redact.go` a
   `sum by (code) (rate(http_server_problems_total[5m]))`.
 - Are transitions being rejected: `sum by (code) (increase(http_server_problems_total{status="409"}[1h]))`.
 - Is the DB the bottleneck: Tempo `{ span.db.system = "postgresql" && duration > 50ms }`.
+- What did the analyst's click do end to end: Tempo `{ resource.service.name = "dispute-workbench" &&
+  name = "POST /_serverFn/:fn" }`, open one; the API and Postgres spans are in the same trace.
+- Did the email for that transition go out: from the transition's trace, follow the link on
+  `notice.deliver` (Tempo shows linked traces), or Explore > Tempo `{ name = "notice.deliver" &&
+  span.notice.outcome != "sent" }` for the ones that did not.
+- Is the outbox draining: Workbench dashboard "Outbox backlog" and "Notice delivery delay p95"; the
+  alert fires when more than 20 emails have waited for 10 minutes.
 
 ## Synthetic traffic
 
@@ -68,7 +95,10 @@ from `make db-seed` (run by `make otel-up`).
 - Alerts: edit the provisioning yaml; rules are `provenance: file` so the UI shows them read only.
 - New metric: create it next to the code that emits it (see `application/service.go`), keep labels
   bounded (enums, routes), never IDs.
-- New span attribute: put variable data in attributes, never in span names.
+- New span attribute: put variable data in attributes, never in span names; never an id that is a
+  credential (session ids are masked before undici spans see them), never a recipient address.
+- The workbench exports with the same `OTEL_*` variables as the API (`deploy/otel.env`); with no
+  `OTEL_EXPORTER_OTLP_ENDPOINT` the SDK is not started and every span is a no-op.
 
 The probe opens its disputes on a seeded account with no email or postal address ("Probe Account"), so
 synthetic traffic exercises every component except the mail relay and never fills an inbox.
