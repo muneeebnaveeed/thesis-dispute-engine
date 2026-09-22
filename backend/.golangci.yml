@@ -2,6 +2,8 @@
 version: "2"
 
 run:
+  # Integration tests are compiled only with this tag; lint them too.
+  build-tags: [integration]
   timeout: 5m
   tests: true
 

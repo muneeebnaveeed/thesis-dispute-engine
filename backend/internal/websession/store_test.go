@@ -1,3 +1,5 @@
+//go:build integration
+
 package websession_test
 
 import (
