@@ -74,12 +74,14 @@ func Prefix(key string) string {
 
 // Principal is what an analyst token resolves to.
 type Principal struct {
-	Tenant  uuid.UUID
-	Subject string
-	Sid     string
-	Email   string
-	Name    string
-	Roles   []string
+	Tenant    uuid.UUID
+	Subject   string
+	Sid       string
+	Email     string
+	Name      string
+	FirstName string
+	LastName  string
+	Roles     []string
 }
 
 // HasRole reports whether the realm granted the role.

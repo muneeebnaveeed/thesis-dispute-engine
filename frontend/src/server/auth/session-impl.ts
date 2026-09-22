@@ -25,6 +25,8 @@ export type Viewer = {
   tenantId: string
   tenantSlug: string
   name: string
+  firstName: string | null
+  lastName: string | null
   email: string | null
   roles: string[]
 }
@@ -59,10 +61,14 @@ export const viewer = async (): Promise<Viewer | null> => {
   const live = await signedInSession()
   if (!live) return null
   const { identity } = live.session
+  const fullName = [identity.firstName, identity.lastName].filter(Boolean).join(' ')
   return {
     tenantId: identity.tenantId,
     tenantSlug: live.session.tenantSlug,
-    name: identity.name ?? identity.subject,
+    // a realm that maps neither name claim leaves the username, and a nameless one the subject
+    name: fullName || (identity.name ?? identity.subject),
+    firstName: identity.firstName ?? null,
+    lastName: identity.lastName ?? null,
     email: identity.email,
     roles: identity.roles,
   }
@@ -123,6 +129,8 @@ export const completeLogin = async (callbackUrl: URL): Promise<string> => {
         subject: claims.sub,
         sid: typeof claims.sid === 'string' ? claims.sid : null,
         name: typeof claims.preferred_username === 'string' ? claims.preferred_username : null,
+        firstName: typeof claims.given_name === 'string' ? claims.given_name : null,
+        lastName: typeof claims.family_name === 'string' ? claims.family_name : null,
         email: typeof claims.email === 'string' ? claims.email : null,
         roles,
       },

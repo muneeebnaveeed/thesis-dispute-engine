@@ -6,7 +6,15 @@ import { vi } from 'vitest'
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children }: { children: ReactNode }) => <a href="/">{children}</a>,
   useRouteContext: () => ({
-    viewer: { name: 'Anna Kovacs', tenantSlug: 'otp', tenantId: 't', email: null, roles: ['tenant-admin'] },
+    viewer: {
+      name: 'Eszter Varga',
+      firstName: 'Eszter',
+      lastName: 'Varga',
+      tenantSlug: 'otp',
+      tenantId: 't',
+      email: null,
+      roles: ['tenant-admin'],
+    },
   }),
   useRouter: () => ({ navigate: vi.fn<() => Promise<void>>() }),
   useRouterState: () => '/otp',
@@ -41,7 +49,7 @@ test('the shell shows the title, the content and the tenant navigation', async (
   expect(screen.getByRole('link', { name: 'Disputes' })).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Search' })).toBeInTheDocument()
   // the person's name reads once, next to their picture; signing out is the icon beside it
-  expect(screen.getByText('Anna Kovacs')).toBeInTheDocument()
+  expect(screen.getByText('Eszter Varga')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Replace your picture' })).toBeInTheDocument()
   expect(await screen.findByText('OTP Bank')).toBeInTheDocument()

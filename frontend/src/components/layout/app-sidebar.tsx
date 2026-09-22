@@ -6,6 +6,7 @@ import {
   KeyIcon,
   MagnifyingGlassIcon,
   SignOutIcon,
+  UploadSimpleIcon,
 } from '@phosphor-icons/react'
 import { useRef, type ChangeEvent } from 'react'
 
@@ -22,14 +23,19 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '#/components/shadcn/sidebar'
-import { Tooltip, TooltipContent, TooltipTrigger } from '#/components/shadcn/tooltip'
 import { brandingQuery, myAvatarQuery } from '#/queries/identity'
 import { useServerMutation } from '#/queries/use-server-mutation'
 import { cn } from '#/lib/utils'
 import { putMyAvatar, putTenantLogo } from '#/server/functions/identity'
 import { logout } from '#/server/functions/session'
 
-type Viewer = { tenantSlug: string; name: string; roles: string[] }
+type Viewer = {
+  tenantSlug: string
+  name: string
+  firstName: string | null
+  lastName: string | null
+  roles: string[]
+}
 
 // what the API stores; the picker filters before the refusal travels
 const PICKABLE_IMAGE_TYPES = 'image/png,image/jpeg,image/webp'
@@ -40,9 +46,9 @@ const upload = (file: File) => {
   return form
 }
 
-const initialsOf = (name: string) =>
-  name
-    .split(/\s+/)
+const initialsOf = (...parts: (string | null)[]) =>
+  parts
+    .flatMap((part) => (part ?? '').split(/\s+/))
     .filter(Boolean)
     .slice(0, 2)
     .map((word) => word.charAt(0).toUpperCase())
@@ -78,19 +84,26 @@ const PickableImage = ({
   }
   return (
     <>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            aria-label={label}
-            onClick={() => picker.current?.click()}
-            className="rounded-full ring-offset-background transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            {picture}
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="right">{label}</TooltipContent>
-      </Tooltip>
+      <button
+        type="button"
+        aria-label={label}
+        onClick={() => picker.current?.click()}
+        className={cn(
+          'group/pick relative cursor-pointer ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+          square ? 'rounded-md' : 'rounded-full',
+        )}
+      >
+        {picture}
+        <span
+          aria-hidden
+          className={cn(
+            'absolute inset-0 flex items-center justify-center bg-black/55 text-white opacity-0 transition-opacity group-hover/pick:opacity-100 group-focus-visible/pick:opacity-100',
+            square ? 'rounded-md' : 'rounded-full',
+          )}
+        >
+          <UploadSimpleIcon className="size-4" weight="bold" />
+        </span>
+      </button>
       <input
         ref={picker}
         type="file"
@@ -135,7 +148,7 @@ export const AppSidebar = ({ viewer }: { viewer: Viewer }) => {
           label="Replace the organisation logo"
           onPick={isAdmin ? (file) => logoUpload.mutate(file) : undefined}
         />
-        <span className="truncate text-sm font-medium">{branding?.name ?? tenant}</span>
+        <span className="truncate text-sm font-medium capitalize">{branding?.name ?? tenant}</span>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -194,26 +207,22 @@ export const AppSidebar = ({ viewer }: { viewer: Viewer }) => {
         <div className="flex items-center gap-3 px-2 py-1 group-data-[collapsible=icon]:px-0">
           <PickableImage
             src={loadedAvatar?.value?.dataUrl ?? null}
-            initials={initialsOf(viewer.name)}
+            initials={initialsOf(viewer.firstName, viewer.lastName, viewer.name)}
             label="Replace your picture"
             onPick={(file) => avatarUpload.mutate(file)}
           />
-          <span className="min-w-0 flex-1 truncate text-sm group-data-[collapsible=icon]:hidden">
+          <span className="min-w-0 flex-1 truncate text-sm capitalize group-data-[collapsible=icon]:hidden">
             {viewer.name}
           </span>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                aria-label="Sign out"
-                onClick={() => void signOut()}
-                className="rounded-md p-2 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden"
-              >
-                <SignOutIcon />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Sign out</TooltipContent>
-          </Tooltip>
+          <button
+            type="button"
+            aria-label="Sign out"
+            title="Sign out"
+            onClick={() => void signOut()}
+            className="cursor-pointer rounded-md p-2 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden"
+          >
+            <SignOutIcon />
+          </button>
         </div>
       </SidebarFooter>
     </Sidebar>

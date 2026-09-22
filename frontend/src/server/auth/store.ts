@@ -18,6 +18,8 @@ const SessionSchema = Type.Object({
       subject: Type.String(),
       sid: Type.Optional(Type.Union([Type.String(), Type.Null()])),
       name: Type.Union([Type.String(), Type.Null()]),
+      firstName: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+      lastName: Type.Optional(Type.Union([Type.String(), Type.Null()])),
       email: Type.Union([Type.String(), Type.Null()]),
       roles: Type.Array(Type.String()),
     }),
