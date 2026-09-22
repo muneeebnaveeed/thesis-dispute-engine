@@ -2,6 +2,7 @@ import { Type, type Static, type TSchema } from '@sinclair/typebox'
 import { Value } from '@sinclair/typebox/value'
 import { createServerFn } from '@tanstack/react-start'
 
+import { traced } from '#/server/telemetry/server-fn'
 import { authed } from './middleware'
 
 export const uuid = Type.String({ format: 'uuid' })
@@ -18,5 +19,7 @@ export const parse =
     return value
   }
 
-export const authenticatedGet = createServerFn({ method: 'GET' }).middleware([authed])
-export const authenticatedPost = createServerFn({ method: 'POST' }).middleware([authed])
+export const publicGet = createServerFn({ method: 'GET' }).middleware([traced])
+export const publicPost = createServerFn({ method: 'POST' }).middleware([traced])
+export const authenticatedGet = createServerFn({ method: 'GET' }).middleware([traced, authed])
+export const authenticatedPost = createServerFn({ method: 'POST' }).middleware([traced, authed])

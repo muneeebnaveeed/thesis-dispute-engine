@@ -125,6 +125,8 @@ type NoticeRecord struct {
 	LastError *string
 	Actor     string // the analyst who composed it; empty for the engine's own notices
 	ResendOf  *int64 // the notice this one repeats, for a resend
+	// TraceContext is the W3C traceparent of the request that queued it, set by the store, read by the dispatcher.
+	TraceContext string
 }
 
 // StoredResponse is a prior answer kept for idempotent replay.
@@ -265,6 +267,8 @@ type Store interface {
 	FinishNotice(ctx context.Context, id int64, failure string) error
 	// NoticeAttachments loads a notice's files with content, across tenants, for the dispatcher.
 	NoticeAttachments(ctx context.Context, noticeID int64) ([]Attachment, error)
+	// OutboxBacklog counts the emails not yet sent, across tenants; it feeds a gauge.
+	OutboxBacklog(ctx context.Context) (int64, error)
 	// PurgeDraftAttachments deletes uploads never attached to a notice, older than before.
 	PurgeDraftAttachments(ctx context.Context, before time.Time) (int64, error)
 	// PurgeIdempotencyKeys deletes stored responses older than before and reports how many went; when another

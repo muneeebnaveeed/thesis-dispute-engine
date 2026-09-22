@@ -53,3 +53,27 @@ groups:
               expression: A
               conditions:
                 - evaluator: { type: gt, params: [1] }
+      - uid: dispute-engine-outbox-backlog
+        title: Outbox backlog not draining
+        condition: C
+        for: 10m
+        labels: { service: dispute-engine, severity: warn }
+        annotations:
+          summary: More than 20 emails have waited in the outbox for 10 minutes; the dispatcher or the relay is stuck.
+          runbook: docs/observability.md
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: max(dispute_outbox_backlog{service_name="dispute-engine"})
+              instant: true
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [20] }

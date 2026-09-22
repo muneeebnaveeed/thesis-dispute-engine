@@ -136,6 +136,7 @@ type Notice struct {
 	LastError     *string
 	Actor         *string
 	ResendOf      *int64
+	TraceContext  *string
 }
 
 type Questionnaire struct {

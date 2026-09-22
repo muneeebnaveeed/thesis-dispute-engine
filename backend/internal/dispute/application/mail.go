@@ -7,7 +7,11 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
+
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/telemetry"
 )
 
 // Mail is one message to a customer; Text is the body, HTML the same words laid out, Files what travels with it.
@@ -55,9 +59,42 @@ func (d *Dispatcher) Kick() {
 	}
 }
 
+// deliveryMeters are the dispatcher's instruments: what was handed to the mailer, how long each email waited in
+// the outbox, and how many wait right now.
+type deliveryMeters struct {
+	sent  metric.Int64Counter
+	delay metric.Float64Histogram
+}
+
+func (d *Dispatcher) meters() (deliveryMeters, error) {
+	m := otel.Meter(scopeName)
+	sent, err := m.Int64Counter("dispute.notices_sent", metric.WithDescription("Notice emails handed to the mailer, by outcome"))
+	if err != nil {
+		return deliveryMeters{}, err
+	}
+	delay, err := m.Float64Histogram("dispute.notice_delivery_delay", metric.WithUnit("s"),
+		metric.WithDescription("Seconds between a notice being queued and the mailer accepting it"))
+	if err != nil {
+		return deliveryMeters{}, err
+	}
+	_, err = m.Int64ObservableGauge("dispute.outbox_backlog", metric.WithDescription("Emails queued and not yet sent, read from the store on each scrape"),
+		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
+			n, err := d.store.OutboxBacklog(ctx)
+			if err != nil {
+				return err
+			}
+			o.Observe(n)
+			return nil
+		}))
+	if err != nil {
+		return deliveryMeters{}, err
+	}
+	return deliveryMeters{sent: sent, delay: delay}, nil
+}
+
 // Run delivers until ctx ends.
 func (d *Dispatcher) Run(ctx context.Context) {
-	sent, err := otel.Meter(scopeName).Int64Counter("dispute.notices_sent", metric.WithDescription("Notice emails handed to the mailer, by outcome"))
+	meters, err := d.meters()
 	if err != nil {
 		d.log.Error("notice dispatcher: meter", "err", err)
 		return
@@ -72,7 +109,7 @@ func (d *Dispatcher) Run(ctx context.Context) {
 		case <-d.kick:
 		}
 		for {
-			n := d.pass(ctx, sent)
+			n := d.pass(ctx, meters)
 			if n == 0 {
 				break
 			}
@@ -88,7 +125,7 @@ func (d *Dispatcher) Run(ctx context.Context) {
 }
 
 // pass claims one batch and attempts each; it returns how many it claimed.
-func (d *Dispatcher) pass(ctx context.Context, sent metric.Int64Counter) int {
+func (d *Dispatcher) pass(ctx context.Context, meters deliveryMeters) int {
 	batch, err := d.store.ClaimNotices(ctx, 20)
 	if err != nil {
 		if ctx.Err() == nil {
@@ -97,6 +134,25 @@ func (d *Dispatcher) pass(ctx context.Context, sent metric.Int64Counter) int {
 		return 0
 	}
 	for _, n := range batch {
+		d.deliver(ctx, n, meters)
+	}
+	return len(batch)
+}
+
+// deliver is one attempt at one notice, as its own trace linked to the request that queued it: the delivery is
+// asynchronous work, so a child span would end long after its parent and a link is the honest relation.
+func (d *Dispatcher) deliver(ctx context.Context, n NoticeRecord, meters deliveryMeters) {
+	opts := []trace.SpanStartOption{trace.WithSpanKind(trace.SpanKindConsumer), trace.WithAttributes(
+		attribute.String("notice.kind", string(n.Kind)),
+		attribute.Int("notice.attempt", n.Attempts),
+		attribute.Bool("notice.resend", n.ResendOf != nil),
+	)}
+	if link, ok := telemetry.LinkTo(n.TraceContext); ok {
+		opts = append(opts, trace.WithLinks(link))
+	}
+	ctx, span := otel.Tracer(scopeName).Start(ctx, "notice.deliver", opts...)
+	defer span.End()
+	{
 		outcome := "sent"
 		failure := ""
 		m, err := d.render(n)
@@ -121,12 +177,15 @@ func (d *Dispatcher) pass(ctx context.Context, sent metric.Int64Counter) int {
 		if err := d.store.FinishNotice(ctx, n.ID, failure); err != nil && ctx.Err() == nil {
 			d.log.Warn("notice dispatcher: finish", "id", n.ID, "err", err)
 		}
-		sent.Add(ctx, 1, metric.WithAttributes(attribute.String("outcome", outcome), attribute.String("kind", string(n.Kind))))
+		by := metric.WithAttributes(attribute.String("outcome", outcome), attribute.String("kind", string(n.Kind)))
+		meters.sent.Add(ctx, 1, by)
+		span.SetAttributes(attribute.String("notice.outcome", outcome))
 		if failure != "" {
+			span.SetStatus(codes.Error, failure)
 			d.log.Warn("notice not delivered", "id", n.ID, "tenant", n.TenantID, "dispute", n.DisputeID, "kind", n.Kind, "attempt", n.Attempts, "err", failure)
 		} else {
+			meters.delay.Record(ctx, time.Since(n.CreatedAt).Seconds(), by)
 			d.log.Info("notice sent", "id", n.ID, "tenant", n.TenantID, "dispute", n.DisputeID, "kind", n.Kind, "to", n.Recipient)
 		}
 	}
-	return len(batch)
 }

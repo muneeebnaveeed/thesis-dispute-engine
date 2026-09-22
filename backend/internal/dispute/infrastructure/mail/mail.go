@@ -12,6 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
 )
 
@@ -23,8 +28,16 @@ type SMTP struct {
 }
 
 // Send implements application.Mailer.
-func (s SMTP) Send(_ context.Context, m application.Mail) error {
+func (s SMTP) Send(ctx context.Context, m application.Mail) error {
+	// the recipient is personal data and stays out of the span; the relay and the size are what an operator needs
+	_, span := otel.Tracer("mail").Start(ctx, "smtp.send", trace.WithSpanKind(trace.SpanKindClient), trace.WithAttributes(
+		attribute.String("messaging.system", "smtp"),
+		attribute.String("server.address", s.Addr),
+		attribute.Int("mail.attachments", len(m.Files)),
+	))
+	defer span.End()
 	if err := smtp.SendMail(s.Addr, nil, s.From, []string{m.To}, s.Message(m)); err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("smtp %s: %w", s.Addr, err)
 	}
 	return nil

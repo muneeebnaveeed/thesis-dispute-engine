@@ -95,6 +95,13 @@ services:
       OIDC_CLIENT_SECRET: ${KEYCLOAK_FRONTEND_SECRET:-dev-frontend-secret}
       DISPUTE_SERVICE_KEY: ${DISPUTE_SERVICE_KEY:-dev-service-key}
       SESSION_SECRET: ${SESSION_SECRET:-ZGV2LXNlc3Npb24tc2VjcmV0LTMyLWJ5dGVzLWxvbmc=}
+      # same variables as the API (deploy/otel.env under the otel profile); no endpoint means no SDK
+      OTEL_SERVICE_NAME: dispute-workbench
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-}
+      OTEL_METRICS_EXPORTER: ${OTEL_METRICS_EXPORTER:-}
+      OTEL_LOGS_EXPORTER: ${OTEL_LOGS_EXPORTER:-}
+      OTEL_METRIC_EXPORT_INTERVAL: ${OTEL_METRIC_EXPORT_INTERVAL:-}
 
   # Toolchain container for a fully dockerised dev loop; air watches the bind mount.
   api-dev:

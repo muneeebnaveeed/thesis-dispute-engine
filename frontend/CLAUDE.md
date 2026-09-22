@@ -63,6 +63,12 @@ lint and format fixes. `make fe-dev` for the dev server on :3002. Inside `fronte
 mutation.mutateAsync(...))`, which puts an API validation refusal on the fields it names. Field
   names mirror the API's error pointers (`answers.<id>`, `fields.<id>`). Never read `FormData` or
   keep form values in `useState`.
+- Telemetry (ADR 0022): `src/server/telemetry/` holds the SDK bootstrap, the request span, the
+  `traced` server-function middleware and `log`. Every server function is built from
+  `publicGet/Post` or `authenticatedGet/Post`, which include `traced`; never `createServerFn`
+  directly. Span names are bounded (function names, masked routes); variable data goes in
+  attributes, never a token, session id, recipient or body. Log through `log.info|warn|error` with a
+  fixed attribute vocabulary; no `console.log` in server code.
 - Names carry the meaning, comments do not: `emailLineSegments`, `requestsToApi`, `fieldErrors`,
   `openDisputeMutation`, never `segments`, `res`, `fields`, `open`, `d`, `e`, `v`. A comment is a
   terse one-liner that says why (a constraint, a trap, a decision), never what the code does, and

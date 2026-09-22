@@ -3,6 +3,7 @@ import { deleteCookie, getCookie, setCookie } from '@tanstack/react-start/server
 import * as client from 'openid-client'
 
 import { serverEnv } from '#/server/runtime/env'
+import { log } from '#/server/telemetry/log'
 import { safeNext } from './next'
 import { realmConfig, scopes } from './oidc'
 import * as store from './store'
@@ -131,6 +132,7 @@ export const completeLogin = async (callbackUrl: URL): Promise<string> => {
     env.sessionTtlSeconds,
   )
   await store.remove(pendingId)
+  log.info('signed in', { tenant: tenantSlug, subject: claims.sub })
   setCookie(sessionCookie, sessionId, cookieOptions())
   setCookie(rememberedTenantCookie, tenantSlug, {
     ...cookieOptions(REMEMBERED_TENANT_SECONDS),
@@ -167,6 +169,7 @@ export const accessTokenForRequest = async (): Promise<string | null> => {
     return fresh.access
   } catch {
     // refresh token dead (idle timeout, revoked): the session is over
+    log.warn('session ended: refresh refused', { tenant: live.session.tenantSlug })
     await store.remove(live.id)
     deleteCookie(sessionCookie, { path: '/' })
     return null
@@ -179,6 +182,7 @@ export const endSession = async (): Promise<{ url: string }> => {
   deleteCookie(sessionCookie, { path: '/' })
   if (!live) return { url: '/' }
   await store.remove(live.id)
+  log.info('signed out', { tenant: live.session.tenantSlug })
   // the tenant's own front door, not the generic root
   const tenantHome = `${env.appUrl}/${live.session.tenantSlug}`
   try {

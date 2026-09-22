@@ -244,8 +244,8 @@ UPDATE questionnaires SET answers = $2, received_at = $3 WHERE dispute_id = $1 A
 SELECT dispute_id, reason, questions, answers, sent_at, received_at FROM questionnaires WHERE dispute_id = $1;
 
 -- name: InsertNotice :one
-INSERT INTO notices (dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at, actor, resend_of)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+INSERT INTO notices (dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at, actor, resend_of, trace_context)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 RETURNING id;
 
 -- name: ListNotices :many
@@ -257,7 +257,10 @@ SELECT id, dispute_id, seq, kind, channel, recipient, subject, document, created
 FROM notices WHERE id = $1 AND dispute_id = $2;
 
 -- name: ClaimNotices :many
-SELECT id, tenant_id, dispute_id, seq, kind, channel, recipient, subject, document, created_at, attempts FROM claim_notices($1);
+SELECT id, tenant_id, dispute_id, seq, kind, channel, recipient, subject, document, created_at, attempts, trace_context FROM claim_notices($1);
+
+-- name: OutboxBacklog :one
+SELECT outbox_backlog();
 
 -- name: FinishNotice :exec
 SELECT finish_notice(sqlc.arg(notice_id), sqlc.narg(failure)::text);

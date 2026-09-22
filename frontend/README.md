@@ -76,6 +76,14 @@ label, styling, a11y wiring and error line; the contract's TypeBox schemas valid
 `schemaValidator`; a mutation runs inside `submitTo`, which lands an API validation refusal on the
 fields it names so server and client errors look the same (docs/adr/0021).
 
+## Telemetry
+
+The server side is a traced service, `dispute-workbench` (docs/adr/0022): a span per request, a span
+per server function with its outcome, `traceparent` propagated to the API, request and server-function
+duration metrics, and logs with trace ids. It reads the same `OTEL_*` variables as the API and stays
+silent without `OTEL_EXPORTER_OTLP_ENDPOINT`; to export from a local build, `set -a; . deploy/otel.env;
+set +a; OTEL_SERVICE_NAME=dispute-workbench pnpm start` with `make otel-up` running.
+
 ## Authentication
 
 Analysts sign in through their tenant's Keycloak realm at `/<slug>`, the tenant's front door (docs/adr/0010,

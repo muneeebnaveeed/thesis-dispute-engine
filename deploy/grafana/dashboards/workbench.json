@@ -1,0 +1,236 @@
+{
+  "uid": "dispute-workbench",
+  "title": "Dispute Workbench",
+  "tags": [
+    "dispute-engine"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "10s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Workbench requests / s by route",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{service_name=\"dispute-workbench\"}[1m]))",
+          "legendFormat": "{{http_route}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Workbench p95 latency by route",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{service_name=\"dispute-workbench\"}[5m])))",
+          "legendFormat": "{{http_route}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Server functions / s by function",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (workbench_server_fn) (rate(workbench_server_fn_duration_seconds_count{service_name=\"dispute-workbench\"}[1m]))",
+          "legendFormat": "{{workbench_server_fn}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Server function p95 by function",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, workbench_server_fn) (rate(workbench_server_fn_duration_seconds_bucket{service_name=\"dispute-workbench\"}[5m])))",
+          "legendFormat": "{{workbench_server_fn}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Refused server functions by outcome (problem code)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (workbench_outcome) (rate(workbench_server_fn_duration_seconds_count{service_name=\"dispute-workbench\", workbench_outcome!=\"ok\"}[5m]))",
+          "legendFormat": "{{workbench_outcome}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Where a request's time goes (p95): workbench vs API",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=\"dispute-workbench\", http_route=\"/_serverFn/:fn\"}[5m])))",
+          "legendFormat": "workbench RPC"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=\"dispute-engine\"}[5m])))",
+          "legendFormat": "API"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Outbox backlog (emails waiting)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(dispute_outbox_backlog{service_name=\"dispute-engine\"})",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Notice delivery delay p95 (queued to accepted by the relay)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 24,
+        "w": 9,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, kind) (rate(dispute_notice_delivery_delay_seconds_bucket{service_name=\"dispute-engine\"}[15m])))",
+          "legendFormat": "{{kind}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Notices handed to the mailer by outcome",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 15,
+        "y": 24,
+        "w": 9,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (outcome) (rate(dispute_notices_sent_total{service_name=\"dispute-engine\"}[5m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    }
+  ],
+  "description": "The frontend server (dispute-workbench) and the asynchronous tail of a request: outbox deliveries. Provisioned from deploy/grafana/dashboards/workbench.json."
+}

@@ -21,6 +21,7 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres/sqlcgen"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/telemetry"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
@@ -95,7 +96,8 @@ func (s *Store) ClaimNotices(ctx context.Context, batch int) ([]application.Noti
 	out := make([]application.NoticeRecord, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, application.NoticeRecord{ID: r.ID, TenantID: r.TenantID, DisputeID: r.DisputeID, Seq: int(r.Seq), Kind: domain.NoticeKind(r.Kind),
-			Channel: domain.Channel(r.Channel), Recipient: r.Recipient, Subject: r.Subject, Document: r.Document, CreatedAt: r.CreatedAt, Attempts: int(r.Attempts)})
+			Channel: domain.Channel(r.Channel), Recipient: r.Recipient, Subject: r.Subject, Document: r.Document, CreatedAt: r.CreatedAt, Attempts: int(r.Attempts),
+			TraceContext: derefString(r.TraceContext)})
 	}
 	return out, nil
 }
@@ -107,6 +109,12 @@ func (s *Store) FinishNotice(ctx context.Context, id int64, failure string) erro
 		f = &failure
 	}
 	return mapErr(sqlcgen.New(s.pool).FinishNotice(ctx, sqlcgen.FinishNoticeParams{NoticeID: id, Failure: f}))
+}
+
+// OutboxBacklog implements application.Store through the owner-defined outbox_backlog function.
+func (s *Store) OutboxBacklog(ctx context.Context) (int64, error) {
+	n, err := sqlcgen.New(s.pool).OutboxBacklog(ctx)
+	return n, mapErr(err)
 }
 
 // NoticeAttachments implements application.Store through the owner-defined notice_attachments function.
@@ -490,8 +498,13 @@ func (t *txn) InsertNotice(ctx context.Context, n application.NoticeRecord) (int
 	if n.Actor != "" {
 		actor = &n.Actor
 	}
+	// the request's trace context rides with the row so the dispatcher's span can link back to it
+	var traceContext *string
+	if tp := telemetry.Traceparent(ctx); tp != "" {
+		traceContext = &tp
+	}
 	id, err := t.q.InsertNotice(ctx, sqlcgen.InsertNoticeParams{DisputeID: n.DisputeID, Seq: int32Of(n.Seq), Kind: string(n.Kind), Channel: string(n.Channel),
-		Recipient: n.Recipient, Subject: n.Subject, Document: n.Document, CreatedAt: n.CreatedAt, SentAt: sentAt, Actor: actor, ResendOf: n.ResendOf})
+		Recipient: n.Recipient, Subject: n.Subject, Document: n.Document, CreatedAt: n.CreatedAt, SentAt: sentAt, Actor: actor, ResendOf: n.ResendOf, TraceContext: traceContext})
 	return id, mapErr(err)
 }
 

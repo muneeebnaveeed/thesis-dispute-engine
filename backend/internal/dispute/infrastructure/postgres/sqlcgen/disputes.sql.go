@@ -71,21 +71,22 @@ func (q *Queries) ClaimAttachments(ctx context.Context, arg ClaimAttachmentsPara
 }
 
 const claimNotices = `-- name: ClaimNotices :many
-SELECT id, tenant_id, dispute_id, seq, kind, channel, recipient, subject, document, created_at, attempts FROM claim_notices($1)
+SELECT id, tenant_id, dispute_id, seq, kind, channel, recipient, subject, document, created_at, attempts, trace_context FROM claim_notices($1)
 `
 
 type ClaimNoticesRow struct {
-	ID        int64
-	TenantID  uuid.UUID
-	DisputeID uuid.UUID
-	Seq       int32
-	Kind      string
-	Channel   string
-	Recipient string
-	Subject   string
-	Document  []byte
-	CreatedAt time.Time
-	Attempts  int32
+	ID           int64
+	TenantID     uuid.UUID
+	DisputeID    uuid.UUID
+	Seq          int32
+	Kind         string
+	Channel      string
+	Recipient    string
+	Subject      string
+	Document     []byte
+	CreatedAt    time.Time
+	Attempts     int32
+	TraceContext *string
 }
 
 func (q *Queries) ClaimNotices(ctx context.Context, batch int32) ([]ClaimNoticesRow, error) {
@@ -109,6 +110,7 @@ func (q *Queries) ClaimNotices(ctx context.Context, batch int32) ([]ClaimNotices
 			&i.Document,
 			&i.CreatedAt,
 			&i.Attempts,
+			&i.TraceContext,
 		); err != nil {
 			return nil, err
 		}
@@ -961,23 +963,24 @@ func (q *Queries) InsertLedgerEntry(ctx context.Context, arg InsertLedgerEntryPa
 }
 
 const insertNotice = `-- name: InsertNotice :one
-INSERT INTO notices (dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at, actor, resend_of)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+INSERT INTO notices (dispute_id, seq, kind, channel, recipient, subject, document, created_at, sent_at, actor, resend_of, trace_context)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 RETURNING id
 `
 
 type InsertNoticeParams struct {
-	DisputeID uuid.UUID
-	Seq       int32
-	Kind      string
-	Channel   string
-	Recipient string
-	Subject   string
-	Document  []byte
-	CreatedAt time.Time
-	SentAt    pgtype.Timestamptz
-	Actor     *string
-	ResendOf  *int64
+	DisputeID    uuid.UUID
+	Seq          int32
+	Kind         string
+	Channel      string
+	Recipient    string
+	Subject      string
+	Document     []byte
+	CreatedAt    time.Time
+	SentAt       pgtype.Timestamptz
+	Actor        *string
+	ResendOf     *int64
+	TraceContext *string
 }
 
 func (q *Queries) InsertNotice(ctx context.Context, arg InsertNoticeParams) (int64, error) {
@@ -993,6 +996,7 @@ func (q *Queries) InsertNotice(ctx context.Context, arg InsertNoticeParams) (int
 		arg.SentAt,
 		arg.Actor,
 		arg.ResendOf,
+		arg.TraceContext,
 	)
 	var id int64
 	err := row.Scan(&id)
@@ -1772,6 +1776,17 @@ func (q *Queries) NoticeAttachments(ctx context.Context, nid int64) ([]NoticeAtt
 		return nil, err
 	}
 	return items, nil
+}
+
+const outboxBacklog = `-- name: OutboxBacklog :one
+SELECT outbox_backlog()
+`
+
+func (q *Queries) OutboxBacklog(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, outboxBacklog)
+	var outbox_backlog int64
+	err := row.Scan(&outbox_backlog)
+	return outbox_backlog, err
 }
 
 const purgeDraftAttachments = `-- name: PurgeDraftAttachments :one
