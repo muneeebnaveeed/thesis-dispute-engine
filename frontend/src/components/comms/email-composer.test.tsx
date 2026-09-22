@@ -79,10 +79,14 @@ test('server field errors land under the field they name', async () => {
     retryable: false,
     requestId: 'r1',
   }
-  const refused: Failure = { kind: 'validation', problem, fields: { 'fields.items': 'choose at least one' } }
+  const refused: Failure = {
+    kind: 'validation',
+    problem,
+    fields: { 'fields.items': 'Please select at least one option' },
+  }
   render(
     <EmailComposer templates={templates} facts={facts} busy={false} onSend={() => Promise.reject(refused)} />,
   )
   fireEvent.click(screen.getByRole('button', { name: 'Send email' }))
-  expect(await screen.findByText('choose at least one')).toBeInTheDocument()
+  expect(await screen.findByText('Please select at least one option')).toBeInTheDocument()
 })

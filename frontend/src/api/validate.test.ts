@@ -1,4 +1,5 @@
-import { ApplyEventRequest, CreateDisputeRequest } from './schemas.gen'
+import { FindTenantInput } from '#/forms/schemas'
+import { ApplyEventRequest, CreateDisputeRequest, CreateTenantKeyRequest } from './schemas.gen'
 import { validate } from './validate'
 
 test('accepts a well-formed create request and applies defaults', () => {
@@ -8,17 +9,27 @@ test('accepts a well-formed create request and applies defaults', () => {
   })
 })
 
-test('reports a bad uuid under its field', () => {
+test('messages say what to do, named after the field', () => {
   expect(validate(CreateDisputeRequest, { transactionId: 'nope' })).toMatchObject({
     ok: false,
-    errors: { transactionId: expect.any(String) },
+    errors: { transactionId: 'Please enter a valid transaction ID' },
   })
-})
-
-test('rejects an event outside the enum', () => {
+  expect(validate(CreateDisputeRequest, {})).toMatchObject({
+    errors: { transactionId: 'Please enter the transaction ID' },
+  })
   expect(validate(ApplyEventRequest, { event: 'DANCE' })).toMatchObject({
     ok: false,
-    errors: { event: expect.any(String) },
+    errors: { event: 'Please select the event' },
+  })
+  expect(validate(ApplyEventRequest, {})).toMatchObject({ errors: { event: 'Please select the event' } })
+  expect(validate(CreateTenantKeyRequest, { label: '' })).toMatchObject({
+    errors: { label: 'Please enter the label' },
+  })
+  expect(validate(CreateTenantKeyRequest, { label: 'x'.repeat(81) })).toMatchObject({
+    errors: { label: 'Please keep the label under 80 characters' },
+  })
+  expect(validate(FindTenantInput, { email: 'nope' })).toMatchObject({
+    errors: { email: 'Please enter a valid email address' },
   })
 })
 
