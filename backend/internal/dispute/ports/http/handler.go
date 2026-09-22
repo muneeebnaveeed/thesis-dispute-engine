@@ -29,6 +29,7 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/auth"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/httpserver"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/money"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/websession"
 )
@@ -686,7 +687,7 @@ func (h *Handler) ListDisputes(ctx context.Context, req oapi.ListDisputesRequest
 	out := oapi.DisputePage{Items: make([]oapi.DisputeSummary, 0, len(page.Items))}
 	for _, d := range page.Items {
 		item := oapi.DisputeSummary{Id: d.ID, Regime: oapi.Regime(d.Regime), Reason: oapi.DisputeReason(d.Reason), State: oapi.DisputeState(d.State),
-			TransactionId: d.TransactionID, DisputedAmount: d.DisputedAmount.StringFixed(4), Currency: d.Currency, OpenedAt: d.OpenedAt, UpdatedAt: d.UpdatedAt}
+			TransactionId: d.TransactionID, DisputedAmount: money.Format(d.DisputedAmount, d.Currency), Currency: d.Currency, OpenedAt: d.OpenedAt, UpdatedAt: d.UpdatedAt}
 		if d.NextDeadline != nil {
 			nd := toDeadline(*d.NextDeadline)
 			item.NextDeadline = &nd
@@ -869,7 +870,7 @@ func toAPI(v application.DisputeView) oapi.Dispute {
 	ledger := make([]oapi.LedgerEntry, 0, len(v.Ledger))
 	for _, l := range v.Ledger {
 		entry := oapi.LedgerEntry{Seq: l.Seq, Kind: oapi.PostingKind(l.Kind), Debit: oapi.LedgerAccount(l.Debit),
-			Credit: oapi.LedgerAccount(l.Credit), Amount: l.Amount.StringFixed(4), Currency: l.Currency, Reference: l.Reference, PostedAt: l.PostedAt}
+			Credit: oapi.LedgerAccount(l.Credit), Amount: money.Format(l.Amount, l.Currency), Currency: l.Currency, Reference: l.Reference, PostedAt: l.PostedAt}
 		if l.Core != nil {
 			entry.Core = &oapi.CoreReceipt{Rrn: l.Core.RRN, ResponseCode: l.Core.ResponseCode, LatencyMs: l.Core.LatencyMs}
 		}
@@ -878,10 +879,10 @@ func toAPI(v application.DisputeView) oapi.Dispute {
 	out := oapi.Dispute{
 		Id: v.ID, Regime: oapi.Regime(v.Regime), Reason: oapi.DisputeReason(v.Reason), State: oapi.DisputeState(v.State), Appeals: v.Appeals,
 		Version: v.Version, TransactionId: v.TransactionID, AccountId: v.AccountID,
-		DisputedAmount: v.DisputedAmount.StringFixed(4), Currency: v.Currency, OpenedAt: v.OpenedAt, UpdatedAt: v.UpdatedAt,
+		DisputedAmount: money.Format(v.DisputedAmount, v.Currency), Currency: v.Currency, OpenedAt: v.OpenedAt, UpdatedAt: v.UpdatedAt,
 		AllowedEvents: allowed, Events: events, Deadlines: deadlines, Ledger: ledger,
-		Balances: oapi.Balances{Customer: v.Balances.Customer.StringFixed(4), Suspense: v.Balances.Suspense.StringFixed(4),
-			Recovery: v.Balances.Recovery.StringFixed(4), Loss: v.Balances.Loss.StringFixed(4)},
+		Balances: oapi.Balances{Customer: money.Format(v.Balances.Customer, v.Currency), Suspense: money.Format(v.Balances.Suspense, v.Currency),
+			Recovery: money.Format(v.Balances.Recovery, v.Currency), Loss: money.Format(v.Balances.Loss, v.Currency)},
 	}
 	out.Notices = make([]oapi.Notice, 0, len(v.Notices))
 	for _, n := range v.Notices {

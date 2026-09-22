@@ -1,3 +1,4 @@
+import { formatMoney } from '#/money'
 import type { Dispute } from '#/server/disputes'
 
 const KIND: Record<Dispute['ledger'][number]['kind'], string> = {
@@ -41,9 +42,7 @@ export function Ledger({ ledger, balances, currency }: Pick<Dispute, 'ledger' | 
                 <td className="py-1 pr-4">{KIND[e.kind]}</td>
                 <td className="py-1 pr-4 font-mono">{e.debit}</td>
                 <td className="py-1 pr-4 font-mono">{e.credit}</td>
-                <td className="py-1 pr-4 text-right font-mono">
-                  {e.amount} {e.currency}
-                </td>
+                <td className="py-1 pr-4 text-right font-mono">{formatMoney(e.amount, e.currency)}</td>
                 <td
                   className="py-1 pr-4 font-mono text-xs text-neutral-500"
                   title={e.core ? `response ${e.core.responseCode}` : undefined}
@@ -76,7 +75,7 @@ function Balance({
     <div>
       <dt className="text-neutral-500">{label}</dt>
       <dd className={`font-mono ${outstanding ? 'font-medium text-amber-900' : ''}`}>
-        {value} {currency}
+        {formatMoney(value, currency)}
       </dd>
     </div>
   )

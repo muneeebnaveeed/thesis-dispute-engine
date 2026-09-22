@@ -125,7 +125,7 @@ func TestCreateApplyGetRoundTrip(t *testing.T) {
 	if rec.Code != 201 {
 		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
 	}
-	if created["regime"] != "EU_PSD2_CARD" || created["state"] != "INITIATED" || created["disputedAmount"] != "42.1000" {
+	if created["regime"] != "EU_PSD2_CARD" || created["state"] != "INITIATED" || created["disputedAmount"] != "42.10" {
 		t.Errorf("created = %v", created)
 	}
 	id := created["id"].(string)
@@ -174,13 +174,13 @@ func TestCreateApplyGetRoundTrip(t *testing.T) {
 	}
 	ledger := refunded["ledger"].([]any)
 	credit := ledger[0].(map[string]any)
-	if credit["kind"] != "FAST_REFUND" || credit["amount"] != "40.0000" || credit["debit"] != "SUSPENSE" || credit["credit"] != "CUSTOMER" {
+	if credit["kind"] != "FAST_REFUND" || credit["amount"] != "40.00" || credit["debit"] != "SUSPENSE" || credit["credit"] != "CUSTOMER" {
 		t.Errorf("credit = %v", credit)
 	}
 	if core, ok := credit["core"].(map[string]any); !ok || core["responseCode"] != "00" {
 		t.Errorf("credit core receipt = %v", credit["core"])
 	}
-	if refunded["balances"].(map[string]any)["suspense"] != "40.0000" {
+	if refunded["balances"].(map[string]any)["suspense"] != "40.00" {
 		t.Errorf("balances = %v", refunded["balances"])
 	}
 	rec, closed := a.do(http.MethodPost, "/disputes/"+id+"/events", map[string]any{"event": "CLOSE"}, nil)
@@ -188,7 +188,7 @@ func TestCreateApplyGetRoundTrip(t *testing.T) {
 		t.Fatalf("close: %d %s", rec.Code, rec.Body.String())
 	}
 	off := closed["ledger"].([]any)[1].(map[string]any)
-	if off["kind"] != "WRITE_OFF" || off["core"] != nil || closed["balances"].(map[string]any)["suspense"] != "0.0000" {
+	if off["kind"] != "WRITE_OFF" || off["core"] != nil || closed["balances"].(map[string]any)["suspense"] != "0.00" {
 		t.Errorf("after close: %v %v", off, closed["balances"])
 	}
 

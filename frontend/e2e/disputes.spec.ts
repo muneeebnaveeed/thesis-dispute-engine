@@ -136,14 +136,14 @@ test('a refund with a customer liability posts the difference, an over-cap liabi
   await expect(postings).toContainText('Refund to the customer')
   await expect(postings).toContainText('SUSPENSE')
   const advanced = page.getByText('Advanced, not yet cleared').locator('xpath=following-sibling::dd')
-  await expect(advanced).not.toHaveText(/^0\.0000/)
+  await expect(advanced).not.toHaveText(/EUR 0\.00$/)
 
   // Closing asks how the advance clears; the bank writes it off here and suspense returns to zero.
   const settle = page.getByLabel('Outstanding advance on close')
   await settle.selectOption('WRITTEN_OFF')
   await page.getByRole('button', { name: 'CLOSE' }).click()
   await expect(postings).toContainText('Written off')
-  await expect(advanced).toHaveText(/^0\.0000/)
+  await expect(advanced).toHaveText(/EUR 0\.00$/)
 })
 
 test("the tenant's banking core answers each credit, and a decline leaves the dispute exactly as it was", async ({
