@@ -3,6 +3,7 @@ import createClient from 'openapi-fetch'
 
 import type { paths } from '#/api/schema.gen'
 import { serverEnv } from '#/server/runtime/env'
+import { log } from '#/server/telemetry/log'
 import { realmConfig } from './oidc'
 
 const jwksByIssuer = new Map<string, ReturnType<typeof createRemoteJWKSet>>()
@@ -68,7 +69,11 @@ const jwksFor = async (issuer: string, slug: string) => {
 
 export const handleBackchannelLogout = async (logoutToken: string): Promise<boolean> => {
   const target = await verifyLogoutToken(logoutToken)
-  if (!target) return false
+  if (!target) {
+    log.warn('back-channel logout refused: token not accepted')
+    return false
+  }
+  log.info('back-channel logout', 'sid' in target ? { by: 'sid' } : { by: 'subject', issuer: target.issuer })
   const env = serverEnv()
   const internalApi = createClient<paths>({ baseUrl: env.apiUrl })
   const headers = { 'X-Service-Key': env.serviceKey }

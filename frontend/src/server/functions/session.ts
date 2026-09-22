@@ -1,13 +1,12 @@
 import { Type } from '@sinclair/typebox'
-import { createServerFn } from '@tanstack/react-start'
 
 import * as sessions from '#/server/auth/session-impl'
-import { parse } from '#/server/runtime/fn'
+import { parse, publicGet, publicPost } from '#/server/runtime/fn'
 
 // route files import this, never session-impl.ts, so server-only code stays out of the browser bundle
-export const getViewer = createServerFn({ method: 'GET' }).handler(() => sessions.viewer())
+export const getViewer = publicGet.handler(() => sessions.viewer())
 
-export const beginLogin = createServerFn({ method: 'POST' })
+export const beginLogin = publicPost
   .validator(
     parse(
       Type.Object({
@@ -18,4 +17,4 @@ export const beginLogin = createServerFn({ method: 'POST' })
   )
   .handler(({ data }) => sessions.begin(data))
 
-export const logout = createServerFn({ method: 'POST' }).handler(() => sessions.endSession())
+export const logout = publicPost.handler(() => sessions.endSession())
