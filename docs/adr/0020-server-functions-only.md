@@ -22,7 +22,8 @@ RPC); at that point the second transport bought nothing.
   function resolves the session and calls the API with the analyst's access token. The
   `getAccessToken` server function is gone; `accessTokenForRequest` is server-only.
 - One middleware (`authed`, `createMiddleware({ type: 'function' })`) resolves the session once
-  and puts an API client, or null when there is no session, into `context.api`. Two shared builders
+  and puts an API client into `context.api`; with no session it throws a redirect through the
+  tenant's front door and back to the page, so a stale tab signs in again instead of seeing an error. Two shared builders
   wrap it, `analystGet` and `analystPost`; a server function is `analystGet.validator(parse(schema))
   .handler(({ data, context }) => read(context.api, api => api.GET(...)))` and nothing more.
   `parse` validates every input against a TypeBox schema, the contract's generated schema where
