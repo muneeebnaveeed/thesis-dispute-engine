@@ -9,6 +9,14 @@ seconds=${EVAL_SECONDS:-120}
 key=${EVAL_KEY:-tk_dev_tenant_a}
 api=${DISPUTE_API_URL:-http://localhost:8090}
 prom=${PROMETHEUS_URL:-http://localhost:9090}
+# EVAL_SILENT=1 opens disputes on the probe account (no mail); EVAL_WORKBENCH=<url> adds page loads through the
+# workbench at EVAL_PAGES per second, signed in with the cookie frontend/scripts/session-cookie.ts prints.
+extra=()
+[[ -n ${EVAL_SILENT:-} ]] && extra+=(--silent)
+if [[ -n ${EVAL_WORKBENCH:-} ]]; then
+  session=$(cd "$root/frontend" && node scripts/session-cookie.ts otp "$EVAL_WORKBENCH")
+  extra+=(--workbench "$EVAL_WORKBENCH" --session "$session" --pages "${EVAL_PAGES:-2}")
+fi
 out="$root/docs/thesis/data/$(date +%Y-%m-%d_%H%M)"
 mkdir -p "$out"
 
@@ -32,7 +40,7 @@ print("  " + ", ".join("%s: %d passed, %d failed" % (k, v["passed"], v["failed"]
 ' "$out/correctness.json"
 
 info "load run: $rps iterations/s (about 5 requests each) for ${seconds}s; the tenant budget is 600 requests/min, raise DISPUTE_RATE_PER_MINUTE on the API to go faster"
-(cd "$root/backend" && go run ./cmd/eval --api "$api" --key "$key" --prometheus "$prom" --rps "$rps" --seconds "$seconds" --out "$out/load.json")
+(cd "$root/backend" && go run ./cmd/eval --api "$api" --key "$key" --prometheus "$prom" --rps "$rps" --seconds "$seconds" --out "$out/load.json" "${extra[@]}")
 
 info "environment"
 {

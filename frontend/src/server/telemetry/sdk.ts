@@ -45,9 +45,9 @@ export const startTelemetry = (): void => {
   process.once('SIGINT', stop)
 }
 
-// the JS SDK's default histogram buckets are meant for milliseconds; these are the API's, in seconds, so the two
-// services' latency panels compare like for like
-export const SECONDS_BUCKETS = [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 10]
+// the JS SDK's default histogram buckets are meant for milliseconds; these are the API's (telemetry.LatencyBuckets),
+// in seconds, so the two services' latency panels compare like for like
+export const SECONDS_BUCKETS = [0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
 
 export const tracer = (): Tracer => trace.getTracer(SCOPE)
 export const meter = (): Meter => metrics.getMeter(SCOPE)

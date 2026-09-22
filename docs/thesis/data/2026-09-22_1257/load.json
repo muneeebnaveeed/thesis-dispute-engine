@@ -1,0 +1,93 @@
+{
+  "started": "2026-09-22T12:57:07.219899456+02:00",
+  "ended": "2026-09-22T12:59:07.240784283+02:00",
+  "targetRps": 4,
+  "achievedRps": 20.321463249318523,
+  "requests": 2439,
+  "statuses": {
+    "200": 1440,
+    "201": 519,
+    "409": 480
+  },
+  "idempotentReplays": 39,
+  "disputesOpened": 480,
+  "transitionsApplied": 960,
+  "latencyByRoute": {
+    "p50": {
+      "GET /disputes": "0.0025772694726412058",
+      "GET /disputes/{disputeId}": "0.0019426952141057936",
+      "GET /internal/sessions/{sessionId}": "0.0005030487804878049",
+      "GET /internal/tenants": "0.0005220996428697711",
+      "GET /tenant-keys": "0.0015214262776129602",
+      "GET /tenant-templates": "0.0017257848800703254",
+      "POST /disputes": "0.007739616613418531",
+      "POST /disputes/{disputeId}/events": "0.0028273809523809527",
+      "PUT /internal/sessions/{sessionId}": "0.00175"
+    },
+    "p95": {
+      "GET /disputes": "0.004763829381366874",
+      "GET /disputes/{disputeId}": "0.004505794701986756",
+      "GET /internal/sessions/{sessionId}": "0.0009557926829268294",
+      "GET /internal/tenants": "0.000991989321452565",
+      "GET /tenant-keys": "0.0024021426277612955",
+      "GET /tenant-templates": "0.00395069039284325",
+      "POST /disputes": "0.021311855670103096",
+      "POST /disputes/{disputeId}/events": "0.005657894736842105",
+      "PUT /internal/sessions/{sessionId}": "0.002425"
+    },
+    "p99": {
+      "GET /disputes": "0.004958190262142488",
+      "GET /disputes/{disputeId}": "0.004901158940397352",
+      "GET /internal/sessions/{sessionId}": "0.000996036585365854",
+      "GET /internal/tenants": "0.0021456279999999966",
+      "GET /tenant-keys": "0.0024804285255522595",
+      "GET /tenant-templates": "0.00479013807856865",
+      "POST /disputes": "0.02426237113402062",
+      "POST /disputes/{disputeId}/events": "0.009131578947368425",
+      "PUT /internal/sessions/{sessionId}": "0.0024850000000000002"
+    }
+  },
+  "problemsByCode": {
+    "invalid-transition": "472.496"
+  },
+  "clientLatencyOverall": {
+    "p50": "2.984136ms",
+    "p95": "10.139206ms",
+    "p99": "11.759086ms"
+  },
+  "workbench": {
+    "targetPagesPerSecond": 3,
+    "pages": 359,
+    "statuses": {
+      "200": 359
+    },
+    "clientLatencyOverall": {
+      "p50": "9.043853ms",
+      "p95": "12.746011ms",
+      "p99": "15.498444ms"
+    },
+    "pageLatencyByRoute": {
+      "/otp": "0.023017287342014518",
+      "/otp/disputes/:id": "0.02060625989147309",
+      "/otp/keys": "0.009839629180646455",
+      "/otp/templates": "0.009843224575399625"
+    },
+    "serverFnLatencyByFunction": {
+      "getDispute": "0.009164377684617885",
+      "getViewer": "0.00245546875",
+      "listDisputes": "0.009074091766567417",
+      "listTenantKeys": "0.0049917823075968214",
+      "listTenantTemplates": "0.004990530657564507",
+      "tenantExists": "0.0009499999999999999"
+    }
+  },
+  "runtime": {
+    "apiGoroutinesMax": "62",
+    "apiHeapUsedMaxBytes": "1933312",
+    "apiPostgresP95Seconds": "0.0009631840716735066",
+    "outboxBacklogMax": "0",
+    "workbenchEventLoopP99Max": "0.011526143",
+    "workbenchEventLoopUtilMax": "0.0307736331870235",
+    "workbenchHeapUsedMaxBytes": "57438192"
+  }
+}
