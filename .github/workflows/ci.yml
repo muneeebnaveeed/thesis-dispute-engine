@@ -67,27 +67,13 @@ jobs:
       - run: scripts/check-runtime-versions.sh
 
   backend:
-    name: backend ${{ matrix.name }}
+    # One job, one warm module and build cache: each check used to pay its own checkout and setup, which was
+    # most of the wall time. Steps run to completion even after a failure so one run reports every problem.
+    name: backend checks
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: format
-            run: golangci-lint fmt --diff
-          - name: vet
-            run: go vet ./...
-          - name: lint
-            run: golangci-lint run ./...
-          - name: tidy
-            run: go mod tidy && git diff --exit-code -- go.mod go.sum
-          - name: vuln
-            run: go tool govulncheck ./...
-          - name: generate
-            run: sqlc generate && go generate ./... && git diff --exit-code -- internal/dispute/infrastructure/postgres/sqlcgen internal/dispute/ports/http/oapi
     defaults:
       run:
         working-directory: backend
@@ -98,33 +84,43 @@ jobs:
           go-version: ${{ needs.changes.outputs.go }}
           cache-dependency-path: backend/go.sum
       - name: Cache sqlc
-        if: matrix.name == 'generate'
         id: sqlc-cache
         uses: actions/cache@v6
         with:
           path: ~/.local/bin/sqlc
           key: sqlc-${{ runner.os }}-${{ needs.changes.outputs.sqlc }}
       - name: Install sqlc
-        if: matrix.name == 'generate' && steps.sqlc-cache.outputs.cache-hit != 'true'
+        if: steps.sqlc-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p ~/.local/bin
           curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 \
             "https://github.com/sqlc-dev/sqlc/releases/download/v${{ needs.changes.outputs.sqlc }}/sqlc_${{ needs.changes.outputs.sqlc }}_linux_amd64.tar.gz" \
             | tar -xz -C ~/.local/bin sqlc
-      - name: sqlc version
-        if: matrix.name == 'generate'
-        run: sqlc version
       - name: Install golangci-lint
-        if: matrix.name == 'lint' || matrix.name == 'format'
         uses: golangci/golangci-lint-action@v9
         with:
           version: v${{ needs.changes.outputs.golangci }}
           working-directory: backend
           install-mode: binary
-          # The action would run the linter itself; the matrix step does that.
+          # The action would run the linter itself; the lint step does that.
           args: --help
-      - name: Run ${{ matrix.name }}
-        run: ${{ matrix.run }}
+      - name: format
+        run: golangci-lint fmt --diff
+      - name: generate
+        if: ${{ !cancelled() }}
+        run: sqlc generate && go generate ./... && git diff --exit-code -- internal/dispute/infrastructure/postgres/sqlcgen internal/dispute/ports/http/oapi
+      - name: vet
+        if: ${{ !cancelled() }}
+        run: go vet ./...
+      - name: lint
+        if: ${{ !cancelled() }}
+        run: golangci-lint run ./...
+      - name: tidy
+        if: ${{ !cancelled() }}
+        run: go mod tidy && git diff --exit-code -- go.mod go.sum
+      - name: vuln
+        if: ${{ !cancelled() }}
+        run: go tool govulncheck ./...
 
   backend-test:
     name: backend test
@@ -246,27 +242,12 @@ jobs:
           echo "readyz never answered"; docker logs api; exit 1
 
   frontend:
-    name: frontend ${{ matrix.name }}
+    # One job for the same reason as the backend: install once, run every check, report every failure.
+    name: frontend checks
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: typecheck
-            run: pnpm generate-routes && pnpm typecheck
-          - name: lint
-            run: pnpm generate-routes && pnpm lint
-          - name: format
-            run: pnpm fmt
-          - name: generate
-            run: pnpm generate:check
-          - name: test
-            run: pnpm generate-routes && pnpm test
-          - name: build
-            run: pnpm generate-routes && pnpm build
     defaults:
       run:
         working-directory: frontend
@@ -282,8 +263,23 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - name: ${{ matrix.name }}
-        run: ${{ matrix.run }}
+      - name: generate
+        run: pnpm generate:check && pnpm generate-routes
+      - name: typecheck
+        if: ${{ !cancelled() }}
+        run: pnpm typecheck
+      - name: lint
+        if: ${{ !cancelled() }}
+        run: pnpm lint
+      - name: format
+        if: ${{ !cancelled() }}
+        run: pnpm fmt
+      - name: test
+        if: ${{ !cancelled() }}
+        run: pnpm test
+      - name: build
+        if: ${{ !cancelled() }}
+        run: pnpm build
 
   frontend-image:
     name: frontend image

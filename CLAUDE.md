@@ -10,7 +10,7 @@ How to work in this repo. What the system does is in `README.md` and `docs/adr/`
   vitest; Node and pnpm pinned in `mise.toml`.
 - `docs/thesis/`: long-form design document; tooling not yet decided.
 - `deploy/`: Docker Compose for local dependencies; distroless image in `backend/Dockerfile`.
-- CI: GitHub Actions, one job per check (`.github/workflows/ci.yml`).
+- CI: GitHub Actions, one job per area (backend checks, backend test, frontend checks, images) with a named step per check (`.github/workflows/ci.yml`).
 
 ## Commands (run from the repo root)
 
