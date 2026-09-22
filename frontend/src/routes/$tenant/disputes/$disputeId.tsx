@@ -10,6 +10,7 @@ import { QuestionnairePanel } from '#/components/disputes/questionnaire'
 import { RiskPanel } from '#/components/disputes/risk'
 import { AppShell } from '#/components/layout/app-shell'
 import { FailureBanner } from '#/components/layout/failure-banner'
+import { Panel } from '#/components/ui/panel'
 import { TenantMismatch } from '#/components/layout/tenant-mismatch'
 import { Button } from '#/components/ui/button'
 import { submitTo, submitting, useAppForm } from '#/forms/app-form'
@@ -73,29 +74,28 @@ const DisputePage = () => {
 
   return (
     <AppShell title={`Dispute ${dispute.id.slice(0, 8)}`}>
-      <dl className="mb-6 grid grid-cols-2 gap-x-6 gap-y-2 text-sm md:grid-cols-4">
-        <Fact label="State" value={dispute.state} mono />
-        <Fact label="Regime" value={dispute.regime} mono />
-        <Fact label="Reason" value={dispute.reason} mono />
-        <Fact label="Amount" value={formatMoney(dispute.disputedAmount, dispute.currency)} />
-        <Fact label="Appeals used" value={String(dispute.appeals)} />
-      </dl>
+      <Panel className="mb-6" title="Summary">
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm md:grid-cols-4">
+          <Fact label="State" value={dispute.state} mono />
+          <Fact label="Regime" value={dispute.regime} mono />
+          <Fact label="Reason" value={dispute.reason} mono />
+          <Fact label="Amount" value={formatMoney(dispute.disputedAmount, dispute.currency)} />
+          <Fact label="Appeals used" value={String(dispute.appeals)} />
+        </dl>
+      </Panel>
 
       {dispute.risk && (
-        <section className="mb-8">
-          <h2 className="mb-2 text-lg font-medium">Fraud risk</h2>
+        <Panel className="mb-6" title="Fraud risk">
           <RiskPanel risk={dispute.risk} />
-        </section>
+        </Panel>
       )}
 
-      <section className="mb-8">
-        <h2 className="mb-2 text-lg font-medium">Regulatory clocks</h2>
+      <Panel className="mb-6" title="Regulatory clocks">
         <Deadlines deadlines={dispute.deadlines} />
-      </section>
+      </Panel>
 
       {dispute.questionnaire && (
-        <section className="mb-8">
-          <h2 className="mb-2 text-lg font-medium">Questionnaire</h2>
+        <Panel className="mb-6" title="Questionnaire">
           <QuestionnairePanel
             questionnaire={dispute.questionnaire}
             canReceive={dispute.allowedEvents.includes('RECEIVE_QUESTIONNAIRE')}
@@ -104,13 +104,14 @@ const DisputePage = () => {
               applyEventMutation.mutateAsync({ event: 'RECEIVE_QUESTIONNAIRE', payload: { answers } })
             }
           />
-        </section>
+        </Panel>
       )}
 
-      <section className="mb-8">
-        <h2 className="mb-2 text-lg font-medium">Actions</h2>
+      <Panel className="mb-6" title="Actions">
         {dispute.allowedEvents.length === 0 ? (
-          <p className="text-sm text-neutral-600">This dispute is closed; nothing more can happen to it.</p>
+          <p className="text-sm text-muted-foreground">
+            This dispute is closed; nothing more can happen to it.
+          </p>
         ) : (
           <div className="flex flex-wrap gap-2">
             {dispute.allowedEvents
@@ -185,38 +186,38 @@ const DisputePage = () => {
             <FailureBanner failure={applyFailure} onRetry={applyEventMutation.clearFailure} />
           </div>
         )}
-      </section>
+      </Panel>
 
-      <section className="mb-8">
-        <h2 className="mb-2 text-lg font-medium">Ledger</h2>
+      <Panel className="mb-6" title="Ledger">
         <Ledger ledger={dispute.ledger} balances={dispute.balances} currency={dispute.currency} />
-      </section>
+      </Panel>
 
-      <section className="mb-8">
-        <div className="mb-2 flex items-baseline justify-between">
-          <h2 className="text-lg font-medium">Communications</h2>
+      <Panel
+        className="mb-6"
+        title="Communications"
+        actions={
           <Link
             to="/$tenant/disputes/$disputeId/communications"
             params={{ tenant, disputeId: dispute.id }}
-            className="text-sm underline"
+            className="text-[13px] text-primary underline"
           >
             Open the communications panel
           </Link>
-        </div>
+        }
+      >
         <Notices notices={dispute.notices} tenant={tenant} disputeId={dispute.id} />
-      </section>
+      </Panel>
 
-      <section>
-        <h2 className="mb-2 text-lg font-medium">Event log</h2>
+      <Panel title="Event log">
         <EventLog events={dispute.events} />
-      </section>
+      </Panel>
     </AppShell>
   )
 }
 
 const Fact = ({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) => (
   <div>
-    <dt className="text-neutral-500">{label}</dt>
+    <dt className="text-muted-foreground">{label}</dt>
     <dd className={cn(mono && 'font-mono')}>{value}</dd>
   </div>
 )

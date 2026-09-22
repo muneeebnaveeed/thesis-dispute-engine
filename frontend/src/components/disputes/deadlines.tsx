@@ -37,9 +37,9 @@ export const daysRemaining = (dueAt: string, now = Date.now()): string => {
 
 export const Deadlines = ({ deadlines }: { deadlines: Deadline[] }) => {
   if (deadlines.length === 0)
-    return <p className="text-sm text-neutral-600">This dispute predates the clocks.</p>
+    return <p className="text-[11px] text-muted-foreground">This dispute predates the clocks.</p>
   return (
-    <ul className="divide-y divide-neutral-200 text-sm" aria-label="Regulatory clocks">
+    <ul className="divide-y divide-border text-[11px]" aria-label="Regulatory clocks">
       {deadlines.map((deadline) => {
         const stillCounting = deadline.status === 'RUNNING' || deadline.status === 'BREACHED'
         return (
@@ -49,15 +49,17 @@ export const Deadlines = ({ deadlines }: { deadlines: Deadline[] }) => {
           >
             <span className="w-56 font-medium">
               {DEADLINE_KIND_LABEL[deadline.kind]}
-              {deadline.cycle > 0 && <span className="ml-1 text-neutral-500">(appeal {deadline.cycle})</span>}
+              {deadline.cycle > 0 && (
+                <span className="ml-1 text-muted-foreground">(appeal {deadline.cycle})</span>
+              )}
             </span>
             <DeadlineBadge status={deadline.status} />
-            <span className="text-neutral-600">
+            <span className="text-muted-foreground">
               due {deadline.dueAt.slice(0, 10)}
               {stillCounting && <> ({daysRemaining(deadline.dueAt)})</>}
               {deadline.metAt && <> , met {deadline.metAt.slice(0, 10)}</>}
             </span>
-            <span className="basis-full text-xs text-neutral-500">{deadline.basis}</span>
+            <span className="basis-full text-xs text-muted-foreground">{deadline.basis}</span>
           </li>
         )
       })}

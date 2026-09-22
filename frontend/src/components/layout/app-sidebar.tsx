@@ -89,7 +89,7 @@ const PickableImage = ({
         aria-label={label}
         onClick={() => picker.current?.click()}
         className={cn(
-          'group/pick relative cursor-pointer ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+          'group/pick relative ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
           square ? 'rounded-md' : 'rounded-full',
         )}
       >
@@ -140,7 +140,7 @@ export const AppSidebar = ({ viewer }: { viewer: Viewer }) => {
 
   return (
     <Sidebar>
-      <SidebarHeader className="flex-row items-center gap-3 px-4 py-3">
+      <SidebarHeader className="flex-row items-center gap-2 border-b border-sidebar-border bg-[image:var(--panel-heading)] px-2 py-1.5">
         <PickableImage
           square
           src={branding?.logoDataUrl ?? null}
@@ -148,12 +148,12 @@ export const AppSidebar = ({ viewer }: { viewer: Viewer }) => {
           label="Replace the organisation logo"
           onPick={isAdmin ? (file) => logoUpload.mutate(file) : undefined}
         />
-        <span className="truncate text-sm font-medium capitalize">{branding?.name ?? tenant}</span>
+        <span className="truncate text-[11px] font-bold capitalize">{branding?.name ?? tenant}</span>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
+        <SidebarGroup className="p-0">
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-0">
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname === `/${tenant}`} tooltip="Disputes">
                   <Link to="/$tenant" params={{ tenant }}>
@@ -174,9 +174,9 @@ export const AppSidebar = ({ viewer }: { viewer: Viewer }) => {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="border-t border-sidebar-border bg-[image:var(--toolbar)] p-1">
         {isAdmin && (
-          <SidebarMenu>
+          <SidebarMenu className="gap-0">
             <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname === `/${tenant}/keys`} tooltip="Tenant keys">
                 <Link to="/$tenant/keys" params={{ tenant }}>
@@ -204,14 +204,14 @@ export const AppSidebar = ({ viewer }: { viewer: Viewer }) => {
             {describe(refusal).title}
           </p>
         )}
-        <div className="flex items-center gap-3 px-2 py-1 group-data-[collapsible=icon]:px-0">
+        <div className="flex items-center gap-2 px-1 py-0.5 group-data-[collapsible=icon]:px-0">
           <PickableImage
             src={loadedAvatar?.value?.dataUrl ?? null}
             initials={initialsOf(viewer.firstName, viewer.lastName, viewer.name)}
             label="Replace your picture"
             onPick={(file) => avatarUpload.mutate(file)}
           />
-          <span className="min-w-0 flex-1 truncate text-sm capitalize group-data-[collapsible=icon]:hidden">
+          <span className="min-w-0 flex-1 truncate text-[11px] capitalize group-data-[collapsible=icon]:hidden">
             {viewer.name}
           </span>
           <button
@@ -219,7 +219,7 @@ export const AppSidebar = ({ viewer }: { viewer: Viewer }) => {
             aria-label="Sign out"
             title="Sign out"
             onClick={() => void signOut()}
-            className="cursor-pointer rounded-md p-2 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden"
+            className="rounded-md p-2 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden"
           >
             <SignOutIcon />
           </button>

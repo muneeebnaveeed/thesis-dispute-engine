@@ -7,15 +7,17 @@ import { TooltipProvider } from '#/components/shadcn/tooltip'
 
 // Signed out there is no tenant and nothing to navigate to, so the page keeps the plain centred layout.
 const PlainShell = ({ title, children }: { title: string; children: ReactNode }) => (
-  <div className="mx-auto max-w-5xl px-6 py-8">
-    <header className="mb-8 flex items-baseline justify-between border-b pb-4">
-      <Link to="/" className="text-sm font-medium tracking-wide text-muted-foreground uppercase">
+  <div>
+    <header className="flex items-center justify-between bg-primary px-6 py-3 text-primary-foreground">
+      <Link to="/" className="text-sm font-medium tracking-wide uppercase">
         Dispute Engine
       </Link>
-      <h1 className="text-2xl font-semibold">{title}</h1>
-      <span className="text-sm text-muted-foreground">Not signed in</span>
+      <span className="text-xs opacity-90">Not signed in</span>
     </header>
-    <main>{children}</main>
+    <div className="mx-auto max-w-5xl px-6 py-6">
+      <h1 className="mb-4 border-b border-border pb-2 text-2xl font-light">{title}</h1>
+      <main>{children}</main>
+    </div>
   </div>
 )
 
@@ -28,12 +30,19 @@ export const AppShell = ({ title, children }: { title: string; children: ReactNo
     <TooltipProvider>
       <SidebarProvider>
         <AppSidebar viewer={viewer} />
-        <SidebarInset>
-          <header className="flex h-14 items-center gap-3 border-b px-6">
-            <SidebarTrigger />
-            <h1 className="text-lg font-semibold">{title}</h1>
+        <SidebarInset className="min-w-0 bg-background">
+          <header className="flex h-12 shrink-0 items-center gap-3 bg-primary px-4 text-primary-foreground">
+            <SidebarTrigger className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
           </header>
-          <main className="min-w-0 px-6 py-8">{children}</main>
+          <div className="flex flex-wrap items-baseline justify-between gap-2 px-6 pt-5 pb-4">
+            <h1 className="text-2xl font-light">{title}</h1>
+            <nav aria-label="Breadcrumb" className="text-[13px] text-muted-foreground">
+              <span className="capitalize">{viewer.tenantSlug}</span>
+              <span className="px-1.5">/</span>
+              <span className="text-foreground">{title}</span>
+            </nav>
+          </div>
+          <main className="min-w-0 px-6 pb-8">{children}</main>
         </SidebarInset>
       </SidebarProvider>
     </TooltipProvider>

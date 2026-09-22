@@ -4,20 +4,23 @@ import type { ButtonHTMLAttributes } from 'react'
 import { cn } from '#/lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors disabled:opacity-50',
+  'inline-flex items-center justify-center border text-[11px] font-normal transition-colors disabled:opacity-60',
   {
     variants: {
       variant: {
-        primary: 'bg-neutral-900 text-white hover:bg-neutral-700',
-        secondary: 'border border-neutral-300 bg-white hover:bg-neutral-100',
-        link: 'underline hover:text-neutral-900',
-        action: 'border border-neutral-300 bg-white font-mono hover:bg-neutral-100',
+        primary:
+          'border-input bg-[image:var(--raised-primary)] text-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.6)] hover:bg-accent hover:bg-none',
+        secondary:
+          'border-input bg-[image:var(--raised)] text-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.6)] hover:bg-secondary hover:bg-none',
+        link: 'border-transparent text-primary underline hover:text-accent-foreground',
+        action:
+          'border-input bg-[image:var(--raised)] font-mono text-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.6)] hover:bg-secondary hover:bg-none',
       },
       size: {
-        md: 'px-4 py-2',
-        sm: 'px-3 py-1.5',
-        xs: 'px-2 py-1 text-xs',
-        bare: 'p-0',
+        md: 'px-3 py-[3px]',
+        sm: 'px-2 py-[2px]',
+        xs: 'px-1.5 py-px',
+        bare: 'border-0 p-0 shadow-none',
       },
     },
     defaultVariants: { variant: 'primary', size: 'md' },

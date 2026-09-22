@@ -3,10 +3,10 @@
 exports[`composer preview markup 1`] = `
 <section
   aria-label="Preview"
-  class="rounded-md border border-neutral-200 bg-white p-6 font-serif text-[12pt] leading-relaxed"
+  class="rounded-md border border-border bg-white p-6 font-serif text-[12pt] leading-relaxed"
 >
   <p
-    class="mb-6 text-sm text-neutral-500"
+    class="mb-6 text-sm text-muted-foreground"
   >
     OTP Bank
     <br />
@@ -54,7 +54,7 @@ exports[`composer preview markup 1`] = `
      disputes team
   </p>
   <p
-    class="mt-6 text-sm text-neutral-600"
+    class="mt-6 text-sm text-muted-foreground"
   >
     Attached: 
     statement.pdf

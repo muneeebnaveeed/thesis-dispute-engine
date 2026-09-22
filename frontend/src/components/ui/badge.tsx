@@ -3,18 +3,22 @@ import type { HTMLAttributes } from 'react'
 
 import { cn } from '#/lib/utils'
 
-const badgeVariants = cva('rounded px-1.5 py-0.5 text-xs font-medium', {
-  variants: {
-    tone: {
-      neutral: 'bg-neutral-100 text-neutral-800',
-      muted: 'bg-neutral-100 text-neutral-500',
-      good: 'bg-emerald-100 text-emerald-900',
-      warn: 'bg-amber-100 text-amber-900',
-      bad: 'bg-red-100 text-red-900',
+// the period's label: a solid block of colour with white text, never a soft tint
+const badgeVariants = cva(
+  'inline-block px-1 py-px text-[10px] font-bold tracking-wide text-[color:var(--tone-foreground)] uppercase',
+  {
+    variants: {
+      tone: {
+        neutral: 'bg-[color:var(--tone-neutral)]',
+        muted: 'bg-[color:var(--tone-muted)]',
+        good: 'bg-[color:var(--tone-good)]',
+        warn: 'bg-[color:var(--tone-warn)]',
+        bad: 'bg-[color:var(--tone-bad)]',
+      },
     },
+    defaultVariants: { tone: 'neutral' },
   },
-  defaultVariants: { tone: 'neutral' },
-})
+)
 
 export type BadgeTone = NonNullable<VariantProps<typeof badgeVariants>['tone']>
 

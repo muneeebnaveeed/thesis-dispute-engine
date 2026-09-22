@@ -50,11 +50,12 @@ export const SentEmails = ({
     { onSuccess: (bytes, { filename }) => saveToDisk(bytes, filename) },
   )
 
-  if (newestFirst.length === 0) return <p className="text-sm text-neutral-600">Nothing has been sent yet.</p>
+  if (newestFirst.length === 0)
+    return <p className="text-sm text-muted-foreground">Nothing has been sent yet.</p>
   return (
     <div className="grid gap-8 lg:grid-cols-2">
       <table className="w-full self-start text-left text-sm" aria-label="Sent emails">
-        <thead className="text-neutral-500">
+        <thead className="text-muted-foreground">
           <tr>
             <th className="py-1 pr-4 font-normal">Notice</th>
             <th className="py-1 pr-4 font-normal">Channel</th>
@@ -72,18 +73,18 @@ export const SentEmails = ({
               aria-selected={notice.id === selectedNoticeId}
               onClick={() => setPickedNoticeId(notice.id)}
               className={cn(
-                'cursor-pointer border-t border-neutral-200',
-                notice.id === selectedNoticeId ? 'bg-neutral-100' : 'hover:bg-neutral-50',
+                'cursor-pointer border-t border-border',
+                notice.id === selectedNoticeId ? 'bg-muted' : 'hover:bg-accent',
               )}
             >
               <td className="py-1 pr-4">
                 <button type="button" className="text-left" onClick={() => setPickedNoticeId(notice.id)}>
-                  {notice.resendOf !== undefined && <span className="text-neutral-500">Resent: </span>}
+                  {notice.resendOf !== undefined && <span className="text-muted-foreground">Resent: </span>}
                   {NOTICE_KIND_LABEL[notice.kind]}
                 </button>
               </td>
               <td className="py-1 pr-4 font-mono text-xs">{notice.channel}</td>
-              <td className="py-1 pr-4 text-neutral-600">{notice.actor ?? 'engine'}</td>
+              <td className="py-1 pr-4 text-muted-foreground">{notice.actor ?? 'engine'}</td>
               <td className="py-1 pr-4">
                 <NoticeStatusBadge notice={notice} />
               </td>
@@ -109,11 +110,11 @@ export const SentEmails = ({
       </table>
       <section
         aria-label="Sent email preview"
-        className="rounded-md border border-neutral-200 bg-white p-6 font-serif text-[12pt] leading-relaxed"
+        className="rounded-md border border-border bg-white p-6 font-serif text-[12pt] leading-relaxed"
       >
         {noticeDocument ? (
           <>
-            <p className="mb-6 text-sm text-neutral-500">
+            <p className="mb-6 text-sm text-muted-foreground">
               {noticeDocument.bank}
               <br />
               {noticeDocument.date.slice(0, 10)}
@@ -130,7 +131,7 @@ export const SentEmails = ({
             ))}
             <p className="whitespace-pre-line">{noticeDocument.closing}</p>
             {noticeDocument.basis && (
-              <p className="mt-8 text-[10pt] text-neutral-600">{noticeDocument.basis}</p>
+              <p className="mt-8 text-[10pt] text-muted-foreground">{noticeDocument.basis}</p>
             )}
             {selectedNotice && selectedNotice.attachments.length > 0 && (
               <ul className="mt-6 space-y-1 font-sans text-sm" aria-label="Attachments">
@@ -149,14 +150,14 @@ export const SentEmails = ({
                     >
                       {attachment.filename}
                     </Button>{' '}
-                    <span className="text-neutral-500">({Math.ceil(attachment.size / 1024)} KB)</span>
+                    <span className="text-muted-foreground">({Math.ceil(attachment.size / 1024)} KB)</span>
                   </li>
                 ))}
               </ul>
             )}
           </>
         ) : (
-          <p className="text-sm text-neutral-500">Loading...</p>
+          <p className="text-sm text-muted-foreground">Loading...</p>
         )}
       </section>
     </div>

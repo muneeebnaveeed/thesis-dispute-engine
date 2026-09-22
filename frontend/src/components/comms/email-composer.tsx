@@ -56,7 +56,7 @@ export const EmailComposer = ({
     [selectedTemplate, analystInputs, today],
   )
   if (!selectedTemplate || !renderedEmail) {
-    return <p className="text-sm text-neutral-600">No templates are available.</p>
+    return <p className="text-sm text-muted-foreground">No templates are available.</p>
   }
 
   return (
@@ -78,7 +78,7 @@ export const EmailComposer = ({
               label="Email template"
               options={templates.map((template) => ({ value: template.kind, label: template.label }))}
               hint={
-                <span className="mt-1 block text-xs text-neutral-500">
+                <span className="mt-1 block text-xs text-muted-foreground">
                   {selectedTemplate.description}
                   {selectedTemplate.letter &&
                     ' Also goes out as a letter where the regime requires written notices.'}
@@ -96,7 +96,7 @@ export const EmailComposer = ({
           <div>
             <label className="block">
               Attachments{' '}
-              <span className="text-neutral-400">(PDF, PNG or JPEG, at most 5 MB each, up to 3)</span>
+              <span className="text-muted-foreground">(PDF, PNG or JPEG, at most 5 MB each, up to 3)</span>
               <input
                 type="file"
                 accept="application/pdf,image/png,image/jpeg"
@@ -114,15 +114,15 @@ export const EmailComposer = ({
                 {attachmentDrafts.map((draft) => (
                   <li
                     key={draft.id}
-                    className="flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-0.5 text-xs"
+                    className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs"
                   >
                     {draft.filename}{' '}
-                    <span className="text-neutral-500">({Math.ceil(draft.size / 1024)} KB)</span>
+                    <span className="text-muted-foreground">({Math.ceil(draft.size / 1024)} KB)</span>
                     {onRemoveAttachmentDraft && (
                       <button
                         type="button"
                         aria-label={`Remove ${draft.filename}`}
-                        className="ml-1 text-neutral-500 hover:text-neutral-900"
+                        className="ml-1 text-muted-foreground hover:text-foreground"
                         onClick={() => onRemoveAttachmentDraft(draft.id)}
                       >
                         x
@@ -142,9 +142,9 @@ export const EmailComposer = ({
 
       <section
         aria-label="Preview"
-        className="rounded-md border border-neutral-200 bg-white p-6 font-serif text-[12pt] leading-relaxed"
+        className="rounded-md border border-border bg-white p-6 font-serif text-[12pt] leading-relaxed"
       >
-        <p className="mb-6 text-sm text-neutral-500">
+        <p className="mb-6 text-sm text-muted-foreground">
           {facts.bank}
           <br />
           {today.toLocaleDateString('en-GB', {
@@ -169,7 +169,7 @@ export const EmailComposer = ({
           {facts.bank} disputes team
         </p>
         {attachmentDrafts.length > 0 && (
-          <p className="mt-6 text-sm text-neutral-600">
+          <p className="mt-6 text-sm text-muted-foreground">
             Attached: {attachmentDrafts.map((draft) => draft.filename).join(', ')}
           </p>
         )}
@@ -207,7 +207,7 @@ const TemplateFieldInput = ({
   const label = (
     <>
       {templateField.label}
-      {templateField.required && <span className="text-neutral-400"> (required)</span>}
+      {templateField.required && <span className="text-muted-foreground"> (required)</span>}
     </>
   )
   if (templateField.type === 'MULTISELECT')
