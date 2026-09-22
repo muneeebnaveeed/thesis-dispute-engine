@@ -33,6 +33,13 @@ side effect that can fail, and a transition must not be undone because a mail re
   Recipients come from the account (`accounts.email`, `accounts.postal_address`); a missing
   address skips that channel and the other still goes out.
 
+## Testing
+
+The words are pinned by golden files (`backend/internal/dispute/notice/testdata`, one per kind, regime and
+outcome, plus the MIME bytes under `infrastructure/mail/testdata`) and by Vitest snapshots of the browser
+renderer and the composer preview. A change to what a customer reads is therefore a diff in review, not a
+browser scenario; the browser suite does not cover email, by decision (2026-09-22).
+
 ## Consequences
 
 - Easier: the customer's file is complete and auditable from the dispute alone; a new obligation

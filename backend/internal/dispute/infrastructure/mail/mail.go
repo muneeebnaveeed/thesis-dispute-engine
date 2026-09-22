@@ -22,43 +22,50 @@ type SMTP struct {
 	Now  func() time.Time
 }
 
-// Send implements application.Mailer as a multipart/alternative message.
+// Send implements application.Mailer.
 func (s SMTP) Send(_ context.Context, m application.Mail) error {
+	if err := smtp.SendMail(s.Addr, nil, s.From, []string{m.To}, s.Message(m)); err != nil {
+		return fmt.Errorf("smtp %s: %w", s.Addr, err)
+	}
+	return nil
+}
+
+// Message builds the RFC 5322 bytes: multipart/alternative for text and HTML, wrapped in multipart/mixed when
+// files travel with it, base64 in 76-column lines as RFC 2045 asks. Boundaries derive from the clock so a test
+// with a fixed clock gets fixed output.
+func (s SMTP) Message(m application.Mail) []byte {
 	now := time.Now
 	if s.Now != nil {
 		now = s.Now
 	}
-	alt := fmt.Sprintf("alt%d", now().UnixNano())
+	stamp := now()
+	alt := fmt.Sprintf("alt%d", stamp.UnixNano())
 	var body strings.Builder
 	fmt.Fprintf(&body, "--%s\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n%s\r\n", alt, m.Text)
 	fmt.Fprintf(&body, "--%s\r\nContent-Type: text/html; charset=utf-8\r\n\r\n%s\r\n--%s--\r\n", alt, m.HTML, alt)
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "From: %s\r\nTo: %s\r\nSubject: %s\r\nDate: %s\r\nMIME-Version: 1.0\r\n",
-		s.From, m.To, mime.QEncoding.Encode("utf-8", m.Subject), now().Format(time.RFC1123Z))
+		s.From, m.To, mime.QEncoding.Encode("utf-8", m.Subject), stamp.Format(time.RFC1123Z))
 	if len(m.Files) == 0 {
 		fmt.Fprintf(&b, "Content-Type: multipart/alternative; boundary=%s\r\n\r\n%s", alt, body.String())
-	} else {
-		// Attachments wrap the alternative part in a mixed one, base64 in 76-column lines as RFC 2045 asks.
-		mixed := fmt.Sprintf("mix%d", now().UnixNano())
-		fmt.Fprintf(&b, "Content-Type: multipart/mixed; boundary=%s\r\n\r\n", mixed)
-		fmt.Fprintf(&b, "--%s\r\nContent-Type: multipart/alternative; boundary=%s\r\n\r\n%s", mixed, alt, body.String())
-		for _, f := range m.Files {
-			name := mime.QEncoding.Encode("utf-8", f.Name)
-			fmt.Fprintf(&b, "--%s\r\nContent-Type: %s; name=\"%s\"\r\nContent-Disposition: attachment; filename=\"%s\"\r\nContent-Transfer-Encoding: base64\r\n\r\n", mixed, f.ContentType, name, name)
-			enc := base64.StdEncoding.EncodeToString(f.Content)
-			for len(enc) > 76 {
-				b.WriteString(enc[:76] + "\r\n")
-				enc = enc[76:]
-			}
-			b.WriteString(enc + "\r\n")
+		return []byte(b.String())
+	}
+	mixed := fmt.Sprintf("mix%d", stamp.UnixNano())
+	fmt.Fprintf(&b, "Content-Type: multipart/mixed; boundary=%s\r\n\r\n", mixed)
+	fmt.Fprintf(&b, "--%s\r\nContent-Type: multipart/alternative; boundary=%s\r\n\r\n%s", mixed, alt, body.String())
+	for _, f := range m.Files {
+		name := mime.QEncoding.Encode("utf-8", f.Name)
+		fmt.Fprintf(&b, "--%s\r\nContent-Type: %s; name=\"%s\"\r\nContent-Disposition: attachment; filename=\"%s\"\r\nContent-Transfer-Encoding: base64\r\n\r\n", mixed, f.ContentType, name, name)
+		enc := base64.StdEncoding.EncodeToString(f.Content)
+		for len(enc) > 76 {
+			b.WriteString(enc[:76] + "\r\n")
+			enc = enc[76:]
 		}
-		fmt.Fprintf(&b, "--%s--\r\n", mixed)
+		b.WriteString(enc + "\r\n")
 	}
-	if err := smtp.SendMail(s.Addr, nil, s.From, []string{m.To}, []byte(b.String())); err != nil {
-		return fmt.Errorf("smtp %s: %w", s.Addr, err)
-	}
-	return nil
+	fmt.Fprintf(&b, "--%s--\r\n", mixed)
+	return []byte(b.String())
 }
 
 // Log records the message instead of sending it.

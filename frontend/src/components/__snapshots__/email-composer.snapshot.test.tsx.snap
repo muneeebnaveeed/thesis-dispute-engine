@@ -1,0 +1,63 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`composer preview markup 1`] = `
+<section
+  aria-label="Preview"
+  class="rounded-md border border-neutral-200 bg-white p-6 font-serif text-[12pt] leading-relaxed"
+>
+  <p
+    class="mb-6 text-sm text-neutral-500"
+  >
+    OTP Bank
+    <br />
+    22 September 2026
+  </p>
+  <h3
+    class="mb-4 text-[14pt] font-semibold"
+  >
+    We need a little more information
+  </h3>
+  <p
+    class="mb-4"
+  >
+    Dear 
+    Kovács Anna
+    ,
+  </p>
+  <p
+    class="mb-4 whitespace-pre-line"
+  >
+    We need:
+  </p>
+  <p
+    class="mb-4 whitespace-pre-line"
+  >
+    <mark
+      class="rounded bg-amber-100 px-1 font-sans text-xs text-amber-900"
+      data-missing="items"
+    >
+      items
+    </mark>
+  </p>
+  <p
+    class="mb-4 whitespace-pre-line"
+  >
+    Please reply by 2 October 2026.
+  </p>
+  <p
+    class="whitespace-pre-line"
+  >
+    Yours sincerely,
+    
+
+    OTP Bank
+     disputes team
+  </p>
+  <p
+    class="mt-6 text-sm text-neutral-600"
+  >
+    Attached: 
+    statement.pdf
+  </p>
+</section>
+`;

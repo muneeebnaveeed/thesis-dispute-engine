@@ -1,0 +1,99 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CUSTOM renders as the analyst previews it 1`] = `
+{
+  "paragraphs": [
+    "We have posted a replacement card to your address on file.
+It arrives within five working days.",
+    "Dispute reference 01a0c601-0000-7000-8000-000000000001.",
+  ],
+  "subject": "Your new card",
+}
+`;
+
+exports[`CUSTOM with nothing filled shows every placeholder 1`] = `
+{
+  "paragraphs": [
+    "{{body}}",
+    "Dispute reference 01a0c601-0000-7000-8000-000000000001.",
+  ],
+  "subject": "{{subject}}",
+}
+`;
+
+exports[`DOCUMENTS_RECEIVED renders as the analyst previews it 1`] = `
+{
+  "paragraphs": [
+    "Thank you for sending us the following about your dispute of the 1899.00 EUR payment to MediaMarkt:",
+    "- receipt dated 9 September
+- photos of the item",
+    "We are still missing:",
+    "- the courier's proof of delivery",
+    "We will let you know as soon as our investigation is complete. Dispute reference 01a0c601-0000-7000-8000-000000000001.",
+  ],
+  "subject": "Thank you, we have your documents",
+}
+`;
+
+exports[`DOCUMENTS_RECEIVED with nothing filled shows every placeholder 1`] = `
+{
+  "paragraphs": [
+    "Thank you for sending us the following about your dispute of the 1899.00 EUR payment to MediaMarkt:",
+    "{{received}}",
+    "{{missing}}",
+    "We will let you know as soon as our investigation is complete. Dispute reference 01a0c601-0000-7000-8000-000000000001.",
+  ],
+  "subject": "Thank you, we have your documents",
+}
+`;
+
+exports[`REQUEST_FOR_INFORMATION renders as the analyst previews it 1`] = `
+{
+  "paragraphs": [
+    "We are looking into your dispute of the 1899.00 EUR payment to MediaMarkt. To continue, we need the following from you:",
+    "- a copy of the receipt, invoice or order confirmation for the payment
+- any correspondence with the merchant about this payment (emails, letters, chat transcripts) and their response",
+    "- the serial number
+- the box it came in",
+    "Please reply by 2 October 2026 (10 days from today). If we do not hear from you by then, we will decide the dispute on what we have.",
+    "Dispute reference 01a0c601-0000-7000-8000-000000000001.",
+  ],
+  "subject": "We need a little more information about your dispute",
+}
+`;
+
+exports[`REQUEST_FOR_INFORMATION with nothing filled shows every placeholder 1`] = `
+{
+  "paragraphs": [
+    "We are looking into your dispute of the 1899.00 EUR payment to MediaMarkt. To continue, we need the following from you:",
+    "{{items}}",
+    "{{other}}",
+    "Please reply by 2 October 2026 (10 days from today). If we do not hear from you by then, we will decide the dispute on what we have.",
+    "Dispute reference 01a0c601-0000-7000-8000-000000000001.",
+  ],
+  "subject": "We need a little more information about your dispute",
+}
+`;
+
+exports[`STATUS_UPDATE renders as the analyst previews it 1`] = `
+{
+  "paragraphs": [
+    "We have raised the case with the merchant's bank through the card network and are waiting for their response.",
+    "The merchant has 30 days to answer.",
+    "We will write to you again by 20 October 2026.",
+    "There is nothing you need to do now. Dispute reference 01a0c601-0000-7000-8000-000000000001.",
+  ],
+  "subject": "An update on your dispute",
+}
+`;
+
+exports[`STATUS_UPDATE with nothing filled shows every placeholder 1`] = `
+{
+  "paragraphs": [
+    "{{stage}}",
+    "{{note}}",
+    "There is nothing you need to do now. Dispute reference 01a0c601-0000-7000-8000-000000000001.",
+  ],
+  "subject": "An update on your dispute",
+}
+`;
