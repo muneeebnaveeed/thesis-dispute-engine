@@ -33,12 +33,13 @@ lint and format fixes. `make fe-dev` for the dev server on :3002. Inside `fronte
   function in `src/server/functions/<domain>.ts`, built from `authenticatedGet` or `authenticatedPost`
   (`src/server/runtime/fn.ts`): the `authed` middleware resolves the session once and provides
   `context.api`; `.validator(parse(schema))` checks the input with a TypeBox schema (the generated
-  one where the contract has it) before the handler runs; the handler is always
-  `asOutcome((api, input) => api.GET(...))`, which drops the `Response` (it cannot cross the RPC
-  boundary) and returns an `Outcome` (`{ value }` or `{ problem }`, never a throw for problem+json).
-  Endpoints that return a dispute wrap the call in `withDisputeView`. Every `queryOptions` sets
-  `select: classified`, so components receive `Loaded<T>` (`{ value, failure }`) and render
-  `failure` straight into `FailureBanner`; never call `classify` in a component. No session (or an API 401) is not an outcome: the middleware throws a redirect
+  one where the contract has it) before the handler runs; the handler returns the openapi-fetch
+  result as it is (`({ data, context: { api } }) => api.GET(...)`), never a throw for problem+json.
+  The `Response` inside it crosses the RPC boundary as its status line through the serialization
+  adapter in `src/api/response-adapter.ts`, registered in `src/start.ts`. Endpoints that return a
+  dispute wrap the call in `withDisputeView`. Every `queryOptions` sets `select: classified`, so
+  components receive `Loaded<T>` (`{ value, failure }`) and render `failure` straight into
+  `FailureBanner`; never call `classify` in a component. No session (or an API 401) is not an outcome: the middleware throws a redirect
   through the tenant's front door back to the page (`signInAgain`), loaders follow it by themselves
   and `useServerMutation` follows it for actions, so never call a server function imperatively
   outside that hook.
