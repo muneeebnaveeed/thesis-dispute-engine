@@ -218,7 +218,7 @@ test('the questionnaire follows the reason, incomplete answers are refused under
       .first(),
   ).toHaveText('QUESTIONNAIRE_SENT')
 
-  await page.getByLabel(/card with you when the payment/).selectOption('yes')
+  await page.getByLabel(/still have the card/).selectOption('yes')
   await page.getByLabel(/anyone else had access/).selectOption('no')
   await page.getByLabel(/disputed a transaction with this merchant before/).selectOption('no')
   await noticed.fill('2026-09-20')

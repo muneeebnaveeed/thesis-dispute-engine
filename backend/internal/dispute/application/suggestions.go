@@ -61,21 +61,17 @@ func openedPayload(proposal *ReasonProposal, chosen domain.Reason) []byte {
 
 // recordAcceptance is the only measure of whether any of this helps: how often an analyst keeps what the
 // model offered. The label is the field, never the value, so the counter stays a small fixed set.
-func (s *Service) recordAcceptance(ctx context.Context, field string, proposal *ReasonProposal, chosen domain.Reason) {
-	if proposal == nil || !proposal.Confident {
+func recordAcceptance(ctx context.Context, field, proposed, chosen string) {
+	if proposed == "" {
 		return
 	}
-	counter, _ := decisionMeters()
-	if counter == nil {
-		return
-	}
-	accepted, _ := otel.Meter(scopeName).Int64Counter("dispute.proposals_accepted",
+	accepted, err := otel.Meter(scopeName).Int64Counter("dispute.proposals_accepted",
 		metric.WithDescription("Proposals an analyst kept or overrode, by field"))
-	if accepted == nil {
+	if err != nil {
 		return
 	}
 	accepted.Add(ctx, 1, metric.WithAttributes(
-		attribute.String("field", field), attribute.Bool("accepted", proposal.Reason == chosen)))
+		attribute.String("field", field), attribute.Bool("accepted", proposed == chosen)))
 }
 
 // ReasonProposal is a reason the model offered and how sure it was. Confident is false when it offered

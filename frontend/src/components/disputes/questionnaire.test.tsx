@@ -49,7 +49,7 @@ test('an unanswered questionnaire is a form that sends only what was filled in',
   fireEvent.change(screen.getByLabelText(/did authorise/), { target: { value: '2026-09-10' } })
   fireEvent.click(screen.getByRole('button', { name: 'Record answers' }))
   await waitFor(() =>
-    expect(onReceive).toHaveBeenCalledWith({ original_on: '2026-09-10', same_merchant: 'no' }),
+    expect(onReceive).toHaveBeenCalledWith({ original_on: '2026-09-10', same_merchant: 'no' }, {}),
   )
 })
 

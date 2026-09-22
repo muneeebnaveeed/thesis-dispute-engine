@@ -22,10 +22,14 @@ export const QuestionnairePanel = ({
   disputeId: string
   canReceive: boolean
   busy: boolean
-  onReceive: (answers: Record<string, string>) => Promise<unknown>
+  onReceive: (
+    answers: Record<string, string>,
+    suggestions: Record<string, { value: string; probability: number }>,
+  ) => Promise<unknown>
 }) => {
   // ids the model filled in, cleared per field as soon as the analyst touches it
-  const [proposed, setProposed] = useState<string[]>([])
+  // what was proposed travels with the answers, so acceptance can be counted per question
+  const [proposed, setProposed] = useState<Record<string, { value: string; probability: number }>>({})
   const suggestion = useQuestionnaireSuggestion()
   const answersForm = useAppForm({
     defaultValues: {
@@ -35,6 +39,7 @@ export const QuestionnairePanel = ({
       submitTo(formApi, () =>
         onReceive(
           Object.fromEntries(Object.entries(value.answers).filter(([, answer]) => answer.trim() !== '')),
+          proposed,
         ),
       ),
   })
@@ -46,7 +51,7 @@ export const QuestionnairePanel = ({
     if (!read) return
     const filled = Object.entries(read.answers)
     for (const [id, answer] of filled) answersForm.setFieldValue(`answers.${id}`, answer.value)
-    setProposed(filled.map(([id]) => id))
+    setProposed(Object.fromEntries(filled))
   }
 
   if (questionnaire.receivedAt) {
@@ -116,7 +121,7 @@ export const QuestionnairePanel = ({
                     label={
                       <>
                         {label}
-                        {proposed.includes(question.id) && (
+                        {question.id in proposed && (
                           <span className="text-muted-foreground"> (suggested)</span>
                         )}
                       </>
@@ -124,7 +129,7 @@ export const QuestionnairePanel = ({
                     options={YES_NO}
                     placeholder="choose"
                     disabled={disabled}
-                    onChange={() => setProposed((ids) => ids.filter((id) => id !== question.id))}
+                    onChange={() => setProposed(({ [question.id]: _dropped, ...rest }) => rest)}
                   />
                 )
               if (question.type === 'DATE')

@@ -9,7 +9,7 @@
     },
     {
       "id": "card_in_possession",
-      "text": "Did you have the card with you when the payment was made?",
+      "text": "Do you still have the card, rather than having lost it or had it stolen?",
       "type": "YES_NO",
       "required": true
     },
