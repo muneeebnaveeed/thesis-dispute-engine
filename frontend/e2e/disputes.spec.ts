@@ -206,7 +206,7 @@ test('the questionnaire follows the reason, incomplete answers are refused under
   await page.getByRole('button', { name: 'Record answers' }).click()
   const noticed = page.getByLabel(/When did you notice/)
   await expect(noticed).toHaveAttribute('aria-invalid', 'true')
-  await expect(page.locator('#answers-noticed_on-error')).toContainText(/required/)
+  await expect(page.locator('#answers-noticed_on-error')).toContainText(/Please select a date/)
   await expect(
     page
       .getByRole('definition')

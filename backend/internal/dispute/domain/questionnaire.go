@@ -159,7 +159,7 @@ func ValidateAnswers(questions []Question, answers map[string]string) error {
 		v, ok := answers[q.ID]
 		if !ok || v == "" {
 			if q.Required {
-				fields = append(fields, errs.FieldError{Field: "body.payload.answers." + q.ID, Message: "an answer is required"})
+				fields = append(fields, errs.FieldError{Field: "body.payload.answers." + q.ID, Message: missingAnswer(q.Type)})
 			}
 			continue
 		}
@@ -179,23 +179,37 @@ func ValidateAnswers(questions []Question, answers map[string]string) error {
 	return ErrInvalidAnswers.WithFields(fields...)
 }
 
+// Messages are shown to the analyst under the input, so they say what to do, not what rule was broken.
+func missingAnswer(t AnswerType) string {
+	switch t {
+	case AnswerYesNo:
+		return "Please choose yes or no"
+	case AnswerDate:
+		return "Please select a date"
+	case AnswerAmount:
+		return "Please enter an amount"
+	default:
+		return "Please enter an answer"
+	}
+}
+
 func checkAnswer(t AnswerType, v string) string {
 	switch t {
 	case AnswerYesNo:
 		if v != "yes" && v != "no" {
-			return `must be "yes" or "no"`
+			return "Please choose yes or no"
 		}
 	case AnswerDate:
 		if _, err := time.Parse("2006-01-02", v); err != nil {
-			return "must be a date as YYYY-MM-DD"
+			return "Please enter a date as YYYY-MM-DD"
 		}
 	case AnswerAmount:
 		if d, err := decimal.NewFromString(v); err != nil || d.IsNegative() {
-			return "must be a non-negative decimal amount"
+			return "Please enter an amount of zero or more, such as 12.50"
 		}
 	case AnswerText:
 		if len(v) > 2000 {
-			return fmt.Sprintf("at most 2000 characters (%d given)", len(v))
+			return fmt.Sprintf("Please keep the answer under 2000 characters (%d given)", len(v))
 		}
 	}
 	return ""

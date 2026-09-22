@@ -193,7 +193,7 @@ func Validate(t Template, inputs map[string]string) (map[string]string, error) {
 		}
 		if raw == "" {
 			if f.Required {
-				refuse(f.ID, "required")
+				refuse(f.ID, missingField(f))
 			}
 			continue
 		}
@@ -216,31 +216,47 @@ func Validate(t Template, inputs map[string]string) (map[string]string, error) {
 	return values, nil
 }
 
+// Messages are shown to the analyst under the input, so they say what to do, not what rule was broken.
+func missingField(f Field) string {
+	switch f.Type {
+	case FieldSelect:
+		return "Please select one of the options"
+	case FieldMultiselect:
+		return "Please select at least one option"
+	case FieldDate:
+		return "Please select a date"
+	case FieldNumber:
+		return "Please enter a number"
+	default:
+		return fmt.Sprintf("Please fill in %q", f.Label)
+	}
+}
+
 func displayValue(f Field, raw string) (string, string) {
 	switch f.Type {
 	case FieldText:
 		if len(raw) > 200 {
-			return "", "at most 200 characters"
+			return "", "Please keep this under 200 characters"
 		}
 		return raw, ""
 	case FieldTextarea:
 		if len(raw) > 4000 {
-			return "", "at most 4000 characters"
+			return "", "Please keep this under 4000 characters"
 		}
 		return raw, ""
 	case FieldNumber:
 		n, err := strconv.Atoi(raw)
 		if err != nil {
-			return "", "must be a whole number"
+			return "", "Please enter a whole number"
 		}
 		if (f.Min != nil && n < *f.Min) || (f.Max != nil && n > *f.Max) {
-			return "", fmt.Sprintf("must be between %d and %d", deref(f.Min, 0), deref(f.Max, n))
+			return "", fmt.Sprintf("Please enter a number between %d and %d", deref(f.Min, 0), deref(f.Max, n))
 		}
 		return strconv.Itoa(n), ""
 	case FieldDate:
 		d, err := time.Parse("2006-01-02", raw)
 		if err != nil {
-			return "", "must be a date as YYYY-MM-DD"
+			return "", "Please enter a date as YYYY-MM-DD"
 		}
 		return d.Format("2 January 2006"), ""
 	case FieldSelect:
@@ -249,7 +265,7 @@ func displayValue(f Field, raw string) (string, string) {
 				return o.Text, ""
 			}
 		}
-		return "", "not one of the options"
+		return "", "Please select one of the options"
 	case FieldMultiselect:
 		var texts []string
 		for _, key := range strings.Split(raw, ",") {
@@ -259,12 +275,12 @@ func displayValue(f Field, raw string) (string, string) {
 			}
 			i := slices.IndexFunc(f.Options, func(o Option) bool { return o.Key == key })
 			if i < 0 {
-				return "", fmt.Sprintf("%q is not one of the options", key)
+				return "", fmt.Sprintf("%q is not one of the options; please select only from the list", key)
 			}
 			texts = append(texts, f.Options[i].Text)
 		}
 		if len(texts) == 0 {
-			return "", "choose at least one"
+			return "", "Please select at least one option"
 		}
 		return strings.Join(texts, "\n"), ""
 	}
