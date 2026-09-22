@@ -34,8 +34,8 @@ RPC); at that point the second transport bought nothing.
   `['disputes']` and invalidating it covers the list and every dispute. There is no separate map of
   keys to maintain. Route loaders load the options with `queryClient.query({ ...options,
   staleTime: 'static' })` (`ensureQueryData` is deprecated in Query 5.103); components
-  `useSuspenseQuery` them; the router's SSR integration dehydrates the cache into the page so the browser starts with
-  the data it was rendered with and refetches through the same server functions afterwards.
+  `useSuspenseQuery` them; the router's SSR integration dehydrates the cache into the page so the
+  browser starts with the data it was rendered with and refetches through the same server functions afterwards.
 - Writes are server functions called through `useServerMutation`, which classifies a problem or a
   thrown error into the ADR 0012 `Failure` and invalidates the query prefixes the caller names.
 - Server code is arranged by role: `src/server/functions/` (what pages call: reads, mutations,
