@@ -166,6 +166,13 @@ body {
   html {
     @apply font-sans;
   }
+  /* the reset hands buttons the arrow cursor; anything clickable should say so */
+  button:not(:disabled),
+  select:not(:disabled),
+  summary,
+  [role='button']:not([aria-disabled='true']) {
+    cursor: pointer;
+  }
 }
 
 /* The chrome of the period: everything is raised a little, bordered, and slightly grey. These ride on the

@@ -89,7 +89,7 @@ const PickableImage = ({
         aria-label={label}
         onClick={() => picker.current?.click()}
         className={cn(
-          'group/pick relative cursor-pointer ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+          'group/pick relative ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
           square ? 'rounded-md' : 'rounded-full',
         )}
       >
@@ -219,7 +219,7 @@ export const AppSidebar = ({ viewer }: { viewer: Viewer }) => {
             aria-label="Sign out"
             title="Sign out"
             onClick={() => void signOut()}
-            className="cursor-pointer rounded-md p-2 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden"
+            className="rounded-md p-2 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden"
           >
             <SignOutIcon />
           </button>

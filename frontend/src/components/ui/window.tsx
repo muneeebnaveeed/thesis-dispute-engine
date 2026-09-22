@@ -36,7 +36,7 @@ export const Window = ({
           </DialogPrimitive.Title>
           <DialogPrimitive.Close
             aria-label="Close"
-            className="h-[13px] w-[13px] cursor-pointer border border-border bg-card text-[9px] leading-[11px] text-primary"
+            className="h-[13px] w-[13px] border border-border bg-card text-[9px] leading-[11px] text-primary"
           >
             x
           </DialogPrimitive.Close>
