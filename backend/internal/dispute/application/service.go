@@ -32,7 +32,8 @@ type Service struct {
 	tracer      trace.Tracer
 	core        BankingCore
 	coreTimeout time.Duration
-	afterCommit func() // nudges the notice dispatcher once a transition is durable
+	decisions   Decisions // proposes values an analyst confirms; nil is supported and means no proposals
+	afterCommit func()    // nudges the notice dispatcher once a transition is durable
 
 	transitions   metric.Int64Counter
 	replays       metric.Int64Counter
@@ -53,6 +54,10 @@ func WithCore(core BankingCore) Option { return func(s *Service) { s.core = core
 
 // WithCoreTimeout bounds one core call; the transition is rolled back and reported unavailable when it passes.
 func WithCoreTimeout(d time.Duration) Option { return func(s *Service) { s.coreTimeout = d } }
+
+// WithDecisions sets the typed-decision model that proposes values (ADR 0024); without it every field it
+// would have filled is left empty.
+func WithDecisions(d Decisions) Option { return func(s *Service) { s.decisions = d } }
 
 // WithAfterCommit runs fn after each successful write, typically Dispatcher.Kick; it must not block.
 func WithAfterCommit(fn func()) Option { return func(s *Service) { s.afterCommit = fn } }

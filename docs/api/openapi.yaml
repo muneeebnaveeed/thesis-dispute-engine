@@ -374,6 +374,29 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+  /suggestions/search-filters:
+    post:
+      operationId: suggestSearchFilters
+      summary: Read an analyst's sentence as search filters
+      description: >
+        A convenience, never a decision. The filters come back only when the model is sure enough, so an
+        empty answer is the normal case and never an error; the analyst sees the filters and can change
+        them before searching. Nothing is stored.
+      tags: [suggestions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SearchFilterSuggestionRequest" }
+      responses:
+        "200":
+          description: What the sentence appears to ask for, with any field the model was unsure of left out
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SearchFilterSuggestion" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /tenant:
     get:
       operationId: getTenant
@@ -770,6 +793,26 @@ components:
     Regime:
       type: string
       enum: [EU_SEPA_DIRECT_DEBIT, EU_PSD2_CARD, US_REG_E, US_REG_Z]
+    SearchFilterSuggestionRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 300
+          description: What the analyst typed, in any language.
+      additionalProperties: false
+    SearchFilterSuggestion:
+      type: object
+      description: Every field is optional; an absent field is one the model was not sure enough about.
+      properties:
+        state: { $ref: "#/components/schemas/DisputeState" }
+        reason: { $ref: "#/components/schemas/DisputeReason" }
+        overdue:
+          type: boolean
+          description: Present only when the sentence asks for disputes past a deadline.
+      additionalProperties: false
     DisputeState:
       type: string
       enum:

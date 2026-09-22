@@ -127,6 +127,10 @@ func (c *Client) Decide(ctx context.Context, state map[string]string, questions 
 			}
 		}
 	}
-	span.SetAttributes(attribute.Int("answers", len(out)))
+	lowest := 1.0
+	for _, answer := range out {
+		lowest = min(lowest, answer.Probability)
+	}
+	span.SetAttributes(attribute.Int("answers", len(out)), attribute.Float64("lowest_probability", lowest))
 	return out, nil
 }

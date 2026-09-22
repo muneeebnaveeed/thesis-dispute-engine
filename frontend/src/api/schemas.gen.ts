@@ -669,6 +669,38 @@ export type Problem = Static<typeof Problem>
 const _Problem: Same<Problem, components['schemas']['Problem']> = true
 void _Problem
 
+export const SearchFilterSuggestion = Type.Object(
+  {
+    state: Type.Optional(DisputeState),
+    reason: Type.Optional(DisputeReason),
+    overdue: Type.Optional(
+      Type.Boolean({ description: 'Present only when the sentence asks for disputes past a deadline.' }),
+    ),
+  },
+  { additionalProperties: false },
+)
+export type SearchFilterSuggestion = Static<typeof SearchFilterSuggestion>
+const _SearchFilterSuggestion: Same<SearchFilterSuggestion, components['schemas']['SearchFilterSuggestion']> =
+  true
+void _SearchFilterSuggestion
+
+export const SearchFilterSuggestionRequest = Type.Object(
+  {
+    query: Type.String({
+      description: 'What the analyst typed, in any language.',
+      minLength: 1,
+      maxLength: 300,
+    }),
+  },
+  { additionalProperties: false },
+)
+export type SearchFilterSuggestionRequest = Static<typeof SearchFilterSuggestionRequest>
+const _SearchFilterSuggestionRequest: Same<
+  SearchFilterSuggestionRequest,
+  components['schemas']['SearchFilterSuggestionRequest']
+> = true
+void _SearchFilterSuggestionRequest
+
 export const SessionBlob = Type.Object(
   {
     tenantId: Type.Optional(

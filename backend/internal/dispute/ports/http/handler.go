@@ -1062,3 +1062,20 @@ func (h *Handler) PutMyAvatar(ctx context.Context, req oapi.PutMyAvatarRequestOb
 	}
 	return oapi.PutMyAvatar204Response{}, nil
 }
+
+// SuggestSearchFilters reads an analyst's sentence as filters. A model that is unsure, unreachable or not
+// configured all produce the same empty answer, because a suggestion nobody made is not an error (ADR 0024).
+func (h *Handler) SuggestSearchFilters(ctx context.Context, req oapi.SuggestSearchFiltersRequestObject) (oapi.SuggestSearchFiltersResponseObject, error) {
+	filters := h.svc.SuggestSearchFilters(ctx, req.Body.Query)
+	var out oapi.SearchFilterSuggestion
+	if filters.State != nil {
+		state := oapi.DisputeState(*filters.State)
+		out.State = &state
+	}
+	if filters.Reason != nil {
+		reason := oapi.DisputeReason(*filters.Reason)
+		out.Reason = &reason
+	}
+	out.Overdue = filters.Overdue
+	return oapi.SuggestSearchFilters200JSONResponse(out), nil
+}

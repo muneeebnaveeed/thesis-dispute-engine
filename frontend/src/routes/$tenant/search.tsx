@@ -14,6 +14,7 @@ import { Panel } from '#/components/ui/panel'
 import { TenantMismatch } from '#/components/layout/tenant-mismatch'
 import { submitting, useAppForm } from '#/forms/app-form'
 import { disputeQuery, disputesQuery, type DisputeListSearch } from '#/queries/disputes'
+import { useSearchFilterSuggestion } from '#/queries/suggestions'
 
 type DisputeState = components['schemas']['DisputeState']
 type DisputeReason = components['schemas']['DisputeReason']
@@ -56,10 +57,31 @@ const SearchPage = () => {
     })
   }
 
+  const suggestion = useSearchFilterSuggestion()
   const form = useAppForm({
-    defaultValues: { disputeId: '', state: state ?? '', reason: reason ?? '' },
+    defaultValues: { disputeId: '', state: state ?? '', reason: reason ?? '', sentence: '' },
     onSubmit: async ({ value }) => {
       const disputeId = value.disputeId.trim()
+      // a sentence is read into the filters first, so what the analyst searches with is what they can see
+      const sentence = value.sentence.trim()
+      if (sentence) {
+        const read = await suggestion.mutateAsync(sentence).catch(() => null)
+        if (read) {
+          form.setFieldValue('state', read.state ?? '')
+          form.setFieldValue('reason', read.reason ?? '')
+          setWalked([])
+          await navigate({
+            to: '/$tenant/search',
+            params: { tenant },
+            search: {
+              ...(isState(read.state) ? { state: read.state } : {}),
+              ...(isReason(read.reason) ? { reason: read.reason } : {}),
+              ...(limit ? { limit } : {}),
+            },
+          })
+          return
+        }
+      }
       // an id is a jump, not a filter: the list endpoint does not search by id and the dispute may be on any page
       if (UUID.test(disputeId)) {
         await navigate({ to: '/$tenant/disputes/$disputeId', params: { tenant, disputeId } })
@@ -82,6 +104,15 @@ const SearchPage = () => {
     <AppShell title="Search">
       <Panel className="mb-2" title="Find a dispute">
         <form className="form-rows" onSubmit={submitting(form)}>
+          <form.AppField name="sentence">
+            {(field) => (
+              <field.TextField
+                label="Ask in words"
+                hint="(optional, sets the filters below)"
+                placeholder="overdue duplicate charges"
+              />
+            )}
+          </form.AppField>
           <form.AppField name="disputeId">
             {(field) => (
               <field.TextField

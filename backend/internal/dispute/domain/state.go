@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"fmt"
+
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
 )
 
@@ -25,6 +27,26 @@ const (
 	StateProvisionalCreditReversed State = "PROVISIONAL_CREDIT_REVERSED"
 	StateClosed                    State = "CLOSED"
 )
+
+// AllStates lists the lifecycle in order, for callers that need the vocabulary rather than one value.
+func AllStates() []State {
+	return []State{
+		StateInitiated, StateInvestigating, StateQuestionnaireSent, StateQuestionnaireReceived,
+		StateProvisionalCreditIssued, StateFastRefundIssued, StateSEPANQARefundIssued, StateChargebackFiled,
+		StateChargebackAcknowledged, StateEvidenceSubmitted, StateChargebackWon, StateChargebackLost,
+		StateFinalCreditIssued, StateProvisionalCreditReversed, StateClosed,
+	}
+}
+
+// ParseState accepts a state name, refusing anything outside the lifecycle.
+func ParseState(raw string) (State, error) {
+	for _, s := range AllStates() {
+		if string(s) == raw {
+			return s, nil
+		}
+	}
+	return "", fmt.Errorf("unknown state %q", raw)
+}
 
 // Event is an occurrence that may move a dispute to a new state.
 type Event string

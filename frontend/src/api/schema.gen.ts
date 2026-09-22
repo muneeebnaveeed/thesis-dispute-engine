@@ -244,6 +244,26 @@ export type paths = {
     patch?: never
     trace?: never
   }
+  '/suggestions/search-filters': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Read an analyst's sentence as search filters
+     * @description A convenience, never a decision. The filters come back only when the model is sure enough, so an empty answer is the normal case and never an error; the analyst sees the filters and can change them before searching. Nothing is stored.
+     */
+    post: operations['suggestSearchFilters']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/tenant': {
     parameters: {
       query?: never
@@ -532,6 +552,17 @@ export type components = {
     }
     /** @enum {string} */
     Regime: 'EU_SEPA_DIRECT_DEBIT' | 'EU_PSD2_CARD' | 'US_REG_E' | 'US_REG_Z'
+    SearchFilterSuggestionRequest: {
+      /** @description What the analyst typed, in any language. */
+      query: string
+    }
+    /** @description Every field is optional; an absent field is one the model was not sure enough about. */
+    SearchFilterSuggestion: {
+      state?: components['schemas']['DisputeState']
+      reason?: components['schemas']['DisputeReason']
+      /** @description Present only when the sentence asks for disputes past a deadline. */
+      overdue?: boolean
+    }
     /** @enum {string} */
     DisputeState:
       | 'INITIATED'
@@ -1457,6 +1488,33 @@ export interface operations {
       401: components['responses']['Unauthorized']
       403: components['responses']['Forbidden']
       404: components['responses']['NotFound']
+      429: components['responses']['TooManyRequests']
+    }
+  }
+  suggestSearchFilters: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SearchFilterSuggestionRequest']
+      }
+    }
+    responses: {
+      /** @description What the sentence appears to ask for, with any field the model was unsure of left out */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SearchFilterSuggestion']
+        }
+      }
+      400: components['responses']['BadRequest']
+      401: components['responses']['Unauthorized']
       429: components['responses']['TooManyRequests']
     }
   }

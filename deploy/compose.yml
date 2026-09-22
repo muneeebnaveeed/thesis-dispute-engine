@@ -65,6 +65,9 @@ services:
       DISPUTE_RATE_PER_MINUTE: ${DISPUTE_RATE_PER_MINUTE:-600}
       DISPUTE_INTERNAL_CIDRS: ${DISPUTE_INTERNAL_CIDRS:-127.0.0.0/8,::1/128}
       # Customer notices go to Mailpit (SMTP 1025, inbox on http://localhost:8025); empty logs instead of sending.
+      # empty by default: with no key every proposed field is simply left empty (ADR 0024)
+      DISPUTE_DECISIONS_KEY: ${DISPUTE_DECISIONS_KEY:-}
+      DISPUTE_DECISIONS_MODEL: ${DISPUTE_DECISIONS_MODEL:-}
       DISPUTE_SMTP_ADDR: ${DISPUTE_SMTP_ADDR:-localhost:1025}
       DISPUTE_MAIL_FROM: ${DISPUTE_MAIL_FROM:-disputes@dispute-engine.local}
       # deploy/otel.env fills these under the otel profile; empty means instrumented, nothing exported.

@@ -14,6 +14,7 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/mail"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/mockcore"
 	disputepg "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/typedmodel"
 	disputehttp "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/ports/http"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/auth"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/config"
@@ -82,8 +83,13 @@ func run(cfg config.Config, logger *slog.Logger) error {
 		mailer = mail.SMTP{Addr: cfg.SMTPAddr, From: cfg.MailFrom}
 	}
 	dispatcher := application.NewDispatcher(store, mailer, application.RenderMail, logger)
+	// nil when no key is configured, which leaves every proposed field empty (ADR 0024)
+	suggestions := typedmodel.New(cfg.DecisionsEndpoint, cfg.DecisionsModel, cfg.DecisionsKey, cfg.DecisionsTimeout)
+	if suggestions != nil {
+		logger.Info("typed decisions enabled", "model", suggestions.Model())
+	}
 	svc, err := application.NewService(store, nil, application.WithCore(cores), application.WithCoreTimeout(cfg.CoreTimeout),
-		application.WithAfterCommit(dispatcher.Kick))
+		application.WithDecisions(suggestions), application.WithAfterCommit(dispatcher.Kick))
 	if err != nil {
 		return err
 	}
