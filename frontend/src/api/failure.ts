@@ -51,6 +51,7 @@ const FAILURE_KIND_BY_CODE = {
   'invalid-fields': 'validation',
   'unknown-template': 'validation',
   'invalid-template-override': 'validation',
+  'image-refused': 'validation',
   'attachment-refused': 'validation',
   'attachment-unknown': 'validation',
   'invalid-liability': 'validation',

@@ -42,11 +42,19 @@ type MemStore struct {
 	Templates    map[uuid.UUID]map[domain.NoticeKind]application.TenantTemplate
 	Accounts     map[uuid.UUID]application.AccountRecord
 	Names        map[uuid.UUID]string
+	TenantLogos  map[uuid.UUID]application.Image
+	TenantLogoAt map[uuid.UUID]time.Time
+	Avatars      map[avatarKey]application.Image
 	nextNotice   int64
 	// Calendars holds a tenant's business-day calendar; a tenant without one gets the default.
 	Calendars map[uuid.UUID]domain.Calendar
 	// Cores holds a tenant's banking-core configuration; a tenant without one books postings without a core.
 	Cores map[uuid.UUID]application.CoreConfig
+}
+
+type avatarKey struct {
+	tenant  uuid.UUID
+	subject string
 }
 
 // NewMemStore returns an empty store.
@@ -66,6 +74,9 @@ func NewMemStore() *MemStore {
 		Names:        map[uuid.UUID]string{},
 		Calendars:    map[uuid.UUID]domain.Calendar{},
 		Cores:        map[uuid.UUID]application.CoreConfig{},
+		TenantLogos:  map[uuid.UUID]application.Image{},
+		TenantLogoAt: map[uuid.UUID]time.Time{},
+		Avatars:      map[avatarKey]application.Image{},
 	}
 }
 
@@ -689,4 +700,39 @@ func (t *memTx) DeleteTenantTemplate(_ context.Context, kind domain.NoticeKind) 
 	_, ok := t.s.Templates[t.tenant][kind]
 	delete(t.s.Templates[t.tenant], kind)
 	return ok, nil
+}
+
+func (t *memTx) GetTenantMetadata(_ context.Context) (application.TenantMetadata, error) {
+	img, ok := t.s.TenantLogos[t.tenant]
+	if !ok || len(img.Content) == 0 {
+		return application.TenantMetadata{}, nil
+	}
+	at := t.s.TenantLogoAt[t.tenant]
+	return application.TenantMetadata{HasLogo: true, LogoUpdatedAt: &at}, nil
+}
+
+func (t *memTx) GetTenantLogo(_ context.Context) (application.Image, error) {
+	img, ok := t.s.TenantLogos[t.tenant]
+	if !ok {
+		return application.Image{}, application.ErrNotFound
+	}
+	return img, nil
+}
+
+func (t *memTx) PutTenantLogo(_ context.Context, img application.Image, at time.Time) error {
+	t.s.TenantLogos[t.tenant], t.s.TenantLogoAt[t.tenant] = img, at
+	return nil
+}
+
+func (t *memTx) GetAnalystAvatar(_ context.Context, subject string) (application.Image, error) {
+	img, ok := t.s.Avatars[avatarKey{t.tenant, subject}]
+	if !ok {
+		return application.Image{}, application.ErrNotFound
+	}
+	return img, nil
+}
+
+func (t *memTx) PutAnalystAvatar(_ context.Context, subject string, img application.Image, _ time.Time) error {
+	t.s.Avatars[avatarKey{t.tenant, subject}] = img
+	return nil
 }

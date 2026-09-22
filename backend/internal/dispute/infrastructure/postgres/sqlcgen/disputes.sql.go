@@ -380,6 +380,22 @@ func (q *Queries) GetAccount(ctx context.Context, id uuid.UUID) (GetAccountRow, 
 	return i, err
 }
 
+const getAnalystAvatar = `-- name: GetAnalystAvatar :one
+SELECT avatar, content_type FROM analyst_profiles WHERE tenant_id = current_tenant_id() AND subject = $1
+`
+
+type GetAnalystAvatarRow struct {
+	Avatar      []byte
+	ContentType string
+}
+
+func (q *Queries) GetAnalystAvatar(ctx context.Context, subject string) (GetAnalystAvatarRow, error) {
+	row := q.db.QueryRow(ctx, getAnalystAvatar, subject)
+	var i GetAnalystAvatarRow
+	err := row.Scan(&i.Avatar, &i.ContentType)
+	return i, err
+}
+
 const getAttachment = `-- name: GetAttachment :one
 SELECT id, notice_id, filename, content_type, size, content, uploaded_by, uploaded_at FROM attachments WHERE id = $1 AND dispute_id = $2
 `
@@ -669,6 +685,40 @@ func (q *Queries) GetTenantKeyForTenant(ctx context.Context, arg GetTenantKeyFor
 		&i.ExpiresAt,
 		&i.RevokedAt,
 	)
+	return i, err
+}
+
+const getTenantLogo = `-- name: GetTenantLogo :one
+SELECT logo, logo_content_type FROM tenant_metadata WHERE tenant_id = current_tenant_id() AND logo IS NOT NULL
+`
+
+type GetTenantLogoRow struct {
+	Logo            []byte
+	LogoContentType *string
+}
+
+func (q *Queries) GetTenantLogo(ctx context.Context) (GetTenantLogoRow, error) {
+	row := q.db.QueryRow(ctx, getTenantLogo)
+	var i GetTenantLogoRow
+	err := row.Scan(&i.Logo, &i.LogoContentType)
+	return i, err
+}
+
+const getTenantMetadata = `-- name: GetTenantMetadata :one
+SELECT logo_content_type, logo_updated_at, octet_length(logo)::int AS logo_size
+FROM tenant_metadata WHERE tenant_id = current_tenant_id()
+`
+
+type GetTenantMetadataRow struct {
+	LogoContentType *string
+	LogoUpdatedAt   pgtype.Timestamptz
+	LogoSize        int32
+}
+
+func (q *Queries) GetTenantMetadata(ctx context.Context) (GetTenantMetadataRow, error) {
+	row := q.db.QueryRow(ctx, getTenantMetadata)
+	var i GetTenantMetadataRow
+	err := row.Scan(&i.LogoContentType, &i.LogoUpdatedAt, &i.LogoSize)
 	return i, err
 }
 
@@ -1838,6 +1888,46 @@ func (q *Queries) PurgeWebSessions(ctx context.Context) (int64, error) {
 	return result.RowsAffected(), nil
 }
 
+const putAnalystAvatar = `-- name: PutAnalystAvatar :exec
+INSERT INTO analyst_profiles (tenant_id, subject, avatar, content_type, updated_at)
+VALUES (current_tenant_id(), $1, $2, $3, $4)
+ON CONFLICT (tenant_id, subject) DO UPDATE SET avatar = $2, content_type = $3, updated_at = $4
+`
+
+type PutAnalystAvatarParams struct {
+	Subject     string
+	Avatar      []byte
+	ContentType string
+	UpdatedAt   time.Time
+}
+
+func (q *Queries) PutAnalystAvatar(ctx context.Context, arg PutAnalystAvatarParams) error {
+	_, err := q.db.Exec(ctx, putAnalystAvatar,
+		arg.Subject,
+		arg.Avatar,
+		arg.ContentType,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const putTenantLogo = `-- name: PutTenantLogo :exec
+INSERT INTO tenant_metadata (tenant_id, logo, logo_content_type, logo_updated_at)
+VALUES (current_tenant_id(), $1, $2, $3)
+ON CONFLICT (tenant_id) DO UPDATE SET logo = $1, logo_content_type = $2, logo_updated_at = $3
+`
+
+type PutTenantLogoParams struct {
+	Logo            []byte
+	LogoContentType *string
+	LogoUpdatedAt   pgtype.Timestamptz
+}
+
+func (q *Queries) PutTenantLogo(ctx context.Context, arg PutTenantLogoParams) error {
+	_, err := q.db.Exec(ctx, putTenantLogo, arg.Logo, arg.LogoContentType, arg.LogoUpdatedAt)
+	return err
+}
+
 const putWebSession = `-- name: PutWebSession :exec
 INSERT INTO web_sessions (id, tenant_id, ciphertext, expires_at, subject, sid)
 VALUES ($1, $2, $3, $4, $5, $6)
@@ -1893,6 +1983,23 @@ func (q *Queries) RevokeTenantKeyForTenant(ctx context.Context, arg RevokeTenant
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const seedTenantLogo = `-- name: SeedTenantLogo :exec
+INSERT INTO tenant_metadata (tenant_id, logo, logo_content_type, logo_updated_at)
+VALUES ($1, $2, $3, now())
+ON CONFLICT (tenant_id) DO UPDATE SET logo = EXCLUDED.logo, logo_content_type = EXCLUDED.logo_content_type, logo_updated_at = now()
+`
+
+type SeedTenantLogoParams struct {
+	TenantID        uuid.UUID
+	Logo            []byte
+	LogoContentType *string
+}
+
+func (q *Queries) SeedTenantLogo(ctx context.Context, arg SeedTenantLogoParams) error {
+	_, err := q.db.Exec(ctx, seedTenantLogo, arg.TenantID, arg.Logo, arg.LogoContentType)
+	return err
 }
 
 const setTenantCalendar = `-- name: SetTenantCalendar :execrows

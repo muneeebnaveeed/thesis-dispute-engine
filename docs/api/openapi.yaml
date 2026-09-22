@@ -374,6 +374,93 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+  /tenant:
+    get:
+      operationId: getTenant
+      summary: What the workbench shows about the signed-in analyst's organisation
+      tags: [tenants]
+      responses:
+        "200":
+          description: The tenant's name and whether it has a logo.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tenant" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /tenant/logo:
+    get:
+      operationId: getTenantLogo
+      summary: The organisation's logo
+      tags: [tenants]
+      responses:
+        "200":
+          description: The image.
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    put:
+      operationId: putTenantLogo
+      summary: Replace the organisation's logo
+      description: PNG, JPEG or WebP, at most 256 kB. Tenant admins only.
+      tags: [tenants]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "200":
+          description: Stored.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tenant" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /me/avatar:
+    get:
+      operationId: getMyAvatar
+      summary: The signed-in analyst's picture
+      tags: [tenants]
+      responses:
+        "200":
+          description: The image.
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    put:
+      operationId: putMyAvatar
+      summary: Replace the signed-in analyst's picture
+      description: PNG, JPEG or WebP, at most 256 kB. Analysts only; a tenant key has no person behind it.
+      tags: [tenants]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "204": { description: Stored. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /tenant-keys:
     get:
       operationId: listTenantKeys
@@ -594,6 +681,7 @@ components:
         - invalid-template-override
         - concurrent-update
         - idempotency-key-reuse
+        - image-refused
         - no-regime
         - unknown-regime
         - unavailable
@@ -628,6 +716,13 @@ components:
       properties:
         field: { type: string, example: "/transactionId" }
         message: { type: string }
+    Tenant:
+      type: object
+      required: [name, hasLogo]
+      properties:
+        name: { type: string }
+        hasLogo: { type: boolean, description: Whether GetTenantLogo will answer with an image. }
+        logoUpdatedAt: { type: string, format: date-time }
     TenantKey:
       type: object
       required: [id, prefix, label, createdAt, status]

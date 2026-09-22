@@ -827,3 +827,76 @@ func TestTenantAdminsRewordTemplatesAndAnalystsSeeTheResult(t *testing.T) {
 		t.Errorf("delete again: %d", rec.Code)
 	}
 }
+
+func TestTenantLogoAndAnalystAvatar(t *testing.T) {
+	a := newAPI(t, nil)
+	png := []byte("\x89PNG\r\n\x1a\nfake")
+
+	put := func(path, who, ctype string, content []byte) (*httptest.ResponseRecorder, map[string]any) {
+		var buf bytes.Buffer
+		w := multipart.NewWriter(&buf)
+		hdr := textproto.MIMEHeader{}
+		hdr.Set("Content-Disposition", `form-data; name="file"; filename="logo.png"`)
+		hdr.Set("Content-Type", ctype)
+		part, _ := w.CreatePart(hdr)
+		_, _ = part.Write(content)
+		_ = w.Close()
+		req := httptest.NewRequest(http.MethodPut, path, &buf)
+		req.Header.Set("Content-Type", w.FormDataContentType())
+		req.Header.Set("X-Test-Analyst", who)
+		rec := httptest.NewRecorder()
+		a.h.ServeHTTP(rec, req)
+		var out map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &out)
+		return rec, out
+	}
+	get := func(path, who string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("X-Test-Analyst", who)
+		rec := httptest.NewRecorder()
+		a.h.ServeHTTP(rec, req)
+		return rec
+	}
+
+	rec, profile := a.do(http.MethodGet, "/tenant", nil, map[string]string{"X-Test-Analyst": "a:analyst"})
+	if rec.Code != 200 || profile["name"] != "Test Bank" || profile["hasLogo"] != false {
+		t.Fatalf("tenant before a logo: %d %v", rec.Code, profile)
+	}
+	if rec := get("/tenant/logo", "a:analyst"); rec.Code != 404 {
+		t.Errorf("logo before upload: %d", rec.Code)
+	}
+	if rec, _ := put("/tenant/logo", "a:analyst", "image/png", png); rec.Code != 403 {
+		t.Errorf("analyst replacing the logo: %d", rec.Code)
+	}
+	if rec, refused := put("/tenant/logo", "a:tenant-admin", "image/svg+xml", png); rec.Code != 422 || refused["code"] != "image-refused" {
+		t.Errorf("svg logo: %d %v", rec.Code, refused)
+	}
+	if rec, refused := put("/tenant/logo", "a:tenant-admin", "image/png", bytes.Repeat([]byte{1}, application.MaxImageBytes+1)); rec.Code != 422 || refused["code"] != "image-refused" {
+		t.Errorf("oversized logo: %d %v", rec.Code, refused)
+	}
+	rec, stored := put("/tenant/logo", "a:tenant-admin", "image/png", png)
+	if rec.Code != 200 || stored["hasLogo"] != true || stored["logoUpdatedAt"] == nil {
+		t.Fatalf("logo upload: %d %v", rec.Code, stored)
+	}
+	served := get("/tenant/logo", "a:analyst")
+	if served.Code != 200 || served.Header().Get("Content-Type") != "image/png" || !bytes.Equal(served.Body.Bytes(), png) {
+		t.Errorf("logo download: %d %s", served.Code, served.Header().Get("Content-Type"))
+	}
+	if rec := get("/tenant/logo", "b:analyst"); rec.Code != 404 {
+		t.Errorf("another tenant reading the logo: %d", rec.Code)
+	}
+
+	// An avatar belongs to one analyst, so a colleague of the same tenant does not inherit it.
+	if rec := get("/me/avatar", "a:analyst"); rec.Code != 404 {
+		t.Errorf("avatar before upload: %d", rec.Code)
+	}
+	if rec, _ := put("/me/avatar", "a:analyst", "image/png", png); rec.Code != 204 {
+		t.Fatalf("avatar upload: %d", rec.Code)
+	}
+	if rec := get("/me/avatar", "a:analyst"); rec.Code != 200 || !bytes.Equal(rec.Body.Bytes(), png) {
+		t.Errorf("avatar download: %d", rec.Code)
+	}
+	if rec := get("/me/avatar", "b:analyst"); rec.Code != 404 {
+		t.Errorf("another analyst reading the avatar: %d", rec.Code)
+	}
+}

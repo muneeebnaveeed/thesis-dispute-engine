@@ -129,6 +129,12 @@ type NoticeRecord struct {
 	TraceContext string
 }
 
+// TenantMetadata is the stored half of TenantProfile: whether a logo exists and when it last changed.
+type TenantMetadata struct {
+	HasLogo       bool
+	LogoUpdatedAt *time.Time
+}
+
 // StoredResponse is a prior answer kept for idempotent replay.
 type StoredResponse struct {
 	RequestHash []byte
@@ -170,6 +176,16 @@ type Tx interface {
 	GetQuestionnaire(ctx context.Context, disputeID uuid.UUID) (Questionnaire, error)
 	GetAccount(ctx context.Context, id uuid.UUID) (AccountRecord, error)
 	TenantName(ctx context.Context) (string, error)
+	// GetTenantMetadata reads what the workbench shows about the tenant beyond its name.
+	GetTenantMetadata(ctx context.Context) (TenantMetadata, error)
+	// GetTenantLogo returns the tenant's logo, or ErrNotFound when it has none.
+	GetTenantLogo(ctx context.Context) (Image, error)
+	// PutTenantLogo replaces the tenant's logo.
+	PutTenantLogo(ctx context.Context, img Image, at time.Time) error
+	// GetAnalystAvatar returns one analyst's picture, or ErrNotFound when they have none.
+	GetAnalystAvatar(ctx context.Context, subject string) (Image, error)
+	// PutAnalystAvatar replaces one analyst's picture.
+	PutAnalystAvatar(ctx context.Context, subject string, img Image, at time.Time) error
 	// InsertNotice stores one composed notice; letters are complete at once (SentAt set), emails wait for the dispatcher.
 	InsertNotice(ctx context.Context, n NoticeRecord) (int64, error)
 	ListNotices(ctx context.Context, disputeID uuid.UUID) ([]NoticeRecord, error)

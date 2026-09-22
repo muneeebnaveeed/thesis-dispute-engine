@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"mime/multipart"
 	"net/http"
 	"strconv"
 	"strings"
@@ -942,4 +943,122 @@ func toAPI(v application.DisputeView) oapi.Dispute {
 func toDeadline(d application.DeadlineView) oapi.Deadline {
 	return oapi.Deadline{Kind: oapi.DeadlineKind(d.Kind), Cycle: d.Cycle, StartedAt: d.StartedAt, DueAt: d.DueAt, MetAt: d.MetAt,
 		Status: oapi.DeadlineStatus(d.Status), Basis: d.Basis}
+}
+
+// imageResponse serves a logo or an avatar; nosniff matters because the bytes are uploaded by tenants.
+type imageResponse struct{ img application.Image }
+
+func (r imageResponse) write(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", r.img.ContentType)
+	w.Header().Set("Content-Length", strconv.Itoa(len(r.img.Content)))
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "private, no-cache")
+	w.WriteHeader(http.StatusOK)
+	_, err := w.Write(r.img.Content)
+	return err
+}
+
+func (r imageResponse) VisitGetTenantLogoResponse(w http.ResponseWriter) error { return r.write(w) }
+
+func (r imageResponse) VisitGetMyAvatarResponse(w http.ResponseWriter) error { return r.write(w) }
+
+func readImagePart(body *multipart.Reader) (application.Image, error) {
+	var img application.Image
+	for {
+		part, err := body.NextPart()
+		if errors.Is(err, io.EOF) {
+			return img, nil
+		}
+		if err != nil {
+			return img, errs.New(errs.Invalid, "malformed-request", "the upload is not a valid multipart form").WithFields(errs.FieldError{Field: "body", Message: err.Error()})
+		}
+		if part.FormName() != "file" {
+			continue
+		}
+		// One past the cap so the service can tell "at the limit" from "over it".
+		content, err := io.ReadAll(io.LimitReader(part, application.MaxImageBytes+1))
+		if err != nil {
+			return img, err
+		}
+		img.Content, img.ContentType = content, part.Header.Get("Content-Type")
+	}
+}
+
+// GetTenant returns the organisation the workbench draws its sidebar from.
+func (h *Handler) GetTenant(ctx context.Context, _ oapi.GetTenantRequestObject) (oapi.GetTenantResponseObject, error) {
+	t, err := h.svc.Tenant(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return oapi.GetTenant200JSONResponse{Name: t.Name, HasLogo: t.HasLogo, LogoUpdatedAt: t.LogoUpdatedAt}, nil
+}
+
+// GetTenantLogo serves the organisation's logo.
+func (h *Handler) GetTenantLogo(ctx context.Context, _ oapi.GetTenantLogoRequestObject) (oapi.GetTenantLogoResponseObject, error) {
+	img, err := h.svc.TenantLogo(ctx)
+	if err != nil {
+		if errors.Is(err, application.ErrNotFound) {
+			p := h.problem(ctx, "/tenant/logo", err, uuid.Nil)
+			return oapi.GetTenantLogo404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: oapi.NotFoundApplicationProblemPlusJSONResponse(p)}, nil
+		}
+		return nil, err
+	}
+	return imageResponse{img}, nil
+}
+
+// PutTenantLogo replaces the organisation's logo.
+func (h *Handler) PutTenantLogo(ctx context.Context, req oapi.PutTenantLogoRequestObject) (oapi.PutTenantLogoResponseObject, error) {
+	if err := auth.RequireRole(ctx, auth.RoleTenantAdmin); err != nil {
+		return nil, err
+	}
+	img, err := readImagePart(req.Body)
+	if err != nil {
+		return nil, err
+	}
+	t, err := h.svc.PutTenantLogo(ctx, img)
+	if err != nil {
+		p := h.problem(ctx, "/tenant/logo", err, uuid.Nil)
+		if p.Status == http.StatusUnprocessableEntity {
+			return oapi.PutTenantLogo422ApplicationProblemPlusJSONResponse{UnprocessableApplicationProblemPlusJSONResponse: oapi.UnprocessableApplicationProblemPlusJSONResponse(p)}, nil
+		}
+		return nil, err
+	}
+	return oapi.PutTenantLogo200JSONResponse{Name: t.Name, HasLogo: t.HasLogo, LogoUpdatedAt: t.LogoUpdatedAt}, nil
+}
+
+// GetMyAvatar serves the signed-in analyst's picture.
+func (h *Handler) GetMyAvatar(ctx context.Context, _ oapi.GetMyAvatarRequestObject) (oapi.GetMyAvatarResponseObject, error) {
+	principal, ok := auth.PrincipalFrom(ctx)
+	if !ok {
+		return nil, auth.ErrForbidden.WithDetail("a picture belongs to an analyst, not to a tenant key")
+	}
+	img, err := h.svc.AnalystAvatar(ctx, principal.Subject)
+	if err != nil {
+		if errors.Is(err, application.ErrNotFound) {
+			p := h.problem(ctx, "/me/avatar", err, uuid.Nil)
+			return oapi.GetMyAvatar404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: oapi.NotFoundApplicationProblemPlusJSONResponse(p)}, nil
+		}
+		return nil, err
+	}
+	return imageResponse{img}, nil
+}
+
+// PutMyAvatar replaces the signed-in analyst's picture.
+func (h *Handler) PutMyAvatar(ctx context.Context, req oapi.PutMyAvatarRequestObject) (oapi.PutMyAvatarResponseObject, error) {
+	principal, ok := auth.PrincipalFrom(ctx)
+	if !ok {
+		return nil, auth.ErrForbidden.WithDetail("a picture belongs to an analyst, not to a tenant key")
+	}
+	img, err := readImagePart(req.Body)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.svc.PutAnalystAvatar(ctx, principal.Subject, img); err != nil {
+		p := h.problem(ctx, "/me/avatar", err, uuid.Nil)
+		if p.Status == http.StatusUnprocessableEntity {
+			return oapi.PutMyAvatar422ApplicationProblemPlusJSONResponse{UnprocessableApplicationProblemPlusJSONResponse: oapi.UnprocessableApplicationProblemPlusJSONResponse(p)}, nil
+		}
+		return nil, err
+	}
+	return oapi.PutMyAvatar204Response{}, nil
 }

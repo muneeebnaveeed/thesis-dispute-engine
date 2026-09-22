@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"fmt"
 	"os"
@@ -18,6 +19,14 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/postgres"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/migrations"
 )
+
+// Plain wordmarks, not the banks' trademarks: the sidebar needs something to draw in development.
+//
+//go:embed assets/otp-bank.png
+var otpLogo []byte
+
+//go:embed assets/erste-bank.png
+var ersteLogo []byte
 
 type txn struct {
 	id, tenant, account string
@@ -97,9 +106,12 @@ func run() error {
 	keycloak := getenv("KEYCLOAK_URL", "http://localhost:8180")
 	// Two banks, two cores: OTP's refuses credits above 5000 (so the decline path can be shown on transaction 104),
 	// Erste's answers slowly. Both are the simulated core; the shape is what a real adapter would be configured with.
-	for _, t := range []struct{ id, name, slug, domain, core string }{
-		{tenantA, "OTP Bank", "otp", "otpbank.hu", `{"kind":"mock","declineAbove":"5000.00"}`},
-		{tenantB, "Erste Bank", "erste", "erstebank.hu", `{"kind":"mock","latencyMs":150}`},
+	for _, t := range []struct {
+		id, name, slug, domain, core string
+		logo                         []byte
+	}{
+		{tenantA, "OTP Bank", "otp", "otpbank.hu", `{"kind":"mock","declineAbove":"5000.00"}`, otpLogo},
+		{tenantB, "Erste Bank", "erste", "erstebank.hu", `{"kind":"mock","latencyMs":150}`, ersteLogo},
 	} {
 		issuer := keycloak + "/realms/" + t.slug
 		if err := q.UpsertTenant(ctx, sqlcgen.UpsertTenantParams{ID: uuid.MustParse(t.id), Name: t.name, Slug: t.slug, OidcIssuer: &issuer}); err != nil {
@@ -114,6 +126,10 @@ func run() error {
 			return err
 		}
 		if _, err := q.SetTenantCore(ctx, sqlcgen.SetTenantCoreParams{ID: uuid.MustParse(t.id), Core: []byte(t.core)}); err != nil {
+			return err
+		}
+		pngType := "image/png"
+		if err := q.SeedTenantLogo(ctx, sqlcgen.SeedTenantLogoParams{TenantID: uuid.MustParse(t.id), Logo: t.logo, LogoContentType: &pngType}); err != nil {
 			return err
 		}
 	}
