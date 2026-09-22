@@ -6,15 +6,16 @@ import { NOTICE_KIND_LABEL, NoticeStatusBadge } from '#/components/disputes/noti
 import { Button } from '#/components/ui/button'
 import { cn } from '#/lib/cn'
 import { noticeQuery } from '#/queries/notices'
+import { useServerMutation } from '#/queries/use-server-mutation'
 import { getAttachment } from '#/server/functions/notices'
 
 type Notice = Dispute['notices'][number]
 
-const saveAttachment = async (disputeId: string, attachmentId: string, filename: string) => {
-  const outcome = await getAttachment({ data: { disputeId, attachmentId } })
-  if (!outcome.value) return
-  const bytes = Uint8Array.from(atob(outcome.value.base64), (char) => char.charCodeAt(0))
-  const objectUrl = URL.createObjectURL(new Blob([bytes], { type: outcome.value.contentType }))
+type AttachmentBytes = NonNullable<Awaited<ReturnType<typeof getAttachment>>['value']>
+
+const saveToDisk = ({ base64, contentType }: AttachmentBytes, filename: string) => {
+  const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+  const objectUrl = URL.createObjectURL(new Blob([bytes], { type: contentType }))
   const downloadLink = document.createElement('a')
   downloadLink.href = objectUrl
   downloadLink.download = filename
@@ -43,6 +44,11 @@ export const SentEmails = ({
   })
   const noticeDocument = documentOutcome?.value ?? null
   const selectedNotice = newestFirst.find((notice) => notice.id === selectedNoticeId)
+  const downloadMutation = useServerMutation(
+    ({ attachmentId }: { attachmentId: string; filename: string }) =>
+      getAttachment({ data: { disputeId, attachmentId } }),
+    { onSuccess: (bytes, { filename }) => saveToDisk(bytes, filename) },
+  )
 
   if (newestFirst.length === 0) return <p className="text-sm text-neutral-600">Nothing has been sent yet.</p>
   return (
@@ -133,7 +139,13 @@ export const SentEmails = ({
                     <Button
                       variant="link"
                       size="bare"
-                      onClick={() => void saveAttachment(disputeId, attachment.id, attachment.filename)}
+                      disabled={downloadMutation.isPending}
+                      onClick={() =>
+                        downloadMutation.mutate({
+                          attachmentId: attachment.id,
+                          filename: attachment.filename,
+                        })
+                      }
                     >
                       {attachment.filename}
                     </Button>{' '}

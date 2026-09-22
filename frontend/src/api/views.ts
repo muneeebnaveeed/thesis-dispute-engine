@@ -45,16 +45,3 @@ export const toOutcome = <T>(result: ApiResult<T>): Outcome<T> =>
   result.error || result.data === undefined
     ? { value: null, problem: result.error ?? null }
     : { value: result.data, problem: null }
-
-export const unauthenticated = <T>(): Outcome<T> => ({
-  value: null,
-  problem: {
-    type: 'urn:dispute-engine:error:unauthenticated',
-    title: 'Authentication required',
-    status: 401,
-    code: 'unauthenticated',
-    retryable: false,
-    requestId: 'local',
-    detail: 'Sign in to continue.',
-  },
-})

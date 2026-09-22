@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient, type QueryKey } from '@tanstack/react-query'
+import { isRedirect, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import { classify, type Failure } from '#/api/failure'
@@ -12,6 +13,7 @@ export const useServerMutation = <TVariables, TData>(
   } = {},
 ) => {
   const queryClient = useQueryClient()
+  const router = useRouter()
   const [failure, setFailure] = useState<Failure | null>(null)
   const mutation = useMutation({
     mutationFn: async (variables: TVariables): Promise<TData> => {
@@ -20,6 +22,11 @@ export const useServerMutation = <TVariables, TData>(
       try {
         outcome = await run(variables)
       } catch (thrown) {
+        // the session ended under this tab: the middleware sends us back through the front door
+        if (isRedirect(thrown)) {
+          await router.navigate(router.resolveRedirect(thrown).options)
+          throw thrown
+        }
         const unreachable = classify({ thrown }) ?? {
           kind: 'unreachable' as const,
           message: 'the server could not be reached',
