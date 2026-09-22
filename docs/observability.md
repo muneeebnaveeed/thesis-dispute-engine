@@ -49,14 +49,16 @@ Traces, from the browser inwards: the workbench's server span per request (`GET 
 `POST /_serverFn/:fn`), one span per server function it runs (`serverFn applyEvent`, with the outcome as
 an attribute), an undici client span per call to the API or Keycloak (`url.full` with ids masked; the
 session id never reaches a trace), then the API's server span named by route (`POST
-/disputes/{disputeId}/events`), an application span per use case (`dispute.apply_event`), and one
-`otelpgx` span per statement named after the sqlc query. `traceparent` crosses the workbench-to-API
+/disputes/{disputeId}/events`) with `auth.authenticate` (credential kind, accepted) and
+`ratelimit.bump` (count, limit) under it, an application span per use case (`dispute.apply_event`),
+and one `otelpgx` span per statement named after the sqlc query. `traceparent` crosses the workbench-to-API
 hop automatically. Work that outlives the request is its own trace, linked: every notice row stores
 the queuing request's traceparent, and the dispatcher's `notice.deliver` span (kind, attempt, outcome)
 carries a link to it and a child `smtp.send` span for the relay.
 
 Logs: JSON on stdout and, via `otelslog`, in Loki with `trace_id`, `span_id`, `request_id`, `route`
-and `status` as labels. The workbench logs the same way (`src/server/telemetry/log.ts`): sign-in,
+and `status` as labels. The access line reads as the request it describes (`POST /disputes/{disputeId}/events 409`),
+at INFO, or WARN for a 5xx, so the Loki list is legible without expanding a line. The workbench logs the same way (`src/server/telemetry/log.ts`): sign-in,
 sign-out, back-channel logout, a session whose refresh was refused, and a server function that was
 refused or threw, each with the active trace's ids and never a token or a body. Keys listed in `internal/platform/telemetry/redact.go` are replaced with
 `[redacted]` before either sink sees them. `DISPUTE_LOG_LEVEL` sets the floor (`debug`, `info`,

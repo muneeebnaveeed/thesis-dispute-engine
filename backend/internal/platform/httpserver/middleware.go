@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -144,7 +146,16 @@ func Log(logger *slog.Logger) Middleware {
 				extra = append(extra, info.attrs...)
 				info.mu.Unlock()
 			}
-			logger.LogAttrs(r.Context(), slog.LevelInfo, "request", append([]slog.Attr{
+			// the line itself says what happened; a 5xx is the server's fault and is the only one that warns
+			level := slog.LevelInfo
+			if rec.status >= 500 {
+				level = slog.LevelWarn
+			}
+			line := route // a Go 1.22 pattern already starts with the method
+			if !strings.HasPrefix(line, r.Method+" ") {
+				line = r.Method + " " + line
+			}
+			logger.LogAttrs(r.Context(), level, fmt.Sprintf("%s %d", line, rec.status), append([]slog.Attr{
 				slog.String("request_id", RequestIDFrom(r.Context())),
 				slog.String("trace_id", traceID),
 				slog.String("span_id", spanID),
