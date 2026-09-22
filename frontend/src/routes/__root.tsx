@@ -12,7 +12,7 @@ const RootDocument = ({ children }: { children: ReactNode }) => {
       <head>
         <HeadContent />
       </head>
-      <body className="min-h-screen bg-muted text-foreground antialiased">
+      <body className="min-h-screen bg-background text-foreground antialiased">
         {children}
         <Scripts />
       </body>

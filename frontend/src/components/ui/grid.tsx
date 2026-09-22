@@ -3,6 +3,14 @@ import type { ReactNode } from 'react'
 import { Button } from '#/components/ui/button'
 import { cn } from '#/lib/utils'
 
+// Every list in the app is the same grid: ruled cells, striped rows, a gradient head.
+export const gridTable =
+  'w-full border-collapse text-left text-[11px] [&_td]:border-t [&_td]:border-[color:var(--rule)] [&_td]:border-r [&_td]:px-1.5 [&_td]:py-[3px] [&_th]:border-r [&_th]:border-b [&_th]:border-border [&_th]:px-1.5 [&_th]:py-[3px] [&_th]:font-bold [&_th]:whitespace-nowrap'
+
+export const gridHead = 'bg-[image:var(--toolbar)] text-foreground'
+
+export const gridBody = '[&_tr:nth-child(odd)]:bg-muted'
+
 // The strip of actions above a grid, and the strip of paging controls below it: the period put both on every list.
 export const GridToolbar = ({ children, className }: { children: ReactNode; className?: string }) => (
   <div

@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 
 import type { Dispute } from '#/api/views'
 import { Badge } from '#/components/ui/badge'
+import { gridBody, gridHead, gridTable } from '#/components/ui/grid'
 
 type Notice = Dispute['notices'][number]
 
@@ -27,30 +28,31 @@ export const Notices = ({
   tenant: string
   disputeId: string
 }) => {
-  if (notices.length === 0) return <p className="text-sm text-muted-foreground">Nothing has been sent yet.</p>
+  if (notices.length === 0)
+    return <p className="text-[11px] text-muted-foreground">Nothing has been sent yet.</p>
   return (
-    <table className="w-full text-left text-sm" aria-label="Communications">
-      <thead className="text-muted-foreground">
+    <table className={gridTable} aria-label="Communications">
+      <thead className={gridHead}>
         <tr>
-          <th className="py-1 pr-4 font-normal">Notice</th>
-          <th className="py-1 pr-4 font-normal">Channel</th>
-          <th className="py-1 pr-4 font-normal">To</th>
-          <th className="py-1 pr-4 font-normal">Status</th>
-          <th className="py-1 font-normal">
+          <th>Notice</th>
+          <th>Channel</th>
+          <th>To</th>
+          <th>Status</th>
+          <th>
             <span className="sr-only">Open</span>
           </th>
         </tr>
       </thead>
-      <tbody>
+      <tbody className={gridBody}>
         {notices.map((notice) => (
-          <tr key={notice.id} className="border-t border-border">
-            <td className="py-1 pr-4">{NOTICE_KIND_LABEL[notice.kind]}</td>
-            <td className="py-1 pr-4 font-mono text-xs">{notice.channel}</td>
-            <td className="py-1 pr-4 text-muted-foreground">{notice.recipient}</td>
-            <td className="py-1 pr-4">
+          <tr key={notice.id} className="hover:bg-accent">
+            <td>{NOTICE_KIND_LABEL[notice.kind]}</td>
+            <td className="font-mono">{notice.channel}</td>
+            <td className="text-muted-foreground">{notice.recipient}</td>
+            <td>
               <NoticeStatusBadge notice={notice} />
             </td>
-            <td className="py-1">
+            <td>
               <Link
                 to="/$tenant/disputes/$disputeId/notices/$noticeId"
                 params={{ tenant, disputeId, noticeId: String(notice.id) }}

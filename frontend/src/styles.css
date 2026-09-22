@@ -101,6 +101,12 @@ body {
   --raised: linear-gradient(to bottom, #ffffff 0%, #e2e2e2 100%);
   --raised-primary: linear-gradient(to bottom, #dbeeff 0%, #b9d4f2 100%);
   --rule: #ededed;
+  --tone-neutral: #6b7d93;
+  --tone-muted: #a3b1c2;
+  --tone-good: #3c763d;
+  --tone-warn: #d9922a;
+  --tone-bad: #b23b32;
+  --tone-foreground: #ffffff;
 }
 
 .dark {
@@ -140,6 +146,12 @@ body {
   --raised: linear-gradient(to bottom, #39434f 0%, #2b3440 100%);
   --raised-primary: linear-gradient(to bottom, #4a7fae 0%, #3b688f 100%);
   --rule: #313b46;
+  --tone-neutral: #5d6b7d;
+  --tone-muted: #46525f;
+  --tone-good: #3c763d;
+  --tone-warn: #b87c22;
+  --tone-bad: #9c332b;
+  --tone-foreground: #ffffff;
 }
 
 @layer base {
@@ -215,6 +227,12 @@ body {
     border-radius: 0;
     border-left: 3px solid transparent;
     padding-left: calc(var(--spacing) * 4);
+    font-size: 11px;
+  }
+
+  /* the rail is chrome, so it is ruled off from the content the way a panel would be */
+  [data-slot='sidebar-container'] [data-sidebar='sidebar'] {
+    border-right: 1px solid var(--sidebar-border);
   }
 
   [data-slot='sidebar-menu-button'][data-active='true'] {

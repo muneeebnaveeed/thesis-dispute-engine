@@ -33,7 +33,7 @@ export const QuestionnairePanel = ({
 
   if (questionnaire.receivedAt) {
     return (
-      <div className="space-y-3 text-sm">
+      <div className="space-y-2 text-[11px]">
         <p className="text-muted-foreground">
           Sent {questionnaire.sentAt.slice(0, 10)}, received {questionnaire.receivedAt.slice(0, 10)}.
         </p>
@@ -60,7 +60,7 @@ export const QuestionnairePanel = ({
   }
 
   return (
-    <form className="space-y-3 text-sm" onSubmit={submitting(answersForm)}>
+    <form className="space-y-2 text-[11px]" onSubmit={submitting(answersForm)}>
       <p className="text-muted-foreground">
         Sent {questionnaire.sentAt.slice(0, 10)}; awaiting the customer. Record the answers as they come in.
       </p>

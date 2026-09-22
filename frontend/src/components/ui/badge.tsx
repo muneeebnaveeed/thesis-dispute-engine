@@ -5,15 +5,15 @@ import { cn } from '#/lib/utils'
 
 // the period's label: a solid block of colour with white text, never a soft tint
 const badgeVariants = cva(
-  'inline-block rounded-sm px-1.5 py-0.5 text-[11px] font-bold tracking-wide text-white uppercase',
+  'inline-block px-1 py-px text-[10px] font-bold tracking-wide text-[color:var(--tone-foreground)] uppercase',
   {
     variants: {
       tone: {
-        neutral: 'bg-[#777777]',
-        muted: 'bg-[#b4b4b4]',
-        good: 'bg-[#5cb85c]',
-        warn: 'bg-[#f0ad4e]',
-        bad: 'bg-[#d9534f]',
+        neutral: 'bg-[color:var(--tone-neutral)]',
+        muted: 'bg-[color:var(--tone-muted)]',
+        good: 'bg-[color:var(--tone-good)]',
+        warn: 'bg-[color:var(--tone-warn)]',
+        bad: 'bg-[color:var(--tone-bad)]',
       },
     },
     defaultVariants: { tone: 'neutral' },

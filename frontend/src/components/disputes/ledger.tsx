@@ -1,4 +1,5 @@
 import { formatMoney } from '#/lib/money'
+import { gridBody, gridHead, gridTable } from '#/components/ui/grid'
 import type { Dispute } from '#/api/views'
 import { cn } from '#/lib/utils'
 
@@ -13,7 +14,7 @@ const POSTING_KIND_LABEL: Record<Dispute['ledger'][number]['kind'], string> = {
 
 export const Ledger = ({ ledger, balances, currency }: Pick<Dispute, 'ledger' | 'balances' | 'currency'>) => {
   return (
-    <div className="space-y-3 text-sm">
+    <div className="space-y-2 text-[11px]">
       <dl className="grid grid-cols-2 gap-x-6 gap-y-1 md:grid-cols-4" aria-label="Balances">
         <Balance label="Customer credited" amount={balances.customer} currency={currency} />
         <Balance label="Advanced, not yet cleared" amount={balances.suspense} currency={currency} emphasise />
@@ -23,35 +24,33 @@ export const Ledger = ({ ledger, balances, currency }: Pick<Dispute, 'ledger' | 
       {ledger.length === 0 ? (
         <p className="text-muted-foreground">No money has moved on this dispute.</p>
       ) : (
-        <table className="w-full text-left" aria-label="Postings">
-          <thead className="text-muted-foreground">
+        <table className={gridTable} aria-label="Postings">
+          <thead className={gridHead}>
             <tr>
-              <th className="py-1 pr-4 font-normal">#</th>
-              <th className="py-1 pr-4 font-normal">Posting</th>
-              <th className="py-1 pr-4 font-normal">Debit</th>
-              <th className="py-1 pr-4 font-normal">Credit</th>
-              <th className="py-1 pr-4 text-right font-normal">Amount</th>
-              <th className="py-1 pr-4 font-normal">Core</th>
-              <th className="py-1 font-normal">Reference</th>
+              <th>#</th>
+              <th>Posting</th>
+              <th>Debit</th>
+              <th>Credit</th>
+              <th className="text-right">Amount</th>
+              <th>Core</th>
+              <th>Reference</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className={gridBody}>
             {ledger.map((posting) => (
-              <tr key={posting.reference} className="border-t border-border">
-                <td className="py-1 pr-4 font-mono text-muted-foreground">{posting.seq}</td>
-                <td className="py-1 pr-4">{POSTING_KIND_LABEL[posting.kind]}</td>
-                <td className="py-1 pr-4 font-mono">{posting.debit}</td>
-                <td className="py-1 pr-4 font-mono">{posting.credit}</td>
-                <td className="py-1 pr-4 text-right font-mono">
-                  {formatMoney(posting.amount, posting.currency)}
-                </td>
+              <tr key={posting.reference} className="hover:bg-accent">
+                <td className="font-mono text-muted-foreground">{posting.seq}</td>
+                <td>{POSTING_KIND_LABEL[posting.kind]}</td>
+                <td className="font-mono">{posting.debit}</td>
+                <td className="font-mono">{posting.credit}</td>
+                <td className="text-right font-mono">{formatMoney(posting.amount, posting.currency)}</td>
                 <td
-                  className="py-1 pr-4 font-mono text-xs text-muted-foreground"
+                  className="font-mono text-muted-foreground"
                   title={posting.core ? `response ${posting.core.responseCode}` : undefined}
                 >
                   {posting.core ? posting.core.rrn || 'booked' : 'internal'}
                 </td>
-                <td className="py-1 font-mono text-xs text-muted-foreground">{posting.reference}</td>
+                <td className="font-mono text-muted-foreground">{posting.reference}</td>
               </tr>
             ))}
           </tbody>

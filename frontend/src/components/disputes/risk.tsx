@@ -1,6 +1,7 @@
 import type { Dispute } from '#/api/views'
 import { Badge, type BadgeTone } from '#/components/ui/badge'
 import { cn } from '#/lib/utils'
+import { gridBody, gridHead, gridTable } from '#/components/ui/grid'
 
 type Risk = NonNullable<Dispute['risk']>
 type RiskTier = Risk['tier']
@@ -18,7 +19,7 @@ export const RiskBadge = ({ tier, score }: { tier: RiskTier; score?: number | un
 
 export const RiskPanel = ({ risk }: { risk: Risk }) => {
   return (
-    <div className="space-y-3 text-sm">
+    <div className="space-y-2 text-[11px]">
       <p className="flex items-center gap-2">
         <RiskBadge tier={risk.tier} score={risk.score} />
         <span className="text-muted-foreground">
@@ -30,25 +31,22 @@ export const RiskPanel = ({ risk }: { risk: Risk }) => {
           {risk.history.length > 0 && ` Reassessed ${risk.history.length + 1} times.`}
         </span>
       </p>
-      <table className="w-full text-left" aria-label="Risk signals">
-        <thead className="text-muted-foreground">
+      <table className={gridTable} aria-label="Risk signals">
+        <thead className={gridHead}>
           <tr>
-            <th className="py-1 pr-4 font-normal">Signal</th>
-            <th className="py-1 pr-4 text-right font-normal">Points</th>
-            <th className="py-1 font-normal">Why</th>
+            <th>Signal</th>
+            <th className="text-right">Points</th>
+            <th>Why</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className={gridBody}>
           {risk.signals.map((signal) => (
-            <tr
-              key={signal.name}
-              className={cn('border-t border-border', signal.points === 0 && 'text-muted-foreground')}
-            >
-              <td className="py-1 pr-4">{signal.name}</td>
-              <td className="py-1 pr-4 text-right font-mono">
+            <tr key={signal.name} className={cn(signal.points === 0 && 'text-muted-foreground')}>
+              <td>{signal.name}</td>
+              <td className="text-right font-mono">
                 {signal.points}/{signal.weight}
               </td>
-              <td className="py-1">{signal.detail}</td>
+              <td>{signal.detail}</td>
             </tr>
           ))}
         </tbody>

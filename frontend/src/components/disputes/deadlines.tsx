@@ -37,9 +37,9 @@ export const daysRemaining = (dueAt: string, now = Date.now()): string => {
 
 export const Deadlines = ({ deadlines }: { deadlines: Deadline[] }) => {
   if (deadlines.length === 0)
-    return <p className="text-sm text-muted-foreground">This dispute predates the clocks.</p>
+    return <p className="text-[11px] text-muted-foreground">This dispute predates the clocks.</p>
   return (
-    <ul className="divide-y divide-border text-sm" aria-label="Regulatory clocks">
+    <ul className="divide-y divide-border text-[11px]" aria-label="Regulatory clocks">
       {deadlines.map((deadline) => {
         const stillCounting = deadline.status === 'RUNNING' || deadline.status === 'BREACHED'
         return (

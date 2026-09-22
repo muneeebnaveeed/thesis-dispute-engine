@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router'
 import type { components } from '#/api/schema.gen'
 import { DeadlineBadge, daysRemaining } from '#/components/disputes/deadlines'
 import { RiskBadge } from '#/components/disputes/risk'
+import { gridBody, gridHead, gridTable } from '#/components/ui/grid'
 import { formatMoney } from '#/lib/money'
 
 type Summary = components['schemas']['DisputeSummary']
@@ -16,25 +17,18 @@ const SORTED = 'Opened'
 
 export const DisputeTable = ({ disputes, tenant }: { disputes: Summary[]; tenant: string }) => (
   <div className="overflow-x-auto">
-    <table
-      className="w-full border-collapse text-left text-[11px] [&_td]:border-t [&_td]:border-[color:var(--rule)] [&_td]:border-r [&_td]:px-1.5 [&_td]:py-[3px] [&_th]:border-r [&_th]:border-b [&_th]:border-border [&_th]:px-1.5 [&_th]:py-[3px] [&_th]:whitespace-nowrap"
-      aria-label="Disputes"
-    >
-      <thead className="bg-[image:var(--toolbar)] text-foreground">
+    <table className={gridTable} aria-label="Disputes">
+      <thead className={gridHead}>
         <tr>
           {COLUMNS.map((column) => (
-            <th
-              key={column}
-              className="font-bold"
-              {...(column === SORTED ? { 'aria-sort': 'descending' as const } : {})}
-            >
+            <th key={column} {...(column === SORTED ? { 'aria-sort': 'descending' as const } : {})}>
               {column}
               {column === SORTED && <span className="ml-1 text-[8px] text-primary">▼</span>}
             </th>
           ))}
         </tr>
       </thead>
-      <tbody className="[&_tr:nth-child(odd)]:bg-muted">
+      <tbody className={gridBody}>
         {disputes.map((dispute) => (
           <tr key={dispute.id} className="hover:bg-accent">
             <td className="font-mono">
