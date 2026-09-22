@@ -34,6 +34,14 @@ type Config struct {
 	RatePerMinute int
 	// AuthFailuresPerMinute is how many bad credentials one peer may present per minute before being refused.
 	AuthFailuresPerMinute int
+	// DecisionsKey enables the typed-decision model that proposes values an analyst confirms (ADR 0024);
+	// empty leaves every such field blank, which is the supported case.
+	DecisionsKey string
+	// DecisionsEndpoint and DecisionsModel override the hosted defaults; DecisionsTimeout bounds one call,
+	// past which the analyst simply gets an empty field.
+	DecisionsEndpoint string
+	DecisionsModel    string
+	DecisionsTimeout  time.Duration
 	// Production turns dev defaults into startup errors.
 	Production bool
 	LogLevel   slog.Level
@@ -53,6 +61,10 @@ func Load() (Config, error) {
 		MailFrom:              getenv("DISPUTE_MAIL_FROM", "disputes@localhost"),
 		CORSOrigins:           strings.Split(getenv("DISPUTE_CORS_ORIGINS", "http://localhost:3002"), ","),
 		ServiceKey:            getenv("DISPUTE_SERVICE_KEY", "dev-service-key"),
+		DecisionsKey:          os.Getenv("DISPUTE_DECISIONS_KEY"),
+		DecisionsEndpoint:     os.Getenv("DISPUTE_DECISIONS_ENDPOINT"),
+		DecisionsModel:        os.Getenv("DISPUTE_DECISIONS_MODEL"),
+		DecisionsTimeout:      3 * time.Second,
 		InternalCIDRs:         strings.Split(getenv("DISPUTE_INTERNAL_CIDRS", "127.0.0.0/8,::1/128"), ","),
 		RatePerMinute:         600,
 		AuthFailuresPerMinute: 30,
