@@ -1,6 +1,7 @@
 import { Outlet, createFileRoute, notFound, redirect } from '@tanstack/react-router'
 
 import { AppShell } from '#/components/layout/app-shell'
+import { brandingQuery, myAvatarQuery } from '#/queries/identity'
 import { beginLogin } from '#/server/functions/session'
 import { tenantExists } from '#/server/functions/discovery'
 
@@ -21,6 +22,12 @@ export const Route = createFileRoute('/$tenant')({
     if (search.next) throw redirect({ to: location.pathname, replace: true })
     return { tenant }
   },
+  // the sidebar draws these on every page, so they load with the session rather than from the browser afterwards
+  loader: ({ context }) =>
+    Promise.all([
+      context.queryClient.query({ ...brandingQuery(), staleTime: 'static' }),
+      context.queryClient.query({ ...myAvatarQuery(), staleTime: 'static' }),
+    ]),
   component: Outlet,
   notFoundComponent: () => (
     <AppShell title="Unknown organisation">

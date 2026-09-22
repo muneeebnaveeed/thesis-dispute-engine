@@ -646,3 +646,54 @@ func (t *txn) DeleteTenantTemplate(ctx context.Context, kind domain.NoticeKind) 
 	n, err := t.q.DeleteTenantTemplate(ctx, string(kind))
 	return n > 0, mapErr(err)
 }
+
+func (t *txn) GetTenantMetadata(ctx context.Context) (application.TenantMetadata, error) {
+	row, err := t.q.GetTenantMetadata(ctx)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return application.TenantMetadata{}, nil
+	}
+	if err != nil {
+		return application.TenantMetadata{}, mapErr(err)
+	}
+	meta := application.TenantMetadata{HasLogo: row.LogoContentType != nil}
+	if row.LogoUpdatedAt.Valid {
+		at := row.LogoUpdatedAt.Time
+		meta.LogoUpdatedAt = &at
+	}
+	return meta, nil
+}
+
+func (t *txn) GetTenantLogo(ctx context.Context) (application.Image, error) {
+	row, err := t.q.GetTenantLogo(ctx)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return application.Image{}, application.ErrNotFound
+	}
+	if err != nil {
+		return application.Image{}, mapErr(err)
+	}
+	return application.Image{Content: row.Logo, ContentType: derefString(row.LogoContentType)}, nil
+}
+
+func (t *txn) PutTenantLogo(ctx context.Context, img application.Image, at time.Time) error {
+	contentType := img.ContentType
+	return mapErr(t.q.PutTenantLogo(ctx, sqlcgen.PutTenantLogoParams{
+		Logo: img.Content, LogoContentType: &contentType, LogoUpdatedAt: pgtype.Timestamptz{Time: at, Valid: true},
+	}))
+}
+
+func (t *txn) GetAnalystAvatar(ctx context.Context, subject string) (application.Image, error) {
+	row, err := t.q.GetAnalystAvatar(ctx, subject)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return application.Image{}, application.ErrNotFound
+	}
+	if err != nil {
+		return application.Image{}, mapErr(err)
+	}
+	return application.Image{Content: row.Avatar, ContentType: row.ContentType}, nil
+}
+
+func (t *txn) PutAnalystAvatar(ctx context.Context, subject string, img application.Image, at time.Time) error {
+	return mapErr(t.q.PutAnalystAvatar(ctx, sqlcgen.PutAnalystAvatarParams{
+		Subject: subject, Avatar: img.Content, ContentType: img.ContentType, UpdatedAt: at,
+	}))
+}

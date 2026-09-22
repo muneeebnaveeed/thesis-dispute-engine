@@ -564,6 +564,7 @@ export const ErrorCode = Type.Union(
     Type.Literal('invalid-template-override'),
     Type.Literal('concurrent-update'),
     Type.Literal('idempotency-key-reuse'),
+    Type.Literal('image-refused'),
     Type.Literal('no-regime'),
     Type.Literal('unknown-regime'),
     Type.Literal('unavailable'),
@@ -717,6 +718,15 @@ export const TemplateSetting = Type.Object({
 export type TemplateSetting = Static<typeof TemplateSetting>
 const _TemplateSetting: Same<TemplateSetting, components['schemas']['TemplateSetting']> = true
 void _TemplateSetting
+
+export const Tenant = Type.Object({
+  name: Type.String(),
+  hasLogo: Type.Boolean({ description: 'Whether GetTenantLogo will answer with an image.' }),
+  logoUpdatedAt: Type.Optional(Type.String({ format: 'date-time' })),
+})
+export type Tenant = Static<typeof Tenant>
+const _Tenant: Same<Tenant, components['schemas']['Tenant']> = true
+void _Tenant
 
 export const TenantSummary = Type.Object({
   id: Type.String({ format: 'uuid' }),

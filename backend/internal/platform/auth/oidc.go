@@ -62,11 +62,13 @@ func (o *OIDC) Verify(ctx context.Context, raw string) (Principal, error) {
 		return Principal{}, ErrUnauthenticated
 	}
 	var claims struct {
-		TenantID string   `json:"tenant_id"`
-		Sid      string   `json:"sid"`
-		Email    string   `json:"email"`
-		Name     string   `json:"preferred_username"`
-		Roles    []string `json:"roles"`
+		TenantID  string   `json:"tenant_id"`
+		Sid       string   `json:"sid"`
+		Email     string   `json:"email"`
+		Name      string   `json:"preferred_username"`
+		FirstName string   `json:"given_name"`
+		LastName  string   `json:"family_name"`
+		Roles     []string `json:"roles"`
 	}
 	if err := tok.Claims(&claims); err != nil {
 		return Principal{}, ErrUnauthenticated
@@ -75,7 +77,13 @@ func (o *OIDC) Verify(ctx context.Context, raw string) (Principal, error) {
 	if claims.TenantID != "" && claims.TenantID != tenant.String() {
 		return Principal{}, ErrUnauthenticated
 	}
-	return Principal{Tenant: tenant, Subject: tok.Subject, Sid: claims.Sid, Email: claims.Email, Name: claims.Name, Roles: claims.Roles}, nil
+	// A realm whose scopes drop the sub mapper issues tokens that name nobody; the audit actor, the avatar key and
+	// enduser.id all rest on the subject, so an anonymous token is no token.
+	if tok.Subject == "" {
+		return Principal{}, ErrUnauthenticated
+	}
+	return Principal{Tenant: tenant, Subject: tok.Subject, Sid: claims.Sid, Email: claims.Email,
+		Name: claims.Name, FirstName: claims.FirstName, LastName: claims.LastName, Roles: claims.Roles}, nil
 }
 
 func (o *OIDC) verifier(ctx context.Context, issuer string) (*oidc.IDTokenVerifier, error) {

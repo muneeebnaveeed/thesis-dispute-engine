@@ -22,6 +22,14 @@ type Account struct {
 	PostalAddress *string
 }
 
+type AnalystProfile struct {
+	TenantID    uuid.UUID
+	Subject     string
+	Avatar      []byte
+	ContentType string
+	UpdatedAt   time.Time
+}
+
 type Attachment struct {
 	ID          uuid.UUID
 	TenantID    uuid.UUID
@@ -188,6 +196,13 @@ type TenantKey struct {
 	Prefix     string
 	LastUsedAt pgtype.Timestamptz
 	ExpiresAt  pgtype.Timestamptz
+}
+
+type TenantMetadatum struct {
+	TenantID        uuid.UUID
+	Logo            []byte
+	LogoContentType *string
+	LogoUpdatedAt   pgtype.Timestamptz
 }
 
 type TenantRateWindow struct {

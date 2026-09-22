@@ -297,3 +297,28 @@ ON CONFLICT (tenant_id, kind) DO UPDATE SET override = EXCLUDED.override, update
 
 -- name: DeleteTenantTemplate :execrows
 DELETE FROM tenant_templates WHERE kind = $1;
+
+-- name: SeedTenantLogo :exec
+INSERT INTO tenant_metadata (tenant_id, logo, logo_content_type, logo_updated_at)
+VALUES ($1, $2, $3, now())
+ON CONFLICT (tenant_id) DO UPDATE SET logo = EXCLUDED.logo, logo_content_type = EXCLUDED.logo_content_type, logo_updated_at = now();
+
+-- name: GetTenantMetadata :one
+SELECT logo_content_type, logo_updated_at, octet_length(logo)::int AS logo_size
+FROM tenant_metadata WHERE tenant_id = current_tenant_id();
+
+-- name: GetTenantLogo :one
+SELECT logo, logo_content_type FROM tenant_metadata WHERE tenant_id = current_tenant_id() AND logo IS NOT NULL;
+
+-- name: PutTenantLogo :exec
+INSERT INTO tenant_metadata (tenant_id, logo, logo_content_type, logo_updated_at)
+VALUES (current_tenant_id(), $1, $2, $3)
+ON CONFLICT (tenant_id) DO UPDATE SET logo = $1, logo_content_type = $2, logo_updated_at = $3;
+
+-- name: GetAnalystAvatar :one
+SELECT avatar, content_type FROM analyst_profiles WHERE tenant_id = current_tenant_id() AND subject = $1;
+
+-- name: PutAnalystAvatar :exec
+INSERT INTO analyst_profiles (tenant_id, subject, avatar, content_type, updated_at)
+VALUES (current_tenant_id(), $1, $2, $3, $4)
+ON CONFLICT (tenant_id, subject) DO UPDATE SET avatar = $2, content_type = $3, updated_at = $4;

@@ -12,7 +12,7 @@ test('a signed-out visitor to a tenant page is sent through the realm and back t
 
   await expect(page).toHaveURL(new RegExp(`/otp/disputes/${id}$`))
   await expect(page.getByRole('heading', { name: `Dispute ${id.slice(0, 8)}` })).toBeVisible()
-  await expect(page.getByText(/at otp/)).toBeVisible()
+  await expect(page.getByText('OTP Bank')).toBeVisible()
 
   const cookies = await page.context().cookies()
   const session = cookies.find((cookie) => cookie.name === 'de_session')
@@ -42,7 +42,7 @@ test('an action from a tab whose session has ended signs in again and lands back
 
   await expect(page).toHaveURL(new RegExp(`/otp/disputes/${id}$`))
   await expect(page.getByRole('heading', { name: `Dispute ${id.slice(0, 8)}` })).toBeVisible()
-  await expect(page.getByText(/at otp/)).toBeVisible()
+  await expect(page.getByText('OTP Bank')).toBeVisible()
 })
 
 test('the root remembers the tenant, and a work email finds it for a fresh browser', async ({

@@ -81,9 +81,13 @@ func TestOIDCVerify(t *testing.T) {
 	o := NewOIDC(issuers{alpha.srv.URL: tenantA, beta.srv.URL: tenantB})
 	ctx := context.Background()
 
-	p, err := o.Verify(ctx, alpha.token(t, map[string]any{"tenant_id": tenantA.String(), "roles": []string{"analyst"}, "email": "a@x"}))
+	p, err := o.Verify(ctx, alpha.token(t, map[string]any{"tenant_id": tenantA.String(), "roles": []string{"analyst"},
+		"email": "a@x", "given_name": "Eszter", "family_name": "Varga"}))
 	if err != nil || p.Tenant != tenantA || p.Email != "a@x" || len(p.Roles) != 1 {
 		t.Fatalf("valid token: %+v %v", p, err)
+	}
+	if p.Subject != "u-1" || p.FirstName != "Eszter" || p.LastName != "Varga" {
+		t.Errorf("who the token names: %+v", p)
 	}
 	if p, err := o.Verify(ctx, beta.token(t, nil)); err != nil || p.Tenant != tenantB {
 		t.Fatalf("second realm: %+v %v", p, err)
@@ -96,6 +100,7 @@ func TestOIDCVerify(t *testing.T) {
 		"expired":               alpha.token(t, map[string]any{"exp": time.Now().Add(-time.Minute).Unix()}),
 		"tenant claim mismatch": alpha.token(t, map[string]any{"tenant_id": tenantB.String()}),
 		"garbage":               "a.b.c",
+		"no subject":            alpha.token(t, map[string]any{"sub": ""}),
 	}
 	for name, tok := range cases {
 		if _, err := o.Verify(ctx, tok); !errors.Is(err, ErrUnauthenticated) {

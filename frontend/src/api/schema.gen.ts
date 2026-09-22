@@ -244,6 +244,65 @@ export type paths = {
     patch?: never
     trace?: never
   }
+  '/tenant': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** What the workbench shows about the signed-in analyst's organisation */
+    get: operations['getTenant']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/tenant/logo': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** The organisation's logo */
+    get: operations['getTenantLogo']
+    /**
+     * Replace the organisation's logo
+     * @description PNG, JPEG or WebP, at most 256 kB. Tenant admins only.
+     */
+    put: operations['putTenantLogo']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/me/avatar': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** The signed-in analyst's picture */
+    get: operations['getMyAvatar']
+    /**
+     * Replace the signed-in analyst's picture
+     * @description PNG, JPEG or WebP, at most 256 kB. Analysts only; a tenant key has no person behind it.
+     */
+    put: operations['putMyAvatar']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/tenant-keys': {
     parameters: {
       query?: never
@@ -380,6 +439,7 @@ export type components = {
       | 'invalid-template-override'
       | 'concurrent-update'
       | 'idempotency-key-reuse'
+      | 'image-refused'
       | 'no-regime'
       | 'unknown-regime'
       | 'unavailable'
@@ -406,6 +466,13 @@ export type components = {
       /** @example /transactionId */
       field: string
       message: string
+    }
+    Tenant: {
+      name: string
+      /** @description Whether GetTenantLogo will answer with an image. */
+      hasLogo: boolean
+      /** Format: date-time */
+      logoUpdatedAt?: string
     }
     TenantKey: {
       /** Format: uuid */
@@ -1390,6 +1457,136 @@ export interface operations {
       401: components['responses']['Unauthorized']
       403: components['responses']['Forbidden']
       404: components['responses']['NotFound']
+      429: components['responses']['TooManyRequests']
+    }
+  }
+  getTenant: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The tenant's name and whether it has a logo. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Tenant']
+        }
+      }
+      401: components['responses']['Unauthorized']
+      429: components['responses']['TooManyRequests']
+    }
+  }
+  getTenantLogo: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The image. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'image/*': string
+        }
+      }
+      401: components['responses']['Unauthorized']
+      404: components['responses']['NotFound']
+      429: components['responses']['TooManyRequests']
+    }
+  }
+  putTenantLogo: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': {
+          /** Format: binary */
+          file: string
+        }
+      }
+    }
+    responses: {
+      /** @description Stored. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Tenant']
+        }
+      }
+      400: components['responses']['BadRequest']
+      401: components['responses']['Unauthorized']
+      403: components['responses']['Forbidden']
+      422: components['responses']['Unprocessable']
+      429: components['responses']['TooManyRequests']
+    }
+  }
+  getMyAvatar: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The image. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'image/*': string
+        }
+      }
+      401: components['responses']['Unauthorized']
+      404: components['responses']['NotFound']
+      429: components['responses']['TooManyRequests']
+    }
+  }
+  putMyAvatar: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': {
+          /** Format: binary */
+          file: string
+        }
+      }
+    }
+    responses: {
+      /** @description Stored. */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      400: components['responses']['BadRequest']
+      401: components['responses']['Unauthorized']
+      403: components['responses']['Forbidden']
+      422: components['responses']['Unprocessable']
       429: components['responses']['TooManyRequests']
     }
   }

@@ -13,11 +13,12 @@ const OUT = join(dirname(fileURLToPath(import.meta.url)), '../../docs/thesis/fig
 // read on screen and printed small, never zoomed into
 const QUALITY = 60
 
-type Figure = { path: string; height?: number; prepare?: (page: Page) => Promise<void> }
+type Figure = { path: string; height?: number; element?: string; prepare?: (page: Page) => Promise<void> }
 
 const figures: Record<string, Figure> = {
   workbench: { path: `/${TENANT}`, height: 900 },
   search: { path: `/${TENANT}/search`, height: 700 },
+  sidebar: { path: `/${TENANT}`, height: 720, element: '[data-slot=sidebar-container]' },
   dispute: {
     path: `/${TENANT}`,
     height: 1100,
@@ -55,7 +56,8 @@ for (const [name, figure] of chosen) {
   await figure.prepare?.(page)
   await page.waitForLoadState('networkidle')
   const file = join(OUT, `${name}.webp`)
-  await page.screenshot({ path: file, type: 'webp', quality: QUALITY })
+  const shot = figure.element ? page.locator(figure.element).first() : page
+  await shot.screenshot({ path: file, type: 'webp', quality: QUALITY })
   console.log(`docs/thesis/figures/${name}.webp`)
 }
 
