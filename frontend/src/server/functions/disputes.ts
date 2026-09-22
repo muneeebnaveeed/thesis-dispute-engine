@@ -8,6 +8,7 @@ export const DisputeListSearch = Type.Object({
   state: Type.Optional(DisputeState),
   reason: Type.Optional(DisputeReason),
   cursor: Type.Optional(Type.String()),
+  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
   overdue: Type.Optional(Type.Boolean()),
 })
 

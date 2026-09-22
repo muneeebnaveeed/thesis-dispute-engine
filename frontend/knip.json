@@ -10,5 +10,5 @@
   ],
   "project": ["src/**/*.{ts,tsx}", "e2e/**/*.ts", "scripts/*.ts"],
   "ignore": ["src/api/*.gen.ts"],
-  "ignoreDependencies": ["@fontsource-variable/geist", "shadcn", "tailwindcss", "tw-animate-css"]
+  "ignoreDependencies": ["shadcn", "tailwindcss", "tw-animate-css"]
 }

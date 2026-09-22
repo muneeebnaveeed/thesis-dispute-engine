@@ -1,5 +1,6 @@
-import { useSuspenseQuery } from '@tanstack/react-query'
-import { Link, createFileRoute, useNavigate, useRouteContext } from '@tanstack/react-router'
+import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { createFileRoute, useNavigate, useRouteContext } from '@tanstack/react-router'
+import { useState } from 'react'
 import type { Static } from '@sinclair/typebox'
 import { Value } from '@sinclair/typebox/value'
 
@@ -12,7 +13,10 @@ import type { DisputeState } from '#/api/views'
 import { DisputeTable } from '#/components/disputes/dispute-table'
 import { AppShell } from '#/components/layout/app-shell'
 import { FailureBanner } from '#/components/layout/failure-banner'
+import { Button } from '#/components/ui/button'
+import { GridPager, GridToolbar, ToolbarFill, ToolbarSeparator } from '#/components/ui/grid'
 import { Panel } from '#/components/ui/panel'
+import { Window } from '#/components/ui/window'
 import { TenantMismatch } from '#/components/layout/tenant-mismatch'
 import { submitTo, submitting, useAppForm } from '#/forms/app-form'
 import { parsed, schemaValidator } from '#/forms/schema'
@@ -32,20 +36,44 @@ const DISPUTE_REASONS = DisputeReasonSchema.anyOf.map((literal) => ({
 const isDisputeState = (value: unknown): value is DisputeState =>
   typeof value === 'string' && Value.Check(DisputeStateSchema, value)
 
+const DEFAULT_PAGE_SIZE = 25
+
 const Workbench = () => {
   const { tenant } = Route.useParams()
   const search = Route.useSearch()
-  const { state, cursor, overdue } = search
+  const { state, overdue, limit } = search
   const { viewer } = useRouteContext({ from: '__root__' })
   const { data: loadedPage } = useSuspenseQuery(disputesQuery(search))
-  const activeFilters = { ...(state ? { state } : {}), ...(overdue ? { overdue: true } : {}) }
+  const activeFilters = {
+    ...(state ? { state } : {}),
+    ...(overdue ? { overdue: true } : {}),
+    ...(limit ? { limit } : {}),
+  }
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  // keyset paging knows no page numbers, so the grid remembers the cursors it walked in to step back
+  const [walked, setWalked] = useState<string[]>([])
+  const [opening, setOpening] = useState(false)
+  const pageSize = limit ?? DEFAULT_PAGE_SIZE
+  const goToPage = (cursor: string | undefined, trail: string[]) => {
+    setWalked(trail)
+    void navigate({
+      to: '/$tenant',
+      params: { tenant },
+      search: { ...activeFilters, ...(cursor ? { cursor } : {}) },
+    })
+  }
   const openDisputeMutation = useServerMutation(
     (request: Static<typeof CreateDisputeRequest>) => openDispute({ data: { ...request, actor: 'analyst' } }),
     {
       invalidates: () => [disputeQuery(null).queryKey],
-      onSuccess: (openedDispute) =>
-        navigate({ to: '/$tenant/disputes/$disputeId', params: { tenant, disputeId: openedDispute.id } }),
+      onSuccess: (openedDispute) => {
+        setOpening(false)
+        return navigate({
+          to: '/$tenant/disputes/$disputeId',
+          params: { tenant, disputeId: openedDispute.id },
+        })
+      },
     },
   )
   const openForm = useAppForm({
@@ -56,111 +84,127 @@ const Workbench = () => {
   })
   const filterForm = useAppForm({
     defaultValues: { state: state ?? '', overdue: overdue ?? false },
-    onSubmit: ({ value }) =>
-      navigate({
+    onSubmit: ({ value }) => {
+      setWalked([])
+      return navigate({
         to: '/$tenant',
         params: { tenant },
         search: {
           ...(isDisputeState(value.state) ? { state: value.state } : {}),
           ...(value.overdue ? { overdue: true } : {}),
+          ...(limit ? { limit } : {}),
         },
-      }),
+      })
+    },
   })
   const openFailure = openDisputeMutation.failure
   if (viewer && viewer.tenantSlug !== tenant) return <TenantMismatch wanted={tenant} />
 
   return (
     <AppShell title="Disputes">
-      <Panel
-        className="mb-6"
-        bodyClassName="p-0"
-        title="Recent disputes"
-        actions={
-          <form className="flex items-end gap-2 text-[13px]" onSubmit={submitting(filterForm)}>
+      <Panel bodyClassName="p-0" title="Recent disputes">
+        <GridToolbar>
+          <Button variant="secondary" size="sm" onClick={() => setOpening(true)}>
+            New dispute
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void queryClient.invalidateQueries({ queryKey: disputeQuery(null).queryKey })}
+          >
+            Refresh
+          </Button>
+          <ToolbarSeparator />
+          <form className="flex items-center gap-1.5" onSubmit={submitting(filterForm)}>
             <filterForm.AppField name="state">
               {(field) => (
                 <field.SelectField
                   label="State"
                   options={DISPUTE_STATES}
                   placeholder="any"
-                  className="text-muted-foreground"
+                  className="flex items-center gap-1 [&_.field-control]:contents"
                   inputClassName="mt-0 w-auto"
                 />
               )}
             </filterForm.AppField>
             <filterForm.AppField name="overdue">
-              {(field) => <field.CheckboxField label="overdue only" className="mb-1 text-muted-foreground" />}
+              {(field) => <field.CheckboxField label="overdue only" />}
             </filterForm.AppField>
             <filterForm.AppForm>
-              <filterForm.SubmitButton variant="secondary" size="xs">
+              <filterForm.SubmitButton variant="secondary" size="sm">
                 Filter
               </filterForm.SubmitButton>
             </filterForm.AppForm>
           </form>
-        }
-      >
+          <ToolbarFill />
+        </GridToolbar>
         {loadedPage.failure ? (
-          <div className="p-4">
+          <div className="p-2">
             <FailureBanner failure={loadedPage.failure} />
           </div>
         ) : loadedPage.value.items.length > 0 ? (
-          <>
-            <DisputeTable disputes={loadedPage.value.items} tenant={tenant} />
-            <div className="flex gap-3 border-t border-border bg-muted px-4 py-2 text-[13px]">
-              {cursor && (
-                <Link to="/$tenant" params={{ tenant }} search={activeFilters} className="underline">
-                  Newest
-                </Link>
-              )}
-              {loadedPage.value.nextCursor && (
-                <Link
-                  to="/$tenant"
-                  params={{ tenant }}
-                  search={{ ...activeFilters, cursor: loadedPage.value.nextCursor }}
-                  className="underline"
-                >
-                  Older
-                </Link>
-              )}
-            </div>
-          </>
+          <DisputeTable disputes={loadedPage.value.items} tenant={tenant} />
         ) : (
-          <p className="px-4 py-3 text-[13px] text-muted-foreground">
+          <p className="px-2 py-1.5 text-[11px] text-muted-foreground">
             No {overdue ? 'overdue ' : ''}disputes{state ? ` in ${state}` : ''}
             {overdue ? '.' : ' yet.'}
           </p>
         )}
+        <GridPager
+          noun="disputes"
+          page={walked.length + 1}
+          pageSize={pageSize}
+          shown={loadedPage.value?.items.length ?? 0}
+          hasNext={Boolean(loadedPage.value?.nextCursor)}
+          onFirst={() => goToPage(undefined, [])}
+          onPrevious={() => goToPage(walked.at(-1), walked.slice(0, -1))}
+          onNext={() => goToPage(loadedPage.value?.nextCursor, [...walked, search.cursor ?? ''])}
+          onPageSize={(size) => {
+            setWalked([])
+            void navigate({
+              to: '/$tenant',
+              params: { tenant },
+              search: { ...activeFilters, limit: size },
+            })
+          }}
+        />
       </Panel>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Panel title="Open a dispute">
-          <form className="space-y-3" onSubmit={submitting(openForm)}>
-            <openForm.AppField name="transactionId">
-              {(field) => (
-                <field.TextField
-                  label="Transaction ID"
-                  mono
-                  inputClassName="px-3 py-2"
-                  placeholder="00000000-0000-8000-8000-000000000101"
-                />
-              )}
-            </openForm.AppField>
-            <openForm.AppField name="reason">
-              {(field) => (
-                <field.SelectField label="Reason" options={DISPUTE_REASONS} mono inputClassName="px-3 py-2" />
-              )}
-            </openForm.AppField>
-            <openForm.AppForm>
-              <openForm.SubmitButton busy={openDisputeMutation.isPending}>Open</openForm.SubmitButton>
-            </openForm.AppForm>
-          </form>
-          {openFailure && openFailure.kind !== 'validation' && (
-            <div className="mt-4">
-              <FailureBanner failure={openFailure} />
-            </div>
-          )}
-        </Panel>
-      </div>
+      <Window
+        open={opening}
+        onOpenChange={setOpening}
+        title="Open a dispute"
+        footer={
+          <openForm.AppForm>
+            <openForm.SubmitButton busy={openDisputeMutation.isPending} form="open-dispute">
+              Open
+            </openForm.SubmitButton>
+            <Button variant="secondary" onClick={() => setOpening(false)}>
+              Cancel
+            </Button>
+          </openForm.AppForm>
+        }
+      >
+        <form id="open-dispute" className="form-rows" onSubmit={submitting(openForm)}>
+          <openForm.AppField name="transactionId">
+            {(field) => (
+              <field.TextField
+                label="Transaction ID"
+                mono
+                placeholder="00000000-0000-8000-8000-000000000101"
+              />
+            )}
+          </openForm.AppField>
+          <openForm.AppField name="reason">
+            {(field) => <field.SelectField label="Reason" options={DISPUTE_REASONS} mono />}
+          </openForm.AppField>
+        </form>
+        {openFailure && openFailure.kind !== 'validation' && (
+          <div className="mt-2">
+            <FailureBanner failure={openFailure} />
+          </div>
+        )}
+      </Window>
     </AppShell>
   )
 }
@@ -169,6 +213,7 @@ export const Route = createFileRoute('/$tenant/')({
   validateSearch: (rawSearch: Record<string, unknown>): DisputeListSearch => ({
     ...(isDisputeState(rawSearch.state) ? { state: rawSearch.state } : {}),
     ...(typeof rawSearch.cursor === 'string' ? { cursor: rawSearch.cursor } : {}),
+    ...(typeof rawSearch.limit === 'number' ? { limit: rawSearch.limit } : {}),
     ...(rawSearch.overdue === true || rawSearch.overdue === 'true' ? { overdue: true } : {}),
   }),
   loaderDeps: ({ search }) => search,

@@ -9,22 +9,29 @@ type Summary = components['schemas']['DisputeSummary']
 
 const None = () => <span className="text-muted-foreground">none</span>
 
+const COLUMNS = ['Dispute', 'State', 'Reason', 'Regime', 'Amount', 'Risk', 'Next clock', 'Opened'] as const
+
+// the list arrives newest first, and the grid says so the way the period did: a caret on the sorted column
+const SORTED = 'Opened'
+
 export const DisputeTable = ({ disputes, tenant }: { disputes: Summary[]; tenant: string }) => (
   <div className="overflow-x-auto">
     <table
-      className="w-full border-collapse border border-border text-left text-[12px] [&_td]:border-t [&_td]:border-border [&_td]:px-2 [&_td]:py-1.5 [&_th]:border-b-2 [&_th]:border-border [&_th]:px-2 [&_th]:py-1.5 [&_th]:whitespace-nowrap"
+      className="w-full border-collapse text-left text-[11px] [&_td]:border-t [&_td]:border-[color:var(--rule)] [&_td]:border-r [&_td]:px-1.5 [&_td]:py-[3px] [&_th]:border-r [&_th]:border-b [&_th]:border-border [&_th]:px-1.5 [&_th]:py-[3px] [&_th]:whitespace-nowrap"
       aria-label="Disputes"
     >
-      <thead className="bg-[image:var(--panel-heading)] text-[11px] tracking-wide text-muted-foreground uppercase">
+      <thead className="bg-[image:var(--toolbar)] text-foreground">
         <tr>
-          <th className="font-bold">Dispute</th>
-          <th className="font-bold">State</th>
-          <th className="font-bold">Reason</th>
-          <th className="font-bold">Regime</th>
-          <th className="font-bold">Amount</th>
-          <th className="font-bold">Risk</th>
-          <th className="font-bold">Next clock</th>
-          <th className="font-bold">Opened</th>
+          {COLUMNS.map((column) => (
+            <th
+              key={column}
+              className="font-bold"
+              {...(column === SORTED ? { 'aria-sort': 'descending' as const } : {})}
+            >
+              {column}
+              {column === SORTED && <span className="ml-1 text-[8px] text-primary">▼</span>}
+            </th>
+          ))}
         </tr>
       </thead>
       <tbody className="[&_tr:nth-child(odd)]:bg-muted">
@@ -48,7 +55,7 @@ export const DisputeTable = ({ disputes, tenant }: { disputes: Summary[]; tenant
             </td>
             <td className="whitespace-nowrap">
               {dispute.nextDeadline ? (
-                <span className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5">
                   <DeadlineBadge status={dispute.nextDeadline.status} />
                   <span className="text-muted-foreground">{daysRemaining(dispute.nextDeadline.dueAt)}</span>
                 </span>

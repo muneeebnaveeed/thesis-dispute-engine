@@ -55,26 +55,22 @@ const KeysPage = () => {
               One key per system that calls the API. The key is shown once; store it in that system's
               configuration.
             </p>
-            <form className="flex items-start gap-2" onSubmit={submitting(issueForm)}>
+            <form className="form-rows" onSubmit={submitting(issueForm)}>
               <issueForm.AppField name="label">
-                {(field) => (
-                  <field.TextField
-                    label={<span className="sr-only">Label</span>}
-                    inputClassName="mt-0 px-3 py-2"
-                    placeholder="core banking production"
-                  />
-                )}
+                {(field) => <field.TextField label="Label" placeholder="core banking production" />}
               </issueForm.AppField>
-              <issueForm.AppForm>
-                <issueForm.SubmitButton busy={issueMutation.isPending}>Issue</issueForm.SubmitButton>
-              </issueForm.AppForm>
+              <div className="mt-2 flex justify-end border-t border-border pt-2">
+                <issueForm.AppForm>
+                  <issueForm.SubmitButton busy={issueMutation.isPending}>Issue</issueForm.SubmitButton>
+                </issueForm.AppForm>
+              </div>
             </form>
             {issuedKey && (
-              <output className="mt-4 block rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm">
+              <output className="mt-2 block border border-emerald-300 bg-emerald-50 p-2 text-[11px]">
                 <p className="font-medium">
                   Key for {issuedKey.label}. Copy it now; it will not be shown again.
                 </p>
-                <code className="mt-2 block rounded bg-white p-2 font-mono break-all select-all">
+                <code className="mt-1 block border border-emerald-200 bg-white p-1 font-mono break-all select-all">
                   {issuedKey.secret}
                 </code>
               </output>
@@ -119,31 +115,31 @@ const KeyTable = ({
   busy: boolean
   onRevoke: (keyId: string) => void
 }) => {
-  if (keys.length === 0) return <p className="text-sm text-muted-foreground">No keys yet.</p>
+  if (keys.length === 0) return <p className="p-2 text-[11px] text-muted-foreground">No keys yet.</p>
   return (
-    <table className="w-full text-left text-sm">
-      <thead className="text-muted-foreground">
+    <table className="w-full border-collapse text-left text-[11px] [&_td]:border-t [&_td]:border-[color:var(--rule)] [&_td]:border-r [&_td]:px-1.5 [&_td]:py-[3px] [&_th]:border-r [&_th]:border-b [&_th]:border-border [&_th]:px-1.5 [&_th]:py-[3px]">
+      <thead className="bg-[image:var(--toolbar)] text-foreground">
         <tr>
-          <th className="py-1 pr-4 font-normal">Prefix</th>
-          <th className="py-1 pr-4 font-normal">Label</th>
-          <th className="py-1 pr-4 font-normal">Created</th>
-          <th className="py-1 pr-4 font-normal">Last used</th>
-          <th className="py-1 pr-4 font-normal">Expires</th>
-          <th className="py-1 pr-4 font-normal">Status</th>
-          <th className="py-1 font-normal">
+          <th className="font-bold">Prefix</th>
+          <th className="font-bold">Label</th>
+          <th className="font-bold">Created</th>
+          <th className="font-bold">Last used</th>
+          <th className="font-bold">Expires</th>
+          <th className="font-bold">Status</th>
+          <th className="font-bold">
             <span className="sr-only">Actions</span>
           </th>
         </tr>
       </thead>
       <tbody>
         {keys.map((tenantKey) => (
-          <tr key={tenantKey.id} className="border-t border-border">
-            <td className="py-1 pr-4 font-mono">{tenantKey.prefix}</td>
-            <td className="py-1 pr-4">{tenantKey.label}</td>
-            <td className="py-1 pr-4 text-muted-foreground">{dateOnly(tenantKey.createdAt)}</td>
-            <td className="py-1 pr-4 text-muted-foreground">{dateOnly(tenantKey.lastUsedAt)}</td>
-            <td className="py-1 pr-4 text-muted-foreground">{dateOnly(tenantKey.expiresAt)}</td>
-            <td className="py-1 pr-4">{tenantKey.status}</td>
+          <tr key={tenantKey.id} className="odd:bg-muted hover:bg-accent">
+            <td className="font-mono">{tenantKey.prefix}</td>
+            <td>{tenantKey.label}</td>
+            <td className="text-muted-foreground">{dateOnly(tenantKey.createdAt)}</td>
+            <td className="text-muted-foreground">{dateOnly(tenantKey.lastUsedAt)}</td>
+            <td className="text-muted-foreground">{dateOnly(tenantKey.expiresAt)}</td>
+            <td>{tenantKey.status}</td>
             <td className="py-1 text-right">
               {tenantKey.status === 'live' && (
                 <Button variant="secondary" size="xs" disabled={busy} onClick={() => onRevoke(tenantKey.id)}>

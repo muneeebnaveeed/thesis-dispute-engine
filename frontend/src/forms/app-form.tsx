@@ -47,16 +47,20 @@ const TextField = ({
   >) => {
   const { field, message, id, inputProps } = useBoundInput()
   return (
-    <label className={cn('block text-sm', className)}>
-      {label}
-      {hint && <span className="text-neutral-400"> {hint}</span>}
-      <input
-        {...input}
-        {...inputProps}
-        onChange={(event) => field.handleChange(event.target.value)}
-        className={cn(inputVariants({ invalid: Boolean(message), mono }), inputClassName)}
-      />
-      <FieldError id={id} message={message} />
+    <label className={cn('field text-[11px]', className)}>
+      <span className="field-label">
+        {label}
+        {hint && <span className="text-muted-foreground"> {hint}</span>}
+      </span>
+      <span className="field-control">
+        <input
+          {...input}
+          {...inputProps}
+          onChange={(event) => field.handleChange(event.target.value)}
+          className={cn(inputVariants({ invalid: Boolean(message), mono }), inputClassName)}
+        />
+        <FieldError id={id} message={message} />
+      </span>
     </label>
   )
 }
@@ -72,17 +76,21 @@ const TextareaField = ({
 }: LabelProps & { rows?: number; mono?: boolean; inputClassName?: string; disabled?: boolean }) => {
   const { field, message, id, inputProps } = useBoundInput()
   return (
-    <label className={cn('block text-sm', className)}>
-      {label}
-      {hint && <span className="text-neutral-400"> {hint}</span>}
-      <textarea
-        {...inputProps}
-        rows={rows}
-        disabled={disabled}
-        onChange={(event) => field.handleChange(event.target.value)}
-        className={cn(inputVariants({ invalid: Boolean(message), mono }), inputClassName)}
-      />
-      <FieldError id={id} message={message} />
+    <label className={cn('field text-[11px]', className)}>
+      <span className="field-label">
+        {label}
+        {hint && <span className="text-muted-foreground"> {hint}</span>}
+      </span>
+      <span className="field-control">
+        <textarea
+          {...inputProps}
+          rows={rows}
+          disabled={disabled}
+          onChange={(event) => field.handleChange(event.target.value)}
+          className={cn(inputVariants({ invalid: Boolean(message), mono }), inputClassName)}
+        />
+        <FieldError id={id} message={message} />
+      </span>
     </label>
   )
 }
@@ -107,23 +115,27 @@ const SelectField = ({
 }) => {
   const { field, message, id, inputProps } = useBoundInput()
   return (
-    <label className={cn('block text-sm', className)}>
-      {label}
-      {hint && <span className="text-neutral-400"> {hint}</span>}
-      <select
-        {...inputProps}
-        disabled={disabled}
-        onChange={(event) => field.handleChange(event.target.value)}
-        className={cn(inputVariants({ invalid: Boolean(message), mono }), inputClassName)}
-      >
-        {placeholder !== undefined && <option value="">{placeholder}</option>}
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      <FieldError id={id} message={message} />
+    <label className={cn('field text-[11px]', className)}>
+      <span className="field-label">
+        {label}
+        {hint && <span className="text-muted-foreground"> {hint}</span>}
+      </span>
+      <span className="field-control">
+        <select
+          {...inputProps}
+          disabled={disabled}
+          onChange={(event) => field.handleChange(event.target.value)}
+          className={cn(inputVariants({ invalid: Boolean(message), mono }), inputClassName)}
+        >
+          {placeholder !== undefined && <option value="">{placeholder}</option>}
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <FieldError id={id} message={message} />
+      </span>
     </label>
   )
 }
@@ -131,7 +143,7 @@ const SelectField = ({
 const CheckboxField = ({ label, className }: { label: ReactNode; className?: string }) => {
   const field = useFieldContext<boolean>()
   return (
-    <label className={cn('flex items-center gap-1 text-sm', className)}>
+    <label className={cn('flex items-center gap-1 text-[11px]', className)}>
       <input
         type="checkbox"
         name={field.name}
@@ -175,7 +187,7 @@ const CheckboxGroupField = ({
             <span>
               {option.label}
               {option.description && (
-                <span className="block text-xs text-neutral-500">{option.description}</span>
+                <span className="block text-xs text-muted-foreground">{option.description}</span>
               )}
             </span>
           </label>
