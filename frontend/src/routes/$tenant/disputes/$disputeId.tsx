@@ -46,20 +46,17 @@ const DisputePage = () => {
   const actionForm = useAppForm({
     defaultValues: NO_FACTS,
     onSubmitMeta: { event: 'CLOSE' as DisputeEvent, payload: {} as Record<string, unknown> },
-    onSubmit: ({ value, meta: { event, payload }, formApi }) => {
+    onSubmit: async ({ value, meta: { event, payload }, formApi }) => {
       const facts: Record<string, unknown> = { ...payload }
       if (event === 'ISSUE_REFUND' && value.liability.trim()) facts.liability = value.liability.trim()
       if (event === 'ISSUE_REFUND' && value.riskOverride.trim())
         facts.riskOverride = value.riskOverride.trim()
       if (event === 'CLOSE' && value.settlement) facts.settlement = value.settlement
       setEventInFlight(event)
-      return submitTo(formApi, () => applyEventMutation.mutateAsync({ event, payload: facts })).finally(
-        () => {
-          setEventInFlight(null)
-          // conflict: the state moved under us, show the truth next to the message
-          if (applyEventMutation.failure?.kind === 'conflict') refreshDispute()
-        },
-      )
+      await submitTo(formApi, () => applyEventMutation.mutateAsync({ event, payload: facts }))
+      setEventInFlight(null)
+      // conflict: the state moved under us, show the truth next to the message
+      if (applyEventMutation.failure?.kind === 'conflict') refreshDispute()
     },
   })
   const applyFailure = applyEventMutation.failure

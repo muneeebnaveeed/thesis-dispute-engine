@@ -28,9 +28,9 @@ const KeysPage = () => {
   const issueForm = useAppForm({
     defaultValues: { label: '' },
     validators: { onSubmit: schemaValidator(CreateTenantKeyRequest) },
-    onSubmit: ({ value, formApi }) => {
+    onSubmit: async ({ value, formApi }) => {
       setIssuedKey(null)
-      return submitTo(formApi, () => issueMutation.mutateAsync(parsed(CreateTenantKeyRequest, value)))
+      await submitTo(formApi, () => issueMutation.mutateAsync(parsed(CreateTenantKeyRequest, value)))
     },
   })
   const revokeMutation = useServerMutation((keyId: string) => revokeTenantKey({ data: keyId }), {
