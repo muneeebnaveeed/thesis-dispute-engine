@@ -1,7 +1,14 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["src/router.tsx", "src/start.ts", "src/routes/**/*.{ts,tsx}", "e2e/**/*.ts", "scripts/*.ts"],
+  "entry": [
+    "src/router.tsx",
+    "src/start.ts",
+    "src/routes/**/*.{ts,tsx}",
+    "e2e/**/*.ts",
+    "scripts/*.ts",
+    "src/components/shadcn/**"
+  ],
   "project": ["src/**/*.{ts,tsx}", "e2e/**/*.ts", "scripts/*.ts"],
   "ignore": ["src/api/*.gen.ts"],
-  "ignoreDependencies": ["tailwindcss"]
+  "ignoreDependencies": ["@fontsource-variable/geist", "shadcn", "tailwindcss", "tw-animate-css"]
 }

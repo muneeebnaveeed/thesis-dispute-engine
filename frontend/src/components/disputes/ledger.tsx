@@ -1,6 +1,6 @@
 import { formatMoney } from '#/lib/money'
 import type { Dispute } from '#/api/views'
-import { cn } from '#/lib/cn'
+import { cn } from '#/lib/utils'
 
 const POSTING_KIND_LABEL: Record<Dispute['ledger'][number]['kind'], string> = {
   PROVISIONAL_CREDIT: 'Provisional credit to the customer',

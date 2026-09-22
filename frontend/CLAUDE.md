@@ -23,7 +23,8 @@ lint and format fixes. `make fe-dev` for the dev server on :3002. Inside `fronte
   and `src/server/functions/` (one file per domain: `disputes`, `notices`, `tenant-keys`,
   `tenant-templates`, plus `session` and `discovery`; a new domain gets a new file in each, never a
   line in a shared one), `src/forms/` (form validation and input schemas), `src/lib/` (pure helpers:
-  `cn`, money, email rendering), `src/components/ui/` (cva primitives: Button, Badge, field styles),
+  `cn` in `utils.ts`, money, email rendering), `src/components/shadcn/` (vendored registry
+  components, see below), `src/components/ui/` (our own primitives on top of them),
   `src/components/{layout,disputes,comms}/`, and `src/server/{runtime,auth}/`. Components are
   `kebab-case.tsx` with a colocated `*.test.tsx`.
 - Types, the client and the TypeBox schemas are generated from the OpenAPI contract
@@ -53,7 +54,7 @@ lint and format fixes. `make fe-dev` for the dev server on :3002. Inside `fronte
   `src/queries/use-server-mutation.ts`.
 - Style: const arrow functions everywhere (oxlint `func-style` rejects `function` declarations;
   for overloads use a const with a call-signature type). Compose classes with `cn` from
-  `#/lib/cn`, variants with `cva` in `src/components/ui/`; no hand-written button or input class
+  `#/lib/utils`, variants with `cva` in `src/components/ui/`; no hand-written button or input class
   strings. Define components first and `export const Route` at the bottom of a route file.
 - Forms are TanStack Form through `useAppForm` (`src/forms/app-form.tsx`, ADR 0021): bound fields
   (`field.TextField`, `SelectField`, `TextareaField`, `CheckboxField`, `CheckboxGroupField`) own the
@@ -73,6 +74,13 @@ mutation.mutateAsync(...))`, which puts an API validation refusal on the fields 
   `openDisputeMutation`, never `segments`, `res`, `fields`, `open`, `d`, `e`, `v`. A comment is a
   terse one-liner that says why (a constraint, a trap, a decision), never what the code does, and
   never a doc block on every export.
+- shadcn is configured through `components.json` (radix base, nova preset, Tailwind v4 tokens in
+  `src/styles.css`). `pnpm dlx shadcn@latest add <component>` puts registry components in
+  `src/components/shadcn/`, which is vendored code: keep it as upstream writes it so
+  `shadcn add --diff` stays readable, never import it from a page, and let `src/components/ui/`
+  wrap it for everything the app uses. That directory is exempt from `func-style` and two a11y
+  rules in `.oxlintrc.json` and is an entry point in `knip.json` for the same reason. The CLI needs
+  a real terminal for its prompts; it cannot be driven from here.
 - `pnpm knip` fails on unused files, exports, types and dependencies (`knip.json`). Remove the
   dead code rather than adding an ignore; an export used only in its own file loses the `export`.
 - Server-only code (cookies, OIDC, the sealed store) lives in modules route files never import

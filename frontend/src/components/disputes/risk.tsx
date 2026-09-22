@@ -1,6 +1,6 @@
 import type { Dispute } from '#/api/views'
 import { Badge, type BadgeTone } from '#/components/ui/badge'
-import { cn } from '#/lib/cn'
+import { cn } from '#/lib/utils'
 
 type Risk = NonNullable<Dispute['risk']>
 type RiskTier = Risk['tier']
