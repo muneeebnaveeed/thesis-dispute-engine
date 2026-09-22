@@ -107,6 +107,9 @@ mutation.mutateAsync(...))`, which puts an API validation refusal on the fields 
 - Business rules (which events are allowed, field errors) arrive from the API.
 - No `any`; the lint config is strict on promises, hooks and imports. Fix the code, not the rule.
 - `vitest.config.ts` is deliberately separate from `vite.config.ts`; keep test settings there.
+- `pnpm screenshot [name]` captures the workbench figures the thesis register lists, signed in against
+  the local stack, into `docs/thesis/figures/*.webp`. Retake them when a UI change makes one wrong, and
+  pass them to `scripts/create-pr --screenshot <path>` so the pull request shows what changed.
 - Browser tests live in `e2e/` (Playwright) and run against the real stack (`make e2e`). Write
   them for behaviour a user sees (sign-in, redirects, a dispute advancing), use role and label
   locators, and keep fixtures pointing at the seeded tenants in `e2e/fixtures.ts`. Unit tests

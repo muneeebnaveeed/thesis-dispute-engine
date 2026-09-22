@@ -3,6 +3,11 @@
 Numbering follows chapter order and is stable once assigned. Status: done (file in `figures/`),
 source (exists in the repo, needs exporting), todo. Code listings count as figures.
 
+Workbench figures are captured, not collected: `pnpm screenshot` in `frontend/` drives a signed-in
+browser against the local stack and writes `figures/*.webp`, so a figure can be retaken after a UI
+change instead of going stale. They are lossy (WebP, quality 60, about 60 kB) because they are read
+on screen and printed small.
+
 | # | Chapter | Caption | Source | Status |
 | --- | --- | --- | --- | --- |
 | 4.1 | 4 | Bounded contexts and layers of the service | `CLAUDE.md` layout, `backend/internal/` | todo (diagram) |
@@ -21,8 +26,10 @@ source (exists in the repo, needs exporting), todo. Code listings count as figur
 | 5.2 | 5 | TypeBox schema paired with its generated type (listing) | `frontend/src/api/schemas.gen.ts` | source |
 | 5.3 | 5 | A dispute traced end to end: HTTP span, use case, statements | Tempo screenshot | source (capture from `make otel-up`) |
 | 5.4 | 5 | The dashboard under probe traffic | Grafana screenshot | source |
-| 5.5 | 5 | The analyst dispute page with allowed actions | frontend screenshot | source |
+| 5.5 | 5 | The analyst dispute page with allowed actions | `figures/dispute.webp` | done |
 | 5.6 | 5 | The CI job graph and a coverage comment | GitHub screenshot | source |
+| 5.7 | 5 | The workbench: navigation, filters and the dispute list | `figures/workbench.webp` | done |
+| 5.8 | 5 | Finding a dispute by id, state or reason | `figures/search.webp` | done |
 | 6.1 | 6 | Transition coverage per regime | `make eval` correctness table | todo (after first run) |
 | 6.2 | 6 | Latency percentiles per route under load | `make eval` latency table | todo |
 | 6.3 | 6 | Concurrency: eight writers on one dispute, outcomes | `store_test.go` concurrency test | source |
