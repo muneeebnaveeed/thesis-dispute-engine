@@ -37,7 +37,7 @@ lint and format fixes. `make fe-dev` for the dev server on :3002. Inside `fronte
   result as it is (`({ data, context: { api } }) => api.GET(...)`), never a throw for problem+json.
   The `Response` inside it crosses the RPC boundary as its status line through the serialization
   adapter in `src/api/response-adapter.ts`, registered in `src/start.ts`. Endpoints that return a
-  dispute wrap the call in `withDisputeView`. Every `queryOptions` sets `select: classified`, so
+  dispute wrap the call in `withSerialisableEvents`. Every `queryOptions` sets `select: classified`, so
   components receive `Loaded<T>` (`{ value, failure }`) and render `failure` straight into
   `FailureBanner`; never call `classify` in a component. No session (or an API 401) is not an outcome: the middleware throws a redirect
   through the tenant's front door back to the page (`signInAgain`), loaders follow it by themselves

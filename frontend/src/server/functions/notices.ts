@@ -1,7 +1,7 @@
 import { Type } from '@sinclair/typebox'
 
 import { ComposeEmailRequest } from '#/api/schemas.gen'
-import { withDisputeView } from '#/api/views'
+import { withSerialisableEvents } from '#/api/views'
 import { authenticatedGet, authenticatedPost, parse, uuid } from '#/server/runtime/fn'
 
 const NoticeRef = Type.Object({ disputeId: uuid, noticeId: Type.Integer({ minimum: 1 }) })
@@ -25,13 +25,15 @@ export const listEmailTemplates = authenticatedGet
 export const composeEmail = authenticatedPost
   .validator(parse(Type.Object({ disputeId: uuid, body: ComposeEmailRequest })))
   .handler(({ data: { disputeId, body }, context: { api } }) =>
-    withDisputeView(api.POST('/disputes/{disputeId}/notices', { params: { path: { disputeId } }, body })),
+    withSerialisableEvents(
+      api.POST('/disputes/{disputeId}/notices', { params: { path: { disputeId } }, body }),
+    ),
   )
 
 export const resendNotice = authenticatedPost
   .validator(parse(NoticeRef))
   .handler(({ data: noticeRef, context: { api } }) =>
-    withDisputeView(
+    withSerialisableEvents(
       api.POST('/disputes/{disputeId}/notices/{noticeId}/resend', { params: { path: noticeRef } }),
     ),
   )

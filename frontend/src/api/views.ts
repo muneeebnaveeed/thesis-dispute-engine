@@ -3,6 +3,8 @@ import type { components } from '#/api/schema.gen'
 
 type ApiDispute = components['schemas']['Dispute']
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json }
+// the contract types an event payload as unknown, which Start's output check cannot accept; the UI never reads it,
+// the walk below exists only to earn the Json type
 export type Dispute = Omit<ApiDispute, 'events'> & {
   events: (Omit<ApiDispute['events'][number], 'payload'> & { payload: Json })[]
 }
@@ -13,7 +15,6 @@ export type ApiResult<T> =
   | { data: T; error?: undefined; response: Response }
   | { data?: undefined; error: Problem; response: Response }
 
-// earn the Json type by walking the value instead of asserting it
 const toJson = (value: unknown): Json => {
   if (
     value === null ||
@@ -30,14 +31,14 @@ const toJson = (value: unknown): Json => {
   return null
 }
 
-const disputeView = (apiDispute: ApiDispute): Dispute => ({
+const serialisableEvents = (apiDispute: ApiDispute): Dispute => ({
   ...apiDispute,
   events: apiDispute.events.map((event) => ({ ...event, payload: toJson(event.payload) })),
 })
 
-export const withDisputeView = async (
+export const withSerialisableEvents = async (
   result: Promise<ApiResult<ApiDispute>>,
 ): Promise<ApiResult<Dispute>> => {
   const settled = await result
-  return settled.error ? settled : { data: disputeView(settled.data), response: settled.response }
+  return settled.error ? settled : { data: serialisableEvents(settled.data), response: settled.response }
 }
