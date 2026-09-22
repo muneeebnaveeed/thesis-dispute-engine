@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -599,4 +600,68 @@ func TestListDisputesPagesNewestFirstWithinTheTenant(t *testing.T) {
 	if rec, _ := a.do(http.MethodGet, "/disputes?limit=1000", nil, nil); rec.Code != http.StatusBadRequest {
 		t.Errorf("limit above the maximum should fail validation: %d", rec.Code)
 	}
+}
+
+func TestAnalystsComposeEmailsFromTemplatesAndTenantKeysCannot(t *testing.T) {
+	a := newAPI(t, nil)
+	id := txnDispute(t, a)
+	analyst := map[string]string{"Authorization": "", "X-Test-Analyst": "a:analyst"}
+
+	rec, cat := a.do(http.MethodGet, "/disputes/"+id+"/email-templates", nil, analyst)
+	if rec.Code != 200 {
+		t.Fatalf("templates: %d %s", rec.Code, rec.Body.String())
+	}
+	templates := cat["templates"].([]any)
+	if len(templates) != 4 || cat["facts"].(map[string]any)["customer"] != "Test Holder" {
+		t.Fatalf("catalogue = %v", cat)
+	}
+	var rfi map[string]any
+	for _, x := range templates {
+		if m := x.(map[string]any); m["kind"] == "REQUEST_FOR_INFORMATION" {
+			rfi = m
+		}
+	}
+	if rfi == nil || !strings.Contains(strings.Join(anyStrings(rfi["paragraphs"]), " "), "{{items}}") {
+		t.Errorf("RFI template = %v", rfi)
+	}
+
+	// Incomplete form: one error per field, nothing queued.
+	rec, problem := a.do(http.MethodPost, "/disputes/"+id+"/notices", map[string]any{"template": "REQUEST_FOR_INFORMATION", "fields": map[string]any{"days": "99"}}, analyst)
+	if rec.Code != 422 || problem["code"] != "invalid-fields" || len(problem["errors"].([]any)) != 2 {
+		t.Fatalf("bad form: %d %v", rec.Code, problem)
+	}
+	rec, sent := a.do(http.MethodPost, "/disputes/"+id+"/notices", map[string]any{"template": "REQUEST_FOR_INFORMATION",
+		"fields": map[string]any{"items": "receipt,delivery", "days": "10"}}, analyst)
+	if rec.Code != 201 {
+		t.Fatalf("compose: %d %s", rec.Code, rec.Body.String())
+	}
+	notices := sent["notices"].([]any)
+	last := notices[len(notices)-1].(map[string]any)
+	if last["kind"] != "REQUEST_FOR_INFORMATION" || last["channel"] != "EMAIL" || last["actor"] != "analyst-a" || last["sentAt"] != nil {
+		t.Errorf("queued notice = %v", last)
+	}
+	rec, doc := a.do(http.MethodGet, "/disputes/"+id+"/notices/"+strconv.FormatInt(int64(last["id"].(float64)), 10), nil, analyst)
+	if rec.Code != 200 || !strings.Contains(strings.Join(anyStrings(doc["paragraphs"]), "\n"), "- the expected delivery date") {
+		t.Errorf("document = %d %v", rec.Code, doc)
+	}
+
+	// A tenant key is a machine; it does not write to customers.
+	rec, problem = a.do(http.MethodPost, "/disputes/"+id+"/notices", map[string]any{"template": "CUSTOM", "fields": map[string]any{"subject": "x", "body": "y"}}, nil)
+	if rec.Code != 403 || problem["code"] != "forbidden" {
+		t.Errorf("tenant key composing: %d %v", rec.Code, problem)
+	}
+	rec, problem = a.do(http.MethodPost, "/disputes/"+id+"/notices", map[string]any{"template": "REFUND", "fields": map[string]any{}}, analyst)
+	if rec.Code != 400 || problem["code"] != "unknown-template" {
+		t.Errorf("automatic kind by hand: %d %v", rec.Code, problem)
+	}
+}
+
+func anyStrings(v any) []string {
+	items, _ := v.([]any)
+	out := make([]string, 0, len(items))
+	for _, x := range items {
+		s, _ := x.(string)
+		out = append(out, s)
+	}
+	return out
 }

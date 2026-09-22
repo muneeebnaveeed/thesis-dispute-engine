@@ -26,22 +26,22 @@ import (
 
 // Defines values for AnswerType.
 const (
-	AMOUNT AnswerType = "AMOUNT"
-	DATE   AnswerType = "DATE"
-	TEXT   AnswerType = "TEXT"
-	YESNO  AnswerType = "YES_NO"
+	AnswerTypeAMOUNT AnswerType = "AMOUNT"
+	AnswerTypeDATE   AnswerType = "DATE"
+	AnswerTypeTEXT   AnswerType = "TEXT"
+	AnswerTypeYESNO  AnswerType = "YES_NO"
 )
 
 // Valid indicates whether the value is a known member of the AnswerType enum.
 func (e AnswerType) Valid() bool {
 	switch e {
-	case AMOUNT:
+	case AnswerTypeAMOUNT:
 		return true
-	case DATE:
+	case AnswerTypeDATE:
 		return true
-	case TEXT:
+	case AnswerTypeTEXT:
 		return true
-	case YESNO:
+	case AnswerTypeYESNO:
 		return true
 	default:
 		return false
@@ -256,6 +256,7 @@ const (
 	ErrorCodeIdempotencyKeyReuse ErrorCode = "idempotency-key-reuse"
 	ErrorCodeInternal            ErrorCode = "internal"
 	ErrorCodeInvalidAnswers      ErrorCode = "invalid-answers"
+	ErrorCodeInvalidFields       ErrorCode = "invalid-fields"
 	ErrorCodeInvalidLiability    ErrorCode = "invalid-liability"
 	ErrorCodeInvalidSettlement   ErrorCode = "invalid-settlement"
 	ErrorCodeInvalidTransition   ErrorCode = "invalid-transition"
@@ -268,6 +269,7 @@ const (
 	ErrorCodeUnavailable         ErrorCode = "unavailable"
 	ErrorCodeUnknownReason       ErrorCode = "unknown-reason"
 	ErrorCodeUnknownRegime       ErrorCode = "unknown-regime"
+	ErrorCodeUnknownTemplate     ErrorCode = "unknown-template"
 )
 
 // Valid indicates whether the value is a known member of the ErrorCode enum.
@@ -288,6 +290,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeInternal:
 		return true
 	case ErrorCodeInvalidAnswers:
+		return true
+	case ErrorCodeInvalidFields:
 		return true
 	case ErrorCodeInvalidLiability:
 		return true
@@ -312,6 +316,38 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeUnknownReason:
 		return true
 	case ErrorCodeUnknownRegime:
+		return true
+	case ErrorCodeUnknownTemplate:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FieldType.
+const (
+	FieldTypeDATE        FieldType = "DATE"
+	FieldTypeMULTISELECT FieldType = "MULTISELECT"
+	FieldTypeNUMBER      FieldType = "NUMBER"
+	FieldTypeSELECT      FieldType = "SELECT"
+	FieldTypeTEXT        FieldType = "TEXT"
+	FieldTypeTEXTAREA    FieldType = "TEXTAREA"
+)
+
+// Valid indicates whether the value is a known member of the FieldType enum.
+func (e FieldType) Valid() bool {
+	switch e {
+	case FieldTypeDATE:
+		return true
+	case FieldTypeMULTISELECT:
+		return true
+	case FieldTypeNUMBER:
+		return true
+	case FieldTypeSELECT:
+		return true
+	case FieldTypeTEXT:
+		return true
+	case FieldTypeTEXTAREA:
 		return true
 	default:
 		return false
@@ -383,12 +419,16 @@ func (e LedgerAccount) Valid() bool {
 
 // Defines values for NoticeKind.
 const (
-	NoticeKindACKNOWLEDGEMENT   NoticeKind = "ACKNOWLEDGEMENT"
-	NoticeKindPROVISIONALCREDIT NoticeKind = "PROVISIONAL_CREDIT"
-	NoticeKindQUESTIONNAIRE     NoticeKind = "QUESTIONNAIRE"
-	NoticeKindREFUND            NoticeKind = "REFUND"
-	NoticeKindRESOLUTION        NoticeKind = "RESOLUTION"
-	NoticeKindREVERSAL          NoticeKind = "REVERSAL"
+	NoticeKindACKNOWLEDGEMENT       NoticeKind = "ACKNOWLEDGEMENT"
+	NoticeKindCUSTOM                NoticeKind = "CUSTOM"
+	NoticeKindDOCUMENTSRECEIVED     NoticeKind = "DOCUMENTS_RECEIVED"
+	NoticeKindPROVISIONALCREDIT     NoticeKind = "PROVISIONAL_CREDIT"
+	NoticeKindQUESTIONNAIRE         NoticeKind = "QUESTIONNAIRE"
+	NoticeKindREFUND                NoticeKind = "REFUND"
+	NoticeKindREQUESTFORINFORMATION NoticeKind = "REQUEST_FOR_INFORMATION"
+	NoticeKindRESOLUTION            NoticeKind = "RESOLUTION"
+	NoticeKindREVERSAL              NoticeKind = "REVERSAL"
+	NoticeKindSTATUSUPDATE          NoticeKind = "STATUS_UPDATE"
 )
 
 // Valid indicates whether the value is a known member of the NoticeKind enum.
@@ -396,15 +436,23 @@ func (e NoticeKind) Valid() bool {
 	switch e {
 	case NoticeKindACKNOWLEDGEMENT:
 		return true
+	case NoticeKindCUSTOM:
+		return true
+	case NoticeKindDOCUMENTSRECEIVED:
+		return true
 	case NoticeKindPROVISIONALCREDIT:
 		return true
 	case NoticeKindQUESTIONNAIRE:
 		return true
 	case NoticeKindREFUND:
 		return true
+	case NoticeKindREQUESTFORINFORMATION:
+		return true
 	case NoticeKindRESOLUTION:
 		return true
 	case NoticeKindREVERSAL:
+		return true
+	case NoticeKindSTATUSUPDATE:
 		return true
 	default:
 		return false
@@ -561,6 +609,15 @@ type Balances struct {
 // Channel EMAIL goes out through the mail relay; LETTER is a printable document, ready the moment it exists.
 type Channel string
 
+// ComposeEmailRequest defines model for ComposeEmailRequest.
+type ComposeEmailRequest struct {
+	// Fields Field id to value; MULTISELECT values are comma-separated option keys.
+	Fields map[string]string `json:"fields"`
+
+	// Template The first six the engine sends on its own; the rest an analyst composes from a template.
+	Template NoticeKind `json:"template"`
+}
+
 // CoreReceipt defines model for CoreReceipt.
 type CoreReceipt struct {
 	LatencyMs int64 `json:"latencyMs"`
@@ -686,6 +743,39 @@ type DisputeSummary struct {
 	UpdatedAt     time.Time          `json:"updatedAt"`
 }
 
+// EmailTemplate defines model for EmailTemplate.
+type EmailTemplate struct {
+	Description string          `json:"description"`
+	Fields      []TemplateField `json:"fields"`
+
+	// Kind The first six the engine sends on its own; the rest an analyst composes from a template.
+	Kind  NoticeKind `json:"kind"`
+	Label string     `json:"label"`
+
+	// Letter Also goes out as a letter where the regime requires written notices.
+	Letter bool `json:"letter"`
+
+	// Paragraphs Facts filled in; fields left as {{id}}; {{#id}}...{{/id}} appears only when the field has a value; a paragraph that is only a list field renders as bullet lines; empty paragraphs are dropped.
+	Paragraphs []string `json:"paragraphs"`
+
+	// Subject Facts filled in; fields left as {{id}}.
+	Subject string `json:"subject"`
+}
+
+// EmailTemplates defines model for EmailTemplates.
+type EmailTemplates struct {
+	// Facts The engine-known values, for the preview's greeting and letterhead.
+	Facts struct {
+		Amount   string             `json:"amount"`
+		Bank     string             `json:"bank"`
+		Customer string             `json:"customer"`
+		Dispute  string             `json:"dispute"`
+		Merchant string             `json:"merchant"`
+		Today    openapi_types.Date `json:"today"`
+	} `json:"facts"`
+	Templates []EmailTemplate `json:"templates"`
+}
+
 // ErrorCode Stable machine-readable failure identifier; branch on this, never on text.
 type ErrorCode string
 
@@ -695,6 +785,9 @@ type FieldError struct {
 	Field   string `json:"field"`
 	Message string `json:"message"`
 }
+
+// FieldType TEXT and TEXTAREA are free text; NUMBER a whole number; DATE YYYY-MM-DD; SELECT one option key; MULTISELECT comma-separated option keys.
+type FieldType string
 
 // Health defines model for Health.
 type Health struct {
@@ -766,13 +859,18 @@ type LoggedEvent struct {
 
 // Notice defines model for Notice.
 type Notice struct {
+	// Actor The analyst who composed it; absent for the engine's own notices.
+	Actor *string `json:"actor,omitempty"`
+
 	// Channel EMAIL goes out through the mail relay; LETTER is a printable document, ready the moment it exists.
 	Channel   Channel   `json:"channel"`
 	CreatedAt time.Time `json:"createdAt"`
 
 	// Error The last delivery failure
-	Error     *string    `json:"error,omitempty"`
-	Id        int64      `json:"id"`
+	Error *string `json:"error,omitempty"`
+	Id    int64   `json:"id"`
+
+	// Kind The first six the engine sends on its own; the rest an analyst composes from a template.
 	Kind      NoticeKind `json:"kind"`
 	Recipient string     `json:"recipient"`
 
@@ -792,11 +890,13 @@ type NoticeDocument struct {
 	Basis *string `json:"basis,omitempty"`
 
 	// Channel EMAIL goes out through the mail relay; LETTER is a printable document, ready the moment it exists.
-	Channel    Channel    `json:"channel"`
-	Closing    string     `json:"closing"`
-	Date       time.Time  `json:"date"`
-	Greeting   string     `json:"greeting"`
-	Id         int64      `json:"id"`
+	Channel  Channel   `json:"channel"`
+	Closing  string    `json:"closing"`
+	Date     time.Time `json:"date"`
+	Greeting string    `json:"greeting"`
+	Id       int64     `json:"id"`
+
+	// Kind The first six the engine sends on its own; the rest an analyst composes from a template.
 	Kind       NoticeKind `json:"kind"`
 	Paragraphs []string   `json:"paragraphs"`
 	Recipient  string     `json:"recipient"`
@@ -804,7 +904,7 @@ type NoticeDocument struct {
 	Subject    string     `json:"subject"`
 }
 
-// NoticeKind defines model for NoticeKind.
+// NoticeKind The first six the engine sends on its own; the rest an analyst composes from a template.
 type NoticeKind string
 
 // PostingKind defines model for PostingKind.
@@ -913,6 +1013,31 @@ type SessionBlob struct {
 // SuspenseSettlement defines model for SuspenseSettlement.
 type SuspenseSettlement string
 
+// TemplateField defines model for TemplateField.
+type TemplateField struct {
+	Default  *string           `json:"default,omitempty"`
+	Id       string            `json:"id"`
+	Label    string            `json:"label"`
+	Max      *int              `json:"max,omitempty"`
+	Min      *int              `json:"min,omitempty"`
+	Options  *[]TemplateOption `json:"options,omitempty"`
+	Required bool              `json:"required"`
+
+	// Type TEXT and TEXTAREA are free text; NUMBER a whole number; DATE YYYY-MM-DD; SELECT one option key; MULTISELECT comma-separated option keys.
+	Type FieldType `json:"type"`
+}
+
+// TemplateOption defines model for TemplateOption.
+type TemplateOption struct {
+	Key string `json:"key"`
+
+	// Label What the analyst sees.
+	Label string `json:"label"`
+
+	// Text What the customer reads.
+	Text string `json:"text"`
+}
+
 // TenantKey defines model for TenantKey.
 type TenantKey struct {
 	CreatedAt  time.Time          `json:"createdAt"`
@@ -1002,6 +1127,9 @@ type CreateDisputeJSONRequestBody = CreateDisputeRequest
 
 // ApplyDisputeEventJSONRequestBody defines body for ApplyDisputeEvent for application/json ContentType.
 type ApplyDisputeEventJSONRequestBody = ApplyEventRequest
+
+// ComposeEmailJSONRequestBody defines body for ComposeEmail for application/json ContentType.
+type ComposeEmailJSONRequestBody = ComposeEmailRequest
 
 // PutSessionJSONRequestBody defines body for PutSession for application/json ContentType.
 type PutSessionJSONRequestBody = SessionBlob
@@ -1133,9 +1261,15 @@ type ServerInterface interface {
 	// GetDispute Current state and full event log
 	// (GET /disputes/{disputeId})
 	GetDispute(w http.ResponseWriter, r *http.Request, disputeId DisputeId)
+	// ListEmailTemplates The emails an analyst may compose for this dispute
+	// (GET /disputes/{disputeId}/email-templates)
+	ListEmailTemplates(w http.ResponseWriter, r *http.Request, disputeId openapi_types.UUID)
 	// ApplyDisputeEvent Apply a lifecycle event
 	// (POST /disputes/{disputeId}/events)
 	ApplyDisputeEvent(w http.ResponseWriter, r *http.Request, disputeId DisputeId, params ApplyDisputeEventParams)
+	// ComposeEmail Compose and send an email from a template
+	// (POST /disputes/{disputeId}/notices)
+	ComposeEmail(w http.ResponseWriter, r *http.Request, disputeId openapi_types.UUID)
 	// GetNotice One communication to the customer, as composed
 	// (GET /disputes/{disputeId}/notices/{noticeId})
 	GetNotice(w http.ResponseWriter, r *http.Request, disputeId openapi_types.UUID, noticeId int64)
@@ -1319,6 +1453,32 @@ func (siw *ServerInterfaceWrapper) GetDispute(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ListEmailTemplates operation middleware
+func (siw *ServerInterfaceWrapper) ListEmailTemplates(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "disputeId" -------------
+	var disputeId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "disputeId", r.PathValue("disputeId"), &disputeId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "disputeId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListEmailTemplates(w, r, disputeId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ApplyDisputeEvent operation middleware
 func (siw *ServerInterfaceWrapper) ApplyDisputeEvent(w http.ResponseWriter, r *http.Request) {
 
@@ -1360,6 +1520,32 @@ func (siw *ServerInterfaceWrapper) ApplyDisputeEvent(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ApplyDisputeEvent(w, r, disputeId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ComposeEmail operation middleware
+func (siw *ServerInterfaceWrapper) ComposeEmail(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "disputeId" -------------
+	var disputeId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "disputeId", r.PathValue("disputeId"), &disputeId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "disputeId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ComposeEmail(w, r, disputeId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1763,6 +1949,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/disputes", wrapper.CreateDispute)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/disputes/{disputeId}", wrapper.GetDispute)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/disputes/{disputeId}/events", wrapper.ApplyDisputeEvent)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/disputes/{disputeId}/email-templates", wrapper.ListEmailTemplates)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/disputes/{disputeId}/notices", wrapper.ComposeEmail)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/disputes/{disputeId}/notices/{noticeId}", wrapper.GetNotice)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tenant-keys", wrapper.ListTenantKeys)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tenant-keys", wrapper.CreateTenantKey)
@@ -2047,6 +2235,79 @@ func (response GetDispute429ApplicationProblemPlusJSONResponse) VisitGetDisputeR
 	return err
 }
 
+type ListEmailTemplatesRequestObject struct {
+	DisputeId openapi_types.UUID `json:"disputeId"`
+}
+
+type ListEmailTemplatesResponseObject interface {
+	VisitListEmailTemplatesResponse(w http.ResponseWriter) error
+}
+
+type ListEmailTemplates200JSONResponse EmailTemplates
+
+func (response ListEmailTemplates200JSONResponse) VisitListEmailTemplatesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEmailTemplates401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListEmailTemplates401ApplicationProblemPlusJSONResponse) VisitListEmailTemplatesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEmailTemplates404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListEmailTemplates404ApplicationProblemPlusJSONResponse) VisitListEmailTemplatesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEmailTemplates429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response ListEmailTemplates429ApplicationProblemPlusJSONResponse) VisitListEmailTemplatesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ApplyDisputeEventRequestObject struct {
 	DisputeId DisputeId `json:"disputeId"`
 	Params    ApplyDisputeEventParams
@@ -2178,6 +2439,128 @@ func (response ApplyDisputeEvent503ApplicationProblemPlusJSONResponse) VisitAppl
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ComposeEmailRequestObject struct {
+	DisputeId openapi_types.UUID `json:"disputeId"`
+	Body      *ComposeEmailJSONRequestBody
+}
+
+type ComposeEmailResponseObject interface {
+	VisitComposeEmailResponse(w http.ResponseWriter) error
+}
+
+type ComposeEmail201JSONResponse Dispute
+
+func (response ComposeEmail201JSONResponse) VisitComposeEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ComposeEmail400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ComposeEmail400ApplicationProblemPlusJSONResponse) VisitComposeEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ComposeEmail401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ComposeEmail401ApplicationProblemPlusJSONResponse) VisitComposeEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ComposeEmail403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ComposeEmail403ApplicationProblemPlusJSONResponse) VisitComposeEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ComposeEmail404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ComposeEmail404ApplicationProblemPlusJSONResponse) VisitComposeEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ComposeEmail422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableApplicationProblemPlusJSONResponse
+}
+
+func (response ComposeEmail422ApplicationProblemPlusJSONResponse) VisitComposeEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ComposeEmail429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response ComposeEmail429ApplicationProblemPlusJSONResponse) VisitComposeEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -2738,9 +3121,15 @@ type StrictServerInterface interface {
 	// GetDispute Current state and full event log
 	// (GET /disputes/{disputeId})
 	GetDispute(ctx context.Context, request GetDisputeRequestObject) (GetDisputeResponseObject, error)
+	// ListEmailTemplates The emails an analyst may compose for this dispute
+	// (GET /disputes/{disputeId}/email-templates)
+	ListEmailTemplates(ctx context.Context, request ListEmailTemplatesRequestObject) (ListEmailTemplatesResponseObject, error)
 	// ApplyDisputeEvent Apply a lifecycle event
 	// (POST /disputes/{disputeId}/events)
 	ApplyDisputeEvent(ctx context.Context, request ApplyDisputeEventRequestObject) (ApplyDisputeEventResponseObject, error)
+	// ComposeEmail Compose and send an email from a template
+	// (POST /disputes/{disputeId}/notices)
+	ComposeEmail(ctx context.Context, request ComposeEmailRequestObject) (ComposeEmailResponseObject, error)
 	// GetNotice One communication to the customer, as composed
 	// (GET /disputes/{disputeId}/notices/{noticeId})
 	GetNotice(ctx context.Context, request GetNoticeRequestObject) (GetNoticeResponseObject, error)
@@ -2900,6 +3289,32 @@ func (sh *strictHandler) GetDispute(w http.ResponseWriter, r *http.Request, disp
 	}
 }
 
+// ListEmailTemplates operation middleware
+func (sh *strictHandler) ListEmailTemplates(w http.ResponseWriter, r *http.Request, disputeId openapi_types.UUID) {
+	var request ListEmailTemplatesRequestObject
+
+	request.DisputeId = disputeId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListEmailTemplates(ctx, request.(ListEmailTemplatesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListEmailTemplates")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListEmailTemplatesResponseObject); ok {
+		if err := validResponse.VisitListEmailTemplatesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ApplyDisputeEvent operation middleware
 func (sh *strictHandler) ApplyDisputeEvent(w http.ResponseWriter, r *http.Request, disputeId DisputeId, params ApplyDisputeEventParams) {
 	var request ApplyDisputeEventRequestObject
@@ -2927,6 +3342,39 @@ func (sh *strictHandler) ApplyDisputeEvent(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ApplyDisputeEventResponseObject); ok {
 		if err := validResponse.VisitApplyDisputeEventResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ComposeEmail operation middleware
+func (sh *strictHandler) ComposeEmail(w http.ResponseWriter, r *http.Request, disputeId openapi_types.UUID) {
+	var request ComposeEmailRequestObject
+
+	request.DisputeId = disputeId
+
+	var body ComposeEmailJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ComposeEmail(ctx, request.(ComposeEmailRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ComposeEmail")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ComposeEmailResponseObject); ok {
+		if err := validResponse.VisitComposeEmailResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3230,116 +3678,132 @@ func (sh *strictHandler) RevokeTenantKey(w http.ResponseWriter, r *http.Request,
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"Hw/weY//HQA=",
+	"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",
+	"389UwrOFMvbwh4MfD7Bt3v8OAA==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

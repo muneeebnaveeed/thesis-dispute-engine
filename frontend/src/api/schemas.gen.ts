@@ -91,6 +91,35 @@ export type Channel = Static<typeof Channel>
 const _Channel: Same<Channel, components['schemas']['Channel']> = true
 void _Channel
 
+export const NoticeKind = Type.Union(
+  [
+    Type.Literal('ACKNOWLEDGEMENT'),
+    Type.Literal('QUESTIONNAIRE'),
+    Type.Literal('PROVISIONAL_CREDIT'),
+    Type.Literal('REFUND'),
+    Type.Literal('REVERSAL'),
+    Type.Literal('RESOLUTION'),
+    Type.Literal('REQUEST_FOR_INFORMATION'),
+    Type.Literal('STATUS_UPDATE'),
+    Type.Literal('DOCUMENTS_RECEIVED'),
+    Type.Literal('CUSTOM'),
+  ],
+  { description: 'The first six the engine sends on its own; the rest an analyst composes from a template.' },
+)
+export type NoticeKind = Static<typeof NoticeKind>
+const _NoticeKind: Same<NoticeKind, components['schemas']['NoticeKind']> = true
+void _NoticeKind
+
+export const ComposeEmailRequest = Type.Object({
+  template: NoticeKind,
+  fields: Type.Record(Type.String(), Type.String(), {
+    description: 'Field id to value; MULTISELECT values are comma-separated option keys.',
+  }),
+})
+export type ComposeEmailRequest = Static<typeof ComposeEmailRequest>
+const _ComposeEmailRequest: Same<ComposeEmailRequest, components['schemas']['ComposeEmailRequest']> = true
+void _ComposeEmailRequest
+
 export const CoreReceipt = Type.Object({
   rrn: Type.String({
     description: 'Retrieval reference number (ISO 8583 DE37); empty when the tenant has no core.',
@@ -294,18 +323,6 @@ export type Questionnaire = Static<typeof Questionnaire>
 const _Questionnaire: Same<Questionnaire, components['schemas']['Questionnaire']> = true
 void _Questionnaire
 
-export const NoticeKind = Type.Union([
-  Type.Literal('ACKNOWLEDGEMENT'),
-  Type.Literal('QUESTIONNAIRE'),
-  Type.Literal('PROVISIONAL_CREDIT'),
-  Type.Literal('REFUND'),
-  Type.Literal('REVERSAL'),
-  Type.Literal('RESOLUTION'),
-])
-export type NoticeKind = Static<typeof NoticeKind>
-const _NoticeKind: Same<NoticeKind, components['schemas']['NoticeKind']> = true
-void _NoticeKind
-
 export const Notice = Type.Object({
   id: Type.Integer({ format: 'int64' }),
   seq: Type.Integer({ description: 'The event that caused it.' }),
@@ -318,6 +335,9 @@ export const Notice = Type.Object({
     Type.String({ description: 'Absent while an email waits in the outbox.', format: 'date-time' }),
   ),
   error: Type.Optional(Type.String({ description: 'The last delivery failure' })),
+  actor: Type.Optional(
+    Type.String({ description: "The analyst who composed it; absent for the engine's own notices." }),
+  ),
 })
 export type Notice = Static<typeof Notice>
 const _Notice: Same<Notice, components['schemas']['Notice']> = true
@@ -419,6 +439,83 @@ export type DisputePage = Static<typeof DisputePage>
 const _DisputePage: Same<DisputePage, components['schemas']['DisputePage']> = true
 void _DisputePage
 
+export const FieldType = Type.Union(
+  [
+    Type.Literal('TEXT'),
+    Type.Literal('TEXTAREA'),
+    Type.Literal('NUMBER'),
+    Type.Literal('DATE'),
+    Type.Literal('SELECT'),
+    Type.Literal('MULTISELECT'),
+  ],
+  {
+    description:
+      'TEXT and TEXTAREA are free text; NUMBER a whole number; DATE YYYY-MM-DD; SELECT one option key; MULTISELECT comma-separated option keys.',
+  },
+)
+export type FieldType = Static<typeof FieldType>
+const _FieldType: Same<FieldType, components['schemas']['FieldType']> = true
+void _FieldType
+
+export const TemplateOption = Type.Object({
+  key: Type.String(),
+  label: Type.String({ description: 'What the analyst sees.' }),
+  text: Type.String({ description: 'What the customer reads.' }),
+})
+export type TemplateOption = Static<typeof TemplateOption>
+const _TemplateOption: Same<TemplateOption, components['schemas']['TemplateOption']> = true
+void _TemplateOption
+
+export const TemplateField = Type.Object({
+  id: Type.String(),
+  label: Type.String(),
+  type: FieldType,
+  required: Type.Boolean(),
+  options: Type.Optional(Type.Array(TemplateOption)),
+  default: Type.Optional(Type.String()),
+  min: Type.Optional(Type.Integer()),
+  max: Type.Optional(Type.Integer()),
+})
+export type TemplateField = Static<typeof TemplateField>
+const _TemplateField: Same<TemplateField, components['schemas']['TemplateField']> = true
+void _TemplateField
+
+export const EmailTemplate = Type.Object({
+  kind: NoticeKind,
+  label: Type.String(),
+  description: Type.String(),
+  letter: Type.Boolean({
+    description: 'Also goes out as a letter where the regime requires written notices.',
+  }),
+  fields: Type.Array(TemplateField),
+  subject: Type.String({ description: 'Facts filled in; fields left as {{id}}.' }),
+  paragraphs: Type.Array(Type.String(), {
+    description:
+      'Facts filled in; fields left as {{id}}; {{#id}}...{{/id}} appears only when the field has a value; a paragraph that is only a list field renders as bullet lines; empty paragraphs are dropped.',
+  }),
+})
+export type EmailTemplate = Static<typeof EmailTemplate>
+const _EmailTemplate: Same<EmailTemplate, components['schemas']['EmailTemplate']> = true
+void _EmailTemplate
+
+export const EmailTemplates = Type.Object({
+  templates: Type.Array(EmailTemplate),
+  facts: Type.Object(
+    {
+      customer: Type.String(),
+      bank: Type.String(),
+      amount: Type.String(),
+      merchant: Type.String(),
+      dispute: Type.String(),
+      today: Type.String({ format: 'date' }),
+    },
+    { description: "The engine-known values, for the preview's greeting and letterhead." },
+  ),
+})
+export type EmailTemplates = Static<typeof EmailTemplates>
+const _EmailTemplates: Same<EmailTemplates, components['schemas']['EmailTemplates']> = true
+void _EmailTemplates
+
 export const ErrorCode = Type.Union(
   [
     Type.Literal('unauthenticated'),
@@ -435,6 +532,8 @@ export const ErrorCode = Type.Union(
     Type.Literal('unknown-reason'),
     Type.Literal('invalid-answers'),
     Type.Literal('risk-hold'),
+    Type.Literal('invalid-fields'),
+    Type.Literal('unknown-template'),
     Type.Literal('concurrent-update'),
     Type.Literal('idempotency-key-reuse'),
     Type.Literal('no-regime'),

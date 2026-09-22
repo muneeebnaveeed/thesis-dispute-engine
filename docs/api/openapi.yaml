@@ -141,6 +141,60 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+  /disputes/{disputeId}/email-templates:
+    get:
+      operationId: listEmailTemplates
+      summary: The emails an analyst may compose for this dispute
+      description: >-
+        Each template comes with its form and its words, the facts the engine knows already filled in and the
+        analyst's fields left as {{placeholders}}, so the browser can preview as the analyst types. The server
+        renders the final message on send from the same template.
+      tags: [disputes]
+      parameters:
+        - name: disputeId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The catalogue.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailTemplates" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /disputes/{disputeId}/notices:
+    post:
+      operationId: composeEmail
+      summary: Compose and send an email from a template
+      description: >-
+        Validates the fields against the template (invalid-fields, one error per field), composes the message
+        server-side, queues the email and, where the regime requires writing and the template is a letter, the
+        letter too. Analysts only; a tenant key cannot write to customers.
+      tags: [disputes]
+      parameters:
+        - name: disputeId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ComposeEmailRequest" }
+      responses:
+        "201":
+          description: Queued; the dispute with its communications.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Dispute" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /disputes/{disputeId}/notices/{noticeId}:
     get:
       operationId: getNotice
@@ -377,6 +431,8 @@ components:
         - unknown-reason
         - invalid-answers
         - risk-hold
+        - invalid-fields
+        - unknown-template
         - concurrent-update
         - idempotency-key-reuse
         - no-regime
@@ -687,7 +743,8 @@ components:
               assessedAt: { type: string, format: date-time }
     NoticeKind:
       type: string
-      enum: [ACKNOWLEDGEMENT, QUESTIONNAIRE, PROVISIONAL_CREDIT, REFUND, REVERSAL, RESOLUTION]
+      description: The first six the engine sends on its own; the rest an analyst composes from a template.
+      enum: [ACKNOWLEDGEMENT, QUESTIONNAIRE, PROVISIONAL_CREDIT, REFUND, REVERSAL, RESOLUTION, REQUEST_FOR_INFORMATION, STATUS_UPDATE, DOCUMENTS_RECEIVED, CUSTOM]
     Channel:
       type: string
       description: EMAIL goes out through the mail relay; LETTER is a printable document, ready the moment it exists.
@@ -705,6 +762,77 @@ components:
         createdAt: { type: string, format: date-time }
         sentAt: { type: string, format: date-time, description: Absent while an email waits in the outbox. }
         error: { type: string, description: The last delivery failure, if the email is still waiting. }
+        actor: { type: string, description: The analyst who composed it; absent for the engine's own notices. }
+    FieldType:
+      type: string
+      description: TEXT and TEXTAREA are free text; NUMBER a whole number; DATE YYYY-MM-DD; SELECT one option key; MULTISELECT comma-separated option keys.
+      enum: [TEXT, TEXTAREA, NUMBER, DATE, SELECT, MULTISELECT]
+    TemplateOption:
+      type: object
+      required: [key, label, text]
+      properties:
+        key: { type: string }
+        label: { type: string, description: What the analyst sees. }
+        text: { type: string, description: What the customer reads. }
+    TemplateField:
+      type: object
+      required: [id, label, type, required]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        type: { $ref: "#/components/schemas/FieldType" }
+        required: { type: boolean }
+        options:
+          type: array
+          items: { $ref: "#/components/schemas/TemplateOption" }
+        default: { type: string }
+        min: { type: integer }
+        max: { type: integer }
+    EmailTemplate:
+      type: object
+      required: [kind, label, description, letter, fields, subject, paragraphs]
+      properties:
+        kind: { $ref: "#/components/schemas/NoticeKind" }
+        label: { type: string }
+        description: { type: string }
+        letter: { type: boolean, description: Also goes out as a letter where the regime requires written notices. }
+        fields:
+          type: array
+          items: { $ref: "#/components/schemas/TemplateField" }
+        subject: { type: string, description: "Facts filled in; fields left as {{id}}." }
+        paragraphs:
+          type: array
+          description: >-
+            Facts filled in; fields left as {{id}}; {{#id}}...{{/id}} appears only when the field has a value; a
+            paragraph that is only a list field renders as bullet lines; empty paragraphs are dropped.
+          items: { type: string }
+    EmailTemplates:
+      type: object
+      required: [templates, facts]
+      properties:
+        templates:
+          type: array
+          items: { $ref: "#/components/schemas/EmailTemplate" }
+        facts:
+          type: object
+          description: The engine-known values, for the preview's greeting and letterhead.
+          required: [customer, bank, amount, merchant, dispute, today]
+          properties:
+            customer: { type: string }
+            bank: { type: string }
+            amount: { type: string }
+            merchant: { type: string }
+            dispute: { type: string }
+            today: { type: string, format: date }
+    ComposeEmailRequest:
+      type: object
+      required: [template, fields]
+      properties:
+        template: { $ref: "#/components/schemas/NoticeKind" }
+        fields:
+          type: object
+          description: Field id to value; MULTISELECT values are comma-separated option keys.
+          additionalProperties: { type: string }
     NoticeDocument:
       type: object
       required: [id, kind, channel, recipient, bank, date, subject, greeting, paragraphs, closing]

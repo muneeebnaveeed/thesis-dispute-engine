@@ -1,0 +1,15 @@
+{
+  "kind": "CUSTOM",
+  "label": "Custom message",
+  "description": "A message in your own words, on the bank's letterhead.",
+  "letter": false,
+  "fields": [
+    { "id": "subject", "label": "Subject", "type": "TEXT", "required": true },
+    { "id": "body", "label": "Message", "type": "TEXTAREA", "required": true }
+  ],
+  "subject": "{{subject}}",
+  "paragraphs": [
+    "{{body}}",
+    "Dispute reference {{dispute}}."
+  ]
+}

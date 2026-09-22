@@ -467,8 +467,12 @@ func (t *txn) InsertNotice(ctx context.Context, n application.NoticeRecord) (int
 	if n.SentAt != nil {
 		sentAt = pgtype.Timestamptz{Time: *n.SentAt, Valid: true}
 	}
+	var actor *string
+	if n.Actor != "" {
+		actor = &n.Actor
+	}
 	id, err := t.q.InsertNotice(ctx, sqlcgen.InsertNoticeParams{DisputeID: n.DisputeID, Seq: int32Of(n.Seq), Kind: string(n.Kind), Channel: string(n.Channel),
-		Recipient: n.Recipient, Subject: n.Subject, Document: n.Document, CreatedAt: n.CreatedAt, SentAt: sentAt})
+		Recipient: n.Recipient, Subject: n.Subject, Document: n.Document, CreatedAt: n.CreatedAt, SentAt: sentAt, Actor: actor})
 	return id, mapErr(err)
 }
 
@@ -479,7 +483,7 @@ func (t *txn) ListNotices(ctx context.Context, disputeID uuid.UUID) ([]applicati
 	}
 	out := make([]application.NoticeRecord, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, noticeOf(r.ID, r.DisputeID, r.Seq, r.Kind, r.Channel, r.Recipient, r.Subject, r.Document, r.CreatedAt, r.SentAt, r.Attempts, r.LastError))
+		out = append(out, noticeOf(r.ID, r.DisputeID, r.Seq, r.Kind, r.Channel, r.Recipient, r.Subject, r.Document, r.CreatedAt, r.SentAt, r.Attempts, r.LastError, r.Actor))
 	}
 	return out, nil
 }
@@ -489,13 +493,13 @@ func (t *txn) GetNotice(ctx context.Context, disputeID uuid.UUID, id int64) (app
 	if err != nil {
 		return application.NoticeRecord{}, mapErr(err)
 	}
-	return noticeOf(r.ID, r.DisputeID, r.Seq, r.Kind, r.Channel, r.Recipient, r.Subject, r.Document, r.CreatedAt, r.SentAt, r.Attempts, r.LastError), nil
+	return noticeOf(r.ID, r.DisputeID, r.Seq, r.Kind, r.Channel, r.Recipient, r.Subject, r.Document, r.CreatedAt, r.SentAt, r.Attempts, r.LastError, r.Actor), nil
 }
 
 func noticeOf(id int64, disputeID uuid.UUID, seq int32, kind, channel, recipient, subject string, document []byte, createdAt time.Time,
-	sentAt pgtype.Timestamptz, attempts int32, lastError *string) application.NoticeRecord {
+	sentAt pgtype.Timestamptz, attempts int32, lastError, actor *string) application.NoticeRecord {
 	n := application.NoticeRecord{ID: id, DisputeID: disputeID, Seq: int(seq), Kind: domain.NoticeKind(kind), Channel: domain.Channel(channel),
-		Recipient: recipient, Subject: subject, Document: document, CreatedAt: createdAt, Attempts: int(attempts), LastError: lastError}
+		Recipient: recipient, Subject: subject, Document: document, CreatedAt: createdAt, Attempts: int(attempts), LastError: lastError, Actor: derefString(actor)}
 	if sentAt.Valid {
 		at := sentAt.Time
 		n.SentAt = &at

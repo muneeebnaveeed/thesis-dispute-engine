@@ -277,6 +277,17 @@ let several instances share the work. The trade is the usual one for an outbox: 
 at-least-once, so a relay that accepted a message but failed to say so may receive it twice,
 whereas a letter, being a row, cannot be duplicated.
 
+Analysts also write on their own initiative, to ask for documents or to report where a case
+stands, and the same machinery serves them through a small addition (ADR~0019). Their emails are
+templates kept as data, each a form and a set of paragraphs in a deliberately tiny substitution
+language: placeholders for the analyst's fields and for facts the engine knows, sections that appear
+only when a field has a value, list-valued fields that become bullet lines. The API returns each
+template with the facts already filled and the fields left as placeholders, so the browser can
+preview the message live by the same substitution while the analyst types, and the server renders
+the final message from the same paragraphs on send. Preview and letter therefore cannot disagree,
+the analyst's email is a notice row like any other with its author recorded, and a machine
+credential cannot compose one at all.
+
 Two smaller consequences follow. The acknowledgement clock of section~\ref{sec:design-clocks} is
 met by the acknowledgement notice, not by any state, because the acknowledgement is what the
 regulation asks for. And the customer's file becomes complete and auditable from the dispute alone:

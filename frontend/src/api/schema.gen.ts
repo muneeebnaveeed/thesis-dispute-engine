@@ -86,6 +86,46 @@ export type paths = {
     patch?: never
     trace?: never
   }
+  '/disputes/{disputeId}/email-templates': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The emails an analyst may compose for this dispute
+     * @description Each template comes with its form and its words, the facts the engine knows already filled in and the analyst's fields left as {{placeholders}}, so the browser can preview as the analyst types. The server renders the final message on send from the same template.
+     */
+    get: operations['listEmailTemplates']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/disputes/{disputeId}/notices': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Compose and send an email from a template
+     * @description Validates the fields against the template (invalid-fields, one error per field), composes the message server-side, queues the email and, where the regime requires writing and the template is a letter, the letter too. Analysts only; a tenant key cannot write to customers.
+     */
+    post: operations['composeEmail']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/disputes/{disputeId}/notices/{noticeId}': {
     parameters: {
       query?: never
@@ -234,6 +274,8 @@ export type components = {
       | 'unknown-reason'
       | 'invalid-answers'
       | 'risk-hold'
+      | 'invalid-fields'
+      | 'unknown-template'
       | 'concurrent-update'
       | 'idempotency-key-reuse'
       | 'no-regime'
@@ -535,7 +577,10 @@ export type components = {
         assessedAt: string
       }[]
     }
-    /** @enum {string} */
+    /**
+     * @description The first six the engine sends on its own; the rest an analyst composes from a template.
+     * @enum {string}
+     */
     NoticeKind:
       | 'ACKNOWLEDGEMENT'
       | 'QUESTIONNAIRE'
@@ -543,6 +588,10 @@ export type components = {
       | 'REFUND'
       | 'REVERSAL'
       | 'RESOLUTION'
+      | 'REQUEST_FOR_INFORMATION'
+      | 'STATUS_UPDATE'
+      | 'DOCUMENTS_RECEIVED'
+      | 'CUSTOM'
     /**
      * @description EMAIL goes out through the mail relay; LETTER is a printable document, ready the moment it exists.
      * @enum {string}
@@ -566,6 +615,62 @@ export type components = {
       sentAt?: string
       /** @description The last delivery failure */
       error?: string
+      /** @description The analyst who composed it; absent for the engine's own notices. */
+      actor?: string
+    }
+    /**
+     * @description TEXT and TEXTAREA are free text; NUMBER a whole number; DATE YYYY-MM-DD; SELECT one option key; MULTISELECT comma-separated option keys.
+     * @enum {string}
+     */
+    FieldType: 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'DATE' | 'SELECT' | 'MULTISELECT'
+    TemplateOption: {
+      key: string
+      /** @description What the analyst sees. */
+      label: string
+      /** @description What the customer reads. */
+      text: string
+    }
+    TemplateField: {
+      id: string
+      label: string
+      type: components['schemas']['FieldType']
+      required: boolean
+      options?: components['schemas']['TemplateOption'][]
+      default?: string
+      min?: number
+      max?: number
+    }
+    EmailTemplate: {
+      kind: components['schemas']['NoticeKind']
+      label: string
+      description: string
+      /** @description Also goes out as a letter where the regime requires written notices. */
+      letter: boolean
+      fields: components['schemas']['TemplateField'][]
+      /** @description Facts filled in; fields left as {{id}}. */
+      subject: string
+      /** @description Facts filled in; fields left as {{id}}; {{#id}}...{{/id}} appears only when the field has a value; a paragraph that is only a list field renders as bullet lines; empty paragraphs are dropped. */
+      paragraphs: string[]
+    }
+    EmailTemplates: {
+      templates: components['schemas']['EmailTemplate'][]
+      /** @description The engine-known values, for the preview's greeting and letterhead. */
+      facts: {
+        customer: string
+        bank: string
+        amount: string
+        merchant: string
+        dispute: string
+        /** Format: date */
+        today: string
+      }
+    }
+    ComposeEmailRequest: {
+      template: components['schemas']['NoticeKind']
+      /** @description Field id to value; MULTISELECT values are comma-separated option keys. */
+      fields: {
+        [key: string]: string
+      }
     }
     NoticeDocument: {
       /** Format: int64 */
@@ -889,6 +994,63 @@ export interface operations {
           'application/problem+json': components['schemas']['Problem']
         }
       }
+    }
+  }
+  listEmailTemplates: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        disputeId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The catalogue. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['EmailTemplates']
+        }
+      }
+      401: components['responses']['Unauthorized']
+      404: components['responses']['NotFound']
+      429: components['responses']['TooManyRequests']
+    }
+  }
+  composeEmail: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        disputeId: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ComposeEmailRequest']
+      }
+    }
+    responses: {
+      /** @description Queued; the dispute with its communications. */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Dispute']
+        }
+      }
+      400: components['responses']['BadRequest']
+      401: components['responses']['Unauthorized']
+      403: components['responses']['Forbidden']
+      404: components['responses']['NotFound']
+      422: components['responses']['Unprocessable']
+      429: components['responses']['TooManyRequests']
     }
   }
   getNotice: {

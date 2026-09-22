@@ -121,6 +121,7 @@ type Notice struct {
 	Attempts      int32
 	NextAttemptAt time.Time
 	LastError     *string
+	Actor         *string
 }
 
 type Questionnaire struct {

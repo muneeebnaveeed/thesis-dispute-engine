@@ -11,7 +11,18 @@ const (
 	NoticeRefund            NoticeKind = "REFUND"             // a refund was posted
 	NoticeReversal          NoticeKind = "REVERSAL"           // the provisional credit was taken back
 	NoticeResolution        NoticeKind = "RESOLUTION"         // the outcome, and how it was reached
+
+	// Analyst-initiated kinds; their forms and words are templates in the notice package.
+	NoticeRequestForInformation NoticeKind = "REQUEST_FOR_INFORMATION"
+	NoticeStatusUpdate          NoticeKind = "STATUS_UPDATE"
+	NoticeDocumentsReceived     NoticeKind = "DOCUMENTS_RECEIVED"
+	NoticeCustom                NoticeKind = "CUSTOM"
 )
+
+// ManualNoticeKinds are the notices an analyst composes; the rest the engine sends on its own.
+func ManualNoticeKinds() []NoticeKind {
+	return []NoticeKind{NoticeRequestForInformation, NoticeStatusUpdate, NoticeDocumentsReceived, NoticeCustom}
+}
 
 // Channel is how a notice reaches the customer.
 type Channel string
