@@ -227,6 +227,19 @@ func (m *MemStore) ClaimNotices(_ context.Context, batch int) ([]application.Not
 	return out, nil
 }
 
+// OutboxBacklog implements application.Store.
+func (m *MemStore) OutboxBacklog(_ context.Context) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var n int64
+	for i := range m.Notices {
+		if m.Notices[i].SentAt == nil && m.Notices[i].Channel == domain.ChannelEmail {
+			n++
+		}
+	}
+	return n, nil
+}
+
 // FinishNotice implements application.Store.
 func (m *MemStore) FinishNotice(_ context.Context, id int64, failure string) error {
 	m.mu.Lock()
