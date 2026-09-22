@@ -2,9 +2,13 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 )
@@ -35,6 +39,43 @@ func reasonOptions() map[string]string {
 		out[string(r)] = domain.ReasonMeaning(r)
 	}
 	return out
+}
+
+// openedPayload records what the analyst was shown beside what they chose. An opened dispute with no
+// suggestion keeps the empty payload it has always had.
+func openedPayload(proposal *ReasonProposal, chosen domain.Reason) []byte {
+	if proposal == nil || !proposal.Confident {
+		return []byte("{}")
+	}
+	payload, err := json.Marshal(map[string]any{"suggestion": map[string]any{
+		"field":       "reason",
+		"proposed":    proposal.Reason,
+		"probability": proposal.Probability,
+		"accepted":    proposal.Reason == chosen,
+	}})
+	if err != nil {
+		return []byte("{}")
+	}
+	return payload
+}
+
+// recordAcceptance is the only measure of whether any of this helps: how often an analyst keeps what the
+// model offered. The label is the field, never the value, so the counter stays a small fixed set.
+func (s *Service) recordAcceptance(ctx context.Context, field string, proposal *ReasonProposal, chosen domain.Reason) {
+	if proposal == nil || !proposal.Confident {
+		return
+	}
+	counter, _ := decisionMeters()
+	if counter == nil {
+		return
+	}
+	accepted, _ := otel.Meter(scopeName).Int64Counter("dispute.proposals_accepted",
+		metric.WithDescription("Proposals an analyst kept or overrode, by field"))
+	if accepted == nil {
+		return
+	}
+	accepted.Add(ctx, 1, metric.WithAttributes(
+		attribute.String("field", field), attribute.Bool("accepted", proposal.Reason == chosen)))
 }
 
 // ReasonProposal is a reason the model offered and how sure it was. Confident is false when it offered

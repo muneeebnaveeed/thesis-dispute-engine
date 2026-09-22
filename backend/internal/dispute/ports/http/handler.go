@@ -338,11 +338,18 @@ func (h *Handler) CreateDispute(ctx context.Context, req oapi.CreateDisputeReque
 	if req.Body.Reason != nil {
 		reason = string(*req.Body.Reason)
 	}
+	var suggestion *application.ReasonProposal
+	if s := req.Body.Suggestion; s != nil {
+		suggestion = &application.ReasonProposal{
+			Reason: domain.Reason(s.Reason), Probability: s.Probability, Confident: true,
+		}
+	}
 	res, err := h.svc.CreateDispute(ctx, application.CreateDisputeInput{
 		TransactionID: req.Body.TransactionId,
 		Reason:        reason,
 		Actor:         orDefault(req.Body.Actor, "customer"),
 		Idempotency:   idempotency(req.Params.IdempotencyKey, body),
+		Suggestion:    suggestion,
 	})
 	if err != nil {
 		p := h.problem(ctx, "/disputes", err, uuid.Nil)

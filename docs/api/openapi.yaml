@@ -869,6 +869,16 @@ components:
               probability: { type: number, format: double, minimum: 0, maximum: 1 }
             additionalProperties: false
       additionalProperties: false
+    AcceptedSuggestion:
+      type: object
+      description: >
+        What a model proposed for a field, sent back when the dispute is opened so the record can say the
+        analyst was shown a suggestion and what they did with it. It changes nothing about the dispute.
+      required: [reason, probability]
+      properties:
+        reason: { $ref: "#/components/schemas/DisputeReason" }
+        probability: { type: number, format: double, minimum: 0, maximum: 1 }
+      additionalProperties: false
     DisputeReasonSuggestionRequest:
       type: object
       required: [description]
@@ -954,6 +964,11 @@ components:
           description: Why the customer disputes it; selects the questionnaire. Defaults to UNAUTHORISED.
           $ref: "#/components/schemas/DisputeReason"
         actor: { type: string, description: "Who opened it; defaults to customer.", default: customer }
+        suggestion:
+          description: >
+            What a model proposed for the reason, if the analyst was shown one. Recorded beside the reason
+            they chose so acceptance can be measured; it never changes what is opened.
+          $ref: "#/components/schemas/AcceptedSuggestion"
     DisputeReason:
       type: string
       enum: [UNAUTHORISED, NOT_RECEIVED, DUPLICATE, AMOUNT_DIFFERS]

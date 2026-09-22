@@ -87,7 +87,12 @@ const Workbench = () => {
     onSubmit: ({ value, formApi }) =>
       submitTo(formApi, () =>
         openDisputeMutation.mutateAsync(
-          parsed(CreateDisputeRequest, { transactionId: value.transactionId, reason: value.reason }),
+          parsed(CreateDisputeRequest, {
+            transactionId: value.transactionId,
+            reason: value.reason,
+            // what the analyst was shown travels with what they chose, so acceptance can be counted
+            ...(proposed ? { suggestion: proposed } : {}),
+          }),
         ),
       ),
   })

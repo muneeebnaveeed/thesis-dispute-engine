@@ -3,6 +3,7 @@ package application_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
@@ -70,6 +71,43 @@ func TestSuggestDisputeReasonRefusesTextThatIsNotADispute(t *testing.T) {
 			got := svc.SuggestDisputeReason(context.Background(), "whatever the customer wrote")
 			if got.Confident != tc.want {
 				t.Errorf("confident = %v, want %v (proposal %+v)", got.Confident, tc.want, got)
+			}
+		})
+	}
+}
+
+// What the analyst was shown is recorded beside what they chose, so acceptance is measurable. The dispute
+// itself is unchanged by it.
+func TestOpenedEventRecordsTheSuggestionBesideTheChoice(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		proposal *application.ReasonProposal
+		chosen   string
+		want     string
+	}{
+		{"kept", &application.ReasonProposal{Reason: "DUPLICATE", Probability: 0.97, Confident: true}, "DUPLICATE", `"accepted":true`},
+		{"overridden", &application.ReasonProposal{Reason: "DUPLICATE", Probability: 0.97, Confident: true}, "NOT_RECEIVED", `"accepted":false`},
+		{"never shown", nil, "DUPLICATE", "{}"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			store := apptest.NewMemStore()
+			svc, err := application.NewService(store, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			txn := store.AddTransaction("CARD", "EUR", "EUR", "42.00")
+			res, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{
+				TransactionID: txn, Reason: tc.chosen, Actor: "analyst", Suggestion: tc.proposal,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			payload := string(store.Events[res.View.ID][0].Payload)
+			if !strings.Contains(payload, tc.want) {
+				t.Errorf("opened payload = %s, want it to contain %s", payload, tc.want)
+			}
+			if got := res.View.Reason; string(got) != tc.chosen {
+				t.Errorf("reason = %s, want the analyst's choice %s", got, tc.chosen)
 			}
 		})
 	}

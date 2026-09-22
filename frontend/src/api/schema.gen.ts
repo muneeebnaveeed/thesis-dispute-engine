@@ -607,6 +607,12 @@ export type components = {
         }
       }
     }
+    /** @description What a model proposed for a field, sent back when the dispute is opened so the record can say the analyst was shown a suggestion and what they did with it. It changes nothing about the dispute. */
+    AcceptedSuggestion: {
+      reason: components['schemas']['DisputeReason']
+      /** Format: double */
+      probability: number
+    }
     DisputeReasonSuggestionRequest: {
       /** @description What the customer said, in any language. */
       description: string
@@ -673,6 +679,8 @@ export type components = {
        * @default customer
        */
       actor?: string
+      /** @description What a model proposed for the reason, if the analyst was shown one. Recorded beside the reason they chose so acceptance can be measured; it never changes what is opened. */
+      suggestion?: components['schemas']['AcceptedSuggestion']
     }
     /** @enum {string} */
     DisputeReason: 'UNAUTHORISED' | 'NOT_RECEIVED' | 'DUPLICATE' | 'AMOUNT_DIFFERS'

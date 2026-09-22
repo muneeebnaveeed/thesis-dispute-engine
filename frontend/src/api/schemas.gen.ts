@@ -6,6 +6,27 @@ import type { components } from './schema.gen'
 // Each schema is checked both ways against the openapi-typescript type, so the two generated files cannot drift.
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never
 
+export const DisputeReason = Type.Union([
+  Type.Literal('UNAUTHORISED'),
+  Type.Literal('NOT_RECEIVED'),
+  Type.Literal('DUPLICATE'),
+  Type.Literal('AMOUNT_DIFFERS'),
+])
+export type DisputeReason = Static<typeof DisputeReason>
+const _DisputeReason: Same<DisputeReason, components['schemas']['DisputeReason']> = true
+void _DisputeReason
+
+export const AcceptedSuggestion = Type.Object(
+  {
+    reason: DisputeReason,
+    probability: Type.Number({ format: 'double', minimum: 0, maximum: 1 }),
+  },
+  { additionalProperties: false },
+)
+export type AcceptedSuggestion = Static<typeof AcceptedSuggestion>
+const _AcceptedSuggestion: Same<AcceptedSuggestion, components['schemas']['AcceptedSuggestion']> = true
+void _AcceptedSuggestion
+
 export const AnswerType = Type.Union(
   [Type.Literal('YES_NO'), Type.Literal('DATE'), Type.Literal('TEXT'), Type.Literal('AMOUNT')],
   {
@@ -147,22 +168,13 @@ export type CoreReceipt = Static<typeof CoreReceipt>
 const _CoreReceipt: Same<CoreReceipt, components['schemas']['CoreReceipt']> = true
 void _CoreReceipt
 
-export const DisputeReason = Type.Union([
-  Type.Literal('UNAUTHORISED'),
-  Type.Literal('NOT_RECEIVED'),
-  Type.Literal('DUPLICATE'),
-  Type.Literal('AMOUNT_DIFFERS'),
-])
-export type DisputeReason = Static<typeof DisputeReason>
-const _DisputeReason: Same<DisputeReason, components['schemas']['DisputeReason']> = true
-void _DisputeReason
-
 export const CreateDisputeRequest = Type.Object({
   transactionId: Type.String({ format: 'uuid' }),
   reason: Type.Optional(DisputeReason),
   actor: Type.Optional(
     Type.String({ description: 'Who opened it; defaults to customer.', default: 'customer' }),
   ),
+  suggestion: Type.Optional(AcceptedSuggestion),
 })
 export type CreateDisputeRequest = Static<typeof CreateDisputeRequest>
 const _CreateDisputeRequest: Same<CreateDisputeRequest, components['schemas']['CreateDisputeRequest']> = true

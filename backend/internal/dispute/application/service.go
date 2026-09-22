@@ -295,6 +295,9 @@ type CreateDisputeInput struct {
 	Reason        string
 	Actor         string
 	Idempotency   Idempotency
+	// Suggestion is what a model proposed for the reason, when the analyst was shown one. It is recorded
+	// beside the reason they chose and changes nothing about the dispute (ADR 0024).
+	Suggestion *ReasonProposal
 }
 
 // ApplyEventInput moves a dispute along its lifecycle.
@@ -346,9 +349,10 @@ func (s *Service) CreateDispute(ctx context.Context, in CreateDisputeInput) (Res
 		}
 		ev := EventRecord{
 			Seq: 1, Event: "OPENED", FromState: "", ToState: domain.StateInitiated,
-			Actor: in.Actor, Payload: []byte("{}"), IdempotencyKey: keyPtr(in.Idempotency),
+			Actor: in.Actor, Payload: openedPayload(in.Suggestion, reason), IdempotencyKey: keyPtr(in.Idempotency),
 			TraceID: traceIDPtr(ctx), OccurredAt: now,
 		}
+		s.recordAcceptance(ctx, "reason", in.Suggestion, reason)
 		if err := tx.AppendEvent(ctx, id, ev); err != nil {
 			return DisputeView{}, err
 		}
