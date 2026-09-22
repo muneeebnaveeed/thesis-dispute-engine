@@ -2,7 +2,6 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, useRouteContext } from '@tanstack/react-router'
 import { useState } from 'react'
 
-import { classify } from '#/api/failure'
 import type { components } from '#/api/schema.gen'
 import { TemplateEditor } from '#/components/comms/template-editor'
 import { AppShell } from '#/components/layout/app-shell'
@@ -19,7 +18,7 @@ const TemplatesPage = () => {
   const { tenant } = Route.useParams()
   const { viewer } = useRouteContext({ from: '__root__' })
   const isAdmin = viewer?.roles.includes('tenant-admin') ?? false
-  const { data: settingsOutcome } = useSuspenseQuery(tenantTemplatesQuery())
+  const { data: loadedSettings } = useSuspenseQuery(tenantTemplatesQuery())
   const [savedNote, setSavedNote] = useState<string | null>(null)
   const saveMutation = useServerMutation(
     (change: { kind: NoticeKind; override: TemplateOverride }) => putTenantTemplate({ data: change }),
@@ -64,8 +63,10 @@ const TemplatesPage = () => {
               }}
             />
           )}
-          {settingsOutcome.value ? (
-            settingsOutcome.value.map((setting) => (
+          {loadedSettings.failure ? (
+            <FailureBanner failure={loadedSettings.failure} />
+          ) : (
+            loadedSettings.value.map((setting) => (
               <TemplateEditor
                 key={setting.base.kind}
                 setting={setting}
@@ -81,16 +82,6 @@ const TemplatesPage = () => {
                 }}
               />
             ))
-          ) : (
-            <FailureBanner
-              failure={
-                classify({ error: settingsOutcome.problem }) ?? {
-                  kind: 'unexpected',
-                  status: 0,
-                  message: 'no templates',
-                }
-              }
-            />
           )}
         </div>
       )}

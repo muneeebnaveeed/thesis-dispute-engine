@@ -2,7 +2,6 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, useRouteContext } from '@tanstack/react-router'
 import { useState } from 'react'
 
-import { classify } from '#/api/failure'
 import type { components } from '#/api/schema.gen'
 import { CreateTenantKeyRequest } from '#/api/schemas.gen'
 import { AppShell } from '#/components/layout/app-shell'
@@ -21,7 +20,7 @@ type TenantKey = components['schemas']['TenantKey']
 const KeysPage = () => {
   const { tenant } = Route.useParams()
   const { viewer } = useRouteContext({ from: '__root__' })
-  const { data: keysOutcome } = useSuspenseQuery(tenantKeysQuery())
+  const { data: loadedKeys } = useSuspenseQuery(tenantKeysQuery())
   const [clientFieldErrors, setClientFieldErrors] = useState<Record<string, string>>({})
   const [issuedKey, setIssuedKey] = useState<{ label: string; secret: string } | null>(null)
   const issueMutation = useServerMutation((request: { label: string }) => issueTenantKey({ data: request }), {
@@ -104,19 +103,11 @@ const KeysPage = () => {
           </section>
           <section>
             <h2 className="mb-2 text-lg font-medium">Keys</h2>
-            {keysOutcome.problem ? (
-              <FailureBanner
-                failure={
-                  classify({ error: keysOutcome.problem }) ?? {
-                    kind: 'unexpected',
-                    status: 0,
-                    message: 'no data',
-                  }
-                }
-              />
+            {loadedKeys.failure ? (
+              <FailureBanner failure={loadedKeys.failure} />
             ) : (
               <KeyTable
-                keys={keysOutcome.value ?? []}
+                keys={loadedKeys.value}
                 busy={revokeMutation.isPending}
                 onRevoke={(keyId) => revokeMutation.mutate(keyId)}
               />

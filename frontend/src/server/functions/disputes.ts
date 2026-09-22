@@ -2,7 +2,7 @@ import { Type } from '@sinclair/typebox'
 
 import { ApplyEventRequest, CreateDisputeRequest, DisputeState } from '#/api/schemas.gen'
 import { withDisputeView } from '#/api/views'
-import { analystGet, analystPost, asAnalyst, parse, uuid } from '#/server/runtime/fn'
+import { authenticatedGet, authenticatedPost, asOutcome, parse, uuid } from '#/server/runtime/fn'
 
 export const DisputeListSearch = Type.Object({
   state: Type.Optional(DisputeState),
@@ -10,32 +10,32 @@ export const DisputeListSearch = Type.Object({
   overdue: Type.Optional(Type.Boolean()),
 })
 
-export const getDispute = analystGet
+export const getDispute = authenticatedGet
   .validator(parse(uuid))
   .handler(
-    asAnalyst((api, disputeId) =>
+    asOutcome((api, disputeId) =>
       withDisputeView(api.GET('/disputes/{disputeId}', { params: { path: { disputeId } } })),
     ),
   )
 
-export const listDisputes = analystGet
+export const listDisputes = authenticatedGet
   .validator(parse(DisputeListSearch))
-  .handler(asAnalyst((api, search) => api.GET('/disputes', { params: { query: search } })))
+  .handler(asOutcome((api, search) => api.GET('/disputes', { params: { query: search } })))
 
-export const openDispute = analystPost
+export const openDispute = authenticatedPost
   .validator(parse(CreateDisputeRequest))
   .handler(
-    asAnalyst((api, request) =>
+    asOutcome((api, request) =>
       withDisputeView(
         api.POST('/disputes', { body: request, headers: { 'Idempotency-Key': crypto.randomUUID() } }),
       ),
     ),
   )
 
-export const applyEvent = analystPost
+export const applyEvent = authenticatedPost
   .validator(parse(Type.Object({ disputeId: uuid, body: ApplyEventRequest })))
   .handler(
-    asAnalyst((api, { disputeId, body }) =>
+    asOutcome((api, { disputeId, body }) =>
       withDisputeView(
         api.POST('/disputes/{disputeId}/events', {
           params: { path: { disputeId } },

@@ -4,7 +4,6 @@ import type { Static } from '@sinclair/typebox'
 import { Value } from '@sinclair/typebox/value'
 import { useState } from 'react'
 
-import { classify } from '#/api/failure'
 import {
   CreateDisputeRequest,
   DisputeReason as DisputeReasonSchema,
@@ -36,7 +35,7 @@ const Workbench = () => {
   const search = Route.useSearch()
   const { state, cursor, overdue } = search
   const { viewer } = useRouteContext({ from: '__root__' })
-  const { data: disputePage } = useSuspenseQuery(disputesQuery(search))
+  const { data: loadedPage } = useSuspenseQuery(disputesQuery(search))
   const activeFilters = { ...(state ? { state } : {}), ...(overdue ? { overdue: true } : {}) }
   const navigate = useNavigate()
   const [clientFieldErrors, setClientFieldErrors] = useState<Record<string, string>>({})
@@ -108,17 +107,9 @@ const Workbench = () => {
             </Button>
           </form>
         </div>
-        {disputePage.problem ? (
-          <FailureBanner
-            failure={
-              classify({ error: disputePage.problem }) ?? {
-                kind: 'unexpected',
-                status: 0,
-                message: 'no data',
-              }
-            }
-          />
-        ) : disputePage.value && disputePage.value.items.length > 0 ? (
+        {loadedPage.failure ? (
+          <FailureBanner failure={loadedPage.failure} />
+        ) : loadedPage.value.items.length > 0 ? (
           <>
             <table className="w-full text-left text-sm">
               <thead className="text-neutral-500">
@@ -133,7 +124,7 @@ const Workbench = () => {
                 </tr>
               </thead>
               <tbody>
-                {disputePage.value.items.map((dispute) => (
+                {loadedPage.value.items.map((dispute) => (
                   <tr key={dispute.id} className="border-t border-neutral-200">
                     <td className="py-1 pr-4 font-mono">
                       <Link
@@ -179,11 +170,11 @@ const Workbench = () => {
                   Newest
                 </Link>
               )}
-              {disputePage.value.nextCursor && (
+              {loadedPage.value.nextCursor && (
                 <Link
                   to="/$tenant"
                   params={{ tenant }}
-                  search={{ ...activeFilters, cursor: disputePage.value.nextCursor }}
+                  search={{ ...activeFilters, cursor: loadedPage.value.nextCursor }}
                   className="underline"
                 >
                   Older

@@ -2,7 +2,7 @@ import { Type } from '@sinclair/typebox'
 
 import { ComposeEmailRequest } from '#/api/schemas.gen'
 import { withDisputeView } from '#/api/views'
-import { analystGet, analystPost, asAnalyst, parse, uuid } from '#/server/runtime/fn'
+import { authenticatedGet, authenticatedPost, asOutcome, parse, uuid } from '#/server/runtime/fn'
 
 const NoticeRef = Type.Object({ disputeId: uuid, noticeId: Type.Integer({ minimum: 1 }) })
 const AttachmentRef = Type.Object({ disputeId: uuid, attachmentId: uuid })
@@ -10,42 +10,42 @@ const AttachmentRef = Type.Object({ disputeId: uuid, attachmentId: uuid })
 type AttachmentBytes = { contentType: string; base64: string }
 type MultipartUpload = { file: File; disputeId: string }
 
-export const getNotice = analystGet
+export const getNotice = authenticatedGet
   .validator(parse(NoticeRef))
   .handler(
-    asAnalyst((api, noticeRef) =>
+    asOutcome((api, noticeRef) =>
       api.GET('/disputes/{disputeId}/notices/{noticeId}', { params: { path: noticeRef } }),
     ),
   )
 
-export const listEmailTemplates = analystGet
+export const listEmailTemplates = authenticatedGet
   .validator(parse(uuid))
   .handler(
-    asAnalyst((api, disputeId) =>
+    asOutcome((api, disputeId) =>
       api.GET('/disputes/{disputeId}/email-templates', { params: { path: { disputeId } } }),
     ),
   )
 
-export const composeEmail = analystPost
+export const composeEmail = authenticatedPost
   .validator(parse(Type.Object({ disputeId: uuid, body: ComposeEmailRequest })))
   .handler(
-    asAnalyst((api, { disputeId, body }) =>
+    asOutcome((api, { disputeId, body }) =>
       withDisputeView(api.POST('/disputes/{disputeId}/notices', { params: { path: { disputeId } }, body })),
     ),
   )
 
-export const resendNotice = analystPost
+export const resendNotice = authenticatedPost
   .validator(parse(NoticeRef))
   .handler(
-    asAnalyst((api, noticeRef) =>
+    asOutcome((api, noticeRef) =>
       withDisputeView(
         api.POST('/disputes/{disputeId}/notices/{noticeId}/resend', { params: { path: noticeRef } }),
       ),
     ),
   )
 
-export const getAttachment = analystGet.validator(parse(AttachmentRef)).handler(
-  asAnalyst(async (api, attachmentRef) => {
+export const getAttachment = authenticatedGet.validator(parse(AttachmentRef)).handler(
+  asOutcome(async (api, attachmentRef) => {
     const response = await api.GET('/disputes/{disputeId}/attachments/{attachmentId}', {
       params: { path: attachmentRef },
       parseAs: 'blob',
@@ -69,8 +69,8 @@ const multipartUpload = (input: unknown): MultipartUpload => {
   return { file, disputeId: parse(uuid)(disputeId) }
 }
 
-export const uploadAttachment = analystPost.validator(multipartUpload).handler(
-  asAnalyst((api, { file, disputeId }) => {
+export const uploadAttachment = authenticatedPost.validator(multipartUpload).handler(
+  asOutcome((api, { file, disputeId }) => {
     const multipart = new FormData()
     multipart.append('file', file, file.name)
     return api.POST('/disputes/{disputeId}/attachments', {
