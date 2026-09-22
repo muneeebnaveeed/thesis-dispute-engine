@@ -230,6 +230,59 @@
           "legendFormat": "{{outcome}}"
         }
       ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Event loop delay (p99) and utilisation",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nodejs_eventloop_delay_p99_seconds{service_name=\"dispute-workbench\"}",
+          "legendFormat": "delay p99 (s)"
+        },
+        {
+          "refId": "B",
+          "expr": "nodejs_eventloop_utilization_ratio{service_name=\"dispute-workbench\"}",
+          "legendFormat": "utilisation"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Heap used",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 30,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "v8js_memory_heap_used_bytes{service_name=\"dispute-workbench\"}",
+          "legendFormat": "heap used"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      }
     }
   ],
   "description": "The frontend server (dispute-workbench) and the asynchronous tail of a request: outbox deliveries. Provisioned from deploy/grafana/dashboards/workbench.json."

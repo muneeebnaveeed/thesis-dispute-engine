@@ -6,7 +6,7 @@ import {
   ATTR_URL_PATH,
 } from '@opentelemetry/semantic-conventions'
 
-import { meter, tracer } from './sdk'
+import { SECONDS_BUCKETS, meter, tracer } from './sdk'
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
 
@@ -20,6 +20,7 @@ const requestDuration = () =>
   meter().createHistogram('http.server.request.duration', {
     unit: 's',
     description: 'Time to answer an HTTP request at the workbench server',
+    advice: { explicitBucketBoundaries: SECONDS_BUCKETS },
   })
 
 // one server span per HTTP request, continuing an incoming traceparent (a browser never sends one, a probe might)

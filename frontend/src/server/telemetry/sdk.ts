@@ -1,5 +1,6 @@
 import { metrics, trace, type Meter, type Tracer } from '@opentelemetry/api'
 import { logs, type Logger } from '@opentelemetry/api-logs'
+import { RuntimeNodeInstrumentation } from '@opentelemetry/instrumentation-runtime-node'
 import { UndiciInstrumentation } from '@opentelemetry/instrumentation-undici'
 import { resourceFromAttributes } from '@opentelemetry/resources'
 import { NodeSDK } from '@opentelemetry/sdk-node'
@@ -32,13 +33,21 @@ export const startTelemetry = (): void => {
       [ATTR_SERVICE_VERSION]: process.env.APP_VERSION ?? 'dev',
       'host.name': hostname(),
     }),
-    instrumentations: [new UndiciInstrumentation({ requireParentforSpans: true, startSpanHook: maskedUrl })],
+    instrumentations: [
+      new UndiciInstrumentation({ requireParentforSpans: true, startSpanHook: maskedUrl }),
+      // event loop delay and utilisation, heap: the answer to "is the workbench itself slow"
+      new RuntimeNodeInstrumentation(),
+    ],
   })
   started.start()
   const stop = () => void started?.shutdown().catch(() => undefined)
   process.once('SIGTERM', stop)
   process.once('SIGINT', stop)
 }
+
+// the JS SDK's default histogram buckets are meant for milliseconds; these are the API's, in seconds, so the two
+// services' latency panels compare like for like
+export const SECONDS_BUCKETS = [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 10]
 
 export const tracer = (): Tracer => trace.getTracer(SCOPE)
 export const meter = (): Meter => metrics.getMeter(SCOPE)

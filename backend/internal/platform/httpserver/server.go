@@ -28,6 +28,8 @@ func New(addr string, logger *slog.Logger, mux http.Handler, extra ...Middleware
 		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
 			return r.Method + " (unmatched)"
 		}),
+		// a health check is a heartbeat, not a request anyone will look for in a trace
+		otelhttp.WithFilter(func(r *http.Request) bool { return r.URL.Path != "/healthz" }),
 	)
 
 	return &Server{

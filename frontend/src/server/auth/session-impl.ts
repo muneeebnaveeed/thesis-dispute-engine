@@ -151,12 +151,15 @@ const toTokens = (granted: client.TokenEndpointResponse): NonNullable<store.Sess
   }
 }
 
-export const accessTokenForRequest = async (): Promise<string | null> => {
+export type RequestCredential = { token: string; tenantSlug: string }
+
+export const accessTokenForRequest = async (): Promise<RequestCredential | null> => {
   const live = await signedInSession()
   const tokens = live?.session.tokens
   if (!live || !tokens) return null
+  const tenantSlug = live.session.tenantSlug
   const stillValidFor = Date.parse(tokens.accessExpiresAt) - Date.now()
-  if (stillValidFor > REFRESH_AHEAD_MILLIS) return tokens.access
+  if (stillValidFor > REFRESH_AHEAD_MILLIS) return { token: tokens.access, tenantSlug }
   if (!tokens.refresh) return null
   try {
     const config = await realmConfig(live.session.tenantSlug)
@@ -166,7 +169,7 @@ export const accessTokenForRequest = async (): Promise<string | null> => {
       { ...live.session, tokens: { ...fresh, id: fresh.id ?? tokens.id } },
       serverEnv().sessionTtlSeconds,
     )
-    return fresh.access
+    return { token: fresh.access, tenantSlug }
   } catch {
     // refresh token dead (idle timeout, revoked): the session is over
     log.warn('session ended: refresh refused', { tenant: live.session.tenantSlug })

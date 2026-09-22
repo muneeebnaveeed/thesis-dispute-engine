@@ -8,7 +8,9 @@ import (
 	"os"
 
 	"go.opentelemetry.io/contrib/exporters/autoexport"
+	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/log/global"
 	"go.opentelemetry.io/otel/propagation"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
@@ -46,7 +48,7 @@ func Setup(ctx context.Context, logger *slog.Logger) (Shutdown, error) {
 
 	shutdowns := make([]Shutdown, 0, 3)
 	tracerOpts := []sdktrace.TracerProviderOption{sdktrace.WithResource(res)}
-	meterOpts := []metric.Option{metric.WithResource(res)}
+	meterOpts := []metric.Option{metric.WithResource(res), metric.WithView(views()...)}
 	logOpts := []sdklog.LoggerProviderOption{sdklog.WithResource(res)}
 
 	if exportEnabled() {
@@ -83,6 +85,9 @@ func Setup(ctx context.Context, logger *slog.Logger) (Shutdown, error) {
 	mp := metric.NewMeterProvider(meterOpts...)
 	otel.SetMeterProvider(mp)
 	shutdowns = append(shutdowns, mp.Shutdown)
+	if err := runtime.Start(runtime.WithMeterProvider(mp)); err != nil {
+		return nil, err
+	}
 
 	lp := sdklog.NewLoggerProvider(logOpts...)
 	global.SetLoggerProvider(lp)
@@ -95,6 +100,18 @@ func Setup(ctx context.Context, logger *slog.Logger) (Shutdown, error) {
 		}
 		return errors.Join(errs...)
 	}, nil
+}
+
+// views trim what otelhttp emits by default: the request histogram keeps the three labels dashboards query by,
+// the constant ones (protocol, scheme, listening address) would only multiply series, and the body-size
+// histograms answer no question anyone has asked of this service.
+func views() []metric.View {
+	keep := attribute.NewAllowKeysFilter("http.request.method", "http.route", "http.response.status_code")
+	return []metric.View{
+		metric.NewView(metric.Instrument{Name: "http.server.request.duration"}, metric.Stream{AttributeFilter: keep}),
+		metric.NewView(metric.Instrument{Name: "http.server.request.body.size"}, metric.Stream{Aggregation: metric.AggregationDrop{}}),
+		metric.NewView(metric.Instrument{Name: "http.server.response.body.size"}, metric.Stream{Aggregation: metric.AggregationDrop{}}),
+	}
 }
 
 // SpanIDs returns the current trace and span IDs for log correlation, or empty strings.

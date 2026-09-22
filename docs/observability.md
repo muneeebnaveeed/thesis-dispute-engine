@@ -37,6 +37,13 @@ Metrics (OTel names; Prometheus flattens dots to underscores and adds `_total` t
 | `dispute.notices_sent` | counter | `kind`, `outcome` | every outbox attempt handed to the mailer: `sent`, `failed`, `render-failed` |
 | `dispute.notice_delivery_delay` | histogram | `kind`, `outcome` | seconds from a notice being queued to the relay accepting it |
 | `dispute.outbox_backlog` | gauge | | emails queued and not yet sent, read from Postgres on each scrape |
+| `go.*` | runtime | | goroutines, memory used, GC goal, allocations (contrib runtime instrumentation) |
+| `db.client.operation.duration` | histogram | `pgx.operation_type` | every pgx operation (otelpgx) |
+
+`http.server.request.duration` on the API keeps only `http.request.method`, `http.route` and
+`http.response.status_code` (a metric view drops otelhttp's constant protocol and address labels), and the
+request and response body-size histograms are dropped. Health checks (`/healthz`) are neither traced nor
+counted.
 
 Signals the workbench server emits (`service_name="dispute-workbench"`):
 
@@ -44,6 +51,10 @@ Signals the workbench server emits (`service_name="dispute-workbench"`):
 | --- | --- | --- | --- |
 | `http.server.request.duration` | histogram | `http.request.method`, `http.route`, `http.response.status_code` | every request the frontend server answers; `http.route` has ids masked (`/otp/disputes/:id`) and every RPC is `/_serverFn/:fn` |
 | `workbench.server_fn.duration` | histogram | `workbench.server_fn`, `workbench.outcome` | one series per server function; outcome is `ok`, the API's problem code, `sign-in` (session gone) or `threw` |
+| `nodejs.eventloop.*`, `v8js.*` | runtime | | event loop delay percentiles and utilisation, heap, GC (runtime-node instrumentation) |
+
+Both duration histograms use the API's bucket boundaries in seconds, so the two services' latency panels
+compare like for like; a server function span also carries `tenant.slug` once the session is known.
 
 Traces, from the browser inwards: the workbench's server span per request (`GET /otp/disputes/:id`,
 `POST /_serverFn/:fn`), one span per server function it runs (`serverFn applyEvent`, with the outcome as
@@ -51,7 +62,8 @@ an attribute), an undici client span per call to the API or Keycloak (`url.full`
 session id never reaches a trace), then the API's server span named by route (`POST
 /disputes/{disputeId}/events`) with `auth.authenticate` (credential kind, accepted) and
 `ratelimit.bump` (count, limit) under it, an application span per use case (`dispute.apply_event`),
-and one `otelpgx` span per statement named after the sqlc query. `traceparent` crosses the workbench-to-API
+and one `otelpgx` span per statement named after the sqlc query (pool acquisition spans and the SQL text are off:
+microseconds and static text that only bulked traces up). `traceparent` crosses the workbench-to-API
 hop automatically. Work that outlives the request is its own trace, linked: every notice row stores
 the queuing request's traceparent, and the dispatcher's `notice.deliver` span (kind, attempt, outcome)
 carries a link to it and a child `smtp.send` span for the relay.
@@ -70,6 +82,8 @@ refused or threw, each with the active trace's ids and never a token or a body. 
   Tempo with `{ resource.service.name = "dispute-engine" && duration > 500ms }`.
 - What happened to dispute X: Explore > Loki `{service_name="dispute-engine"} |= "<disputeId>"`,
   then follow the `trace_id` link on a line.
+- Housekeeping sweeps (idempotency keys, rate windows, web sessions, draft attachments) log at INFO only
+  when they removed something; an idle system is quiet at INFO.
 - Which errors are clients hitting: dashboard "Problems by code" panel, or
   `sum by (code) (rate(http_server_problems_total[5m]))`.
 - Are transitions being rejected: `sum by (code) (increase(http_server_problems_total{status="409"}[1h]))`.

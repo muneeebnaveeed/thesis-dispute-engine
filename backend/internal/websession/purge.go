@@ -22,7 +22,12 @@ func RunPurge(ctx context.Context, store *Store, log *slog.Logger) {
 		case err != nil && ctx.Err() == nil:
 			log.Warn("web session purge", "err", err)
 		case n > 0:
-			log.Info("web session purge", "deleted", n)
+			// a sweep that removed nothing is the normal case and not worth a line at INFO
+			level := slog.LevelDebug
+			if n > 0 {
+				level = slog.LevelInfo
+			}
+			log.Log(ctx, level, "web session purge", "deleted", n)
 		}
 	}
 }

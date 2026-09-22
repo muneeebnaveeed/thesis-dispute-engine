@@ -22,8 +22,11 @@ func Connect(ctx context.Context, url string) (*pgxpool.Pool, error) {
 
 // ConnectWithConfig is Connect for a caller-built config (tests set search_path on it).
 func ConnectWithConfig(ctx context.Context, cfg *pgxpool.Config) (*pgxpool.Pool, error) {
-	// Every statement becomes a child span of the request; values are never recorded.
-	cfg.ConnConfig.Tracer = otelpgx.NewTracer(otelpgx.WithSpanNameFunc(spanName))
+	// Every statement becomes a child span of the request; values are never recorded. Pool acquisition spans are
+	// off (a quarter of all spans, microseconds each) and the SQL text too: the span name is the sqlc query name,
+	// which is the text's address.
+	cfg.ConnConfig.Tracer = otelpgx.NewTracer(otelpgx.WithSpanNameFunc(spanName), otelpgx.WithDisableAcquireTracer(),
+		otelpgx.WithDisableSQLStatementInAttributes())
 	cfg.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
 		pgxdecimal.Register(conn.TypeMap())
 		return nil
