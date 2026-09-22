@@ -19,6 +19,6 @@ Rules while writing:
 
 - Every claim about behaviour points at a test, a figure or a number in `data/`.
 - No page explains a tool; a paragraph may say why a tool was chosen (that is a decision).
-- Chapter 4 and 5 are the 20 to 25 pages the supervisor asked for; protect them.
+- Chapter 4 and 5 are the 20 to 25 pages the brief asks for on the application; protect them.
 - Each ADR becomes at most one subsection: context in one paragraph, decision, consequences.
 - Figures carry the argument in 4 to 6; see `figures.md` for what exists and what is missing.
