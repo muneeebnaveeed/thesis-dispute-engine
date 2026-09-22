@@ -53,7 +53,8 @@ Signals the workbench server emits (`service_name="dispute-workbench"`):
 | `workbench.server_fn.duration` | histogram | `workbench.server_fn`, `workbench.outcome` | one series per server function; outcome is `ok`, the API's problem code, `sign-in` (session gone) or `threw` |
 | `nodejs.eventloop.*`, `v8js.*` | runtime | | event loop delay percentiles and utilisation, heap, GC (runtime-node instrumentation) |
 
-Both duration histograms use the API's bucket boundaries in seconds, so the two services' latency panels
+Both duration histograms use one set of bucket boundaries in seconds (`telemetry.LatencyBuckets`, from 1 ms
+up; otelhttp's default starts at 5 ms, above most of this API's reads), so the two services' latency panels
 compare like for like; a server function span also carries `tenant.slug` once the session is known.
 
 Traces, from the browser inwards: the workbench's server span per request (`GET /otp/disputes/:id`,
@@ -95,6 +96,13 @@ refused or threw, each with the active trace's ids and never a token or a body. 
   span.notice.outcome != "sent" }` for the ones that did not.
 - Is the outbox draining: Workbench dashboard "Outbox backlog" and "Notice delivery delay p95"; the
   alert fires when more than 20 emails have waited for 10 minutes.
+
+## Load
+
+`make eval` (docs/thesis/evaluation.md) is the load generator: paced dispute lifecycles through the API with a
+tenant key and, with `EVAL_WORKBENCH`, server-rendered pages through the workbench as a signed-in analyst,
+then the run's numbers read back from Prometheus into `docs/thesis/data/<date>/load.json`. It is the quickest
+way to see every panel on both dashboards move at once.
 
 ## Synthetic traffic
 

@@ -107,12 +107,19 @@ func Setup(ctx context.Context, logger *slog.Logger) (Shutdown, error) {
 // histograms answer no question anyone has asked of this service.
 func views() []metric.View {
 	keep := attribute.NewAllowKeysFilter("http.request.method", "http.route", "http.response.status_code")
+	// otelhttp's first bucket is 5 ms and most of this API's reads finish under it; the finer low end is what
+	// separates a 1 ms read from a 4 ms one in a percentile
+	latency := metric.AggregationExplicitBucketHistogram{Boundaries: LatencyBuckets}
 	return []metric.View{
-		metric.NewView(metric.Instrument{Name: "http.server.request.duration"}, metric.Stream{AttributeFilter: keep}),
+		metric.NewView(metric.Instrument{Name: "http.server.request.duration"}, metric.Stream{AttributeFilter: keep, Aggregation: latency}),
 		metric.NewView(metric.Instrument{Name: "http.server.request.body.size"}, metric.Stream{Aggregation: metric.AggregationDrop{}}),
 		metric.NewView(metric.Instrument{Name: "http.server.response.body.size"}, metric.Stream{Aggregation: metric.AggregationDrop{}}),
 	}
 }
+
+// LatencyBuckets are the request-duration histogram boundaries in seconds, shared with the workbench so the two
+// services' percentiles compare like for like.
+var LatencyBuckets = []float64{0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10}
 
 // SpanIDs returns the current trace and span IDs for log correlation, or empty strings.
 func SpanIDs(ctx context.Context) (traceID, spanID string) {
