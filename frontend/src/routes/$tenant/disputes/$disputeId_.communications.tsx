@@ -176,8 +176,8 @@ export const Route = createFileRoute('/$tenant/disputes/$disputeId_/communicatio
   validateSearch: (s: Record<string, unknown>): { tab?: Tab } => (s.tab === 'sent' ? { tab: 'sent' } : {}),
   loader: ({ params, context }) =>
     Promise.all([
-      context.queryClient.ensureQueryData(disputeQuery(params.disputeId)),
-      context.queryClient.ensureQueryData(emailTemplatesQuery(params.disputeId)),
+      context.queryClient.query({ ...disputeQuery(params.disputeId), staleTime: 'static' }),
+      context.queryClient.query({ ...emailTemplatesQuery(params.disputeId), staleTime: 'static' }),
     ]),
   component: CommunicationsPage,
 })

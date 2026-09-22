@@ -38,9 +38,9 @@ lint and format fixes. `make fe-dev` for the dev server on :3002. Inside `fronte
 - Reads are `queryOptions` in `src/queries/index.ts`, one per server function, and they are the
   only source of key truth: `disputeQuery(id).queryKey` is `['disputes', id]`, and the null form
   `disputeQuery(null).queryKey` is the `['disputes']` prefix for invalidation. Do not keep a
-  separate map of keys.
-  Loaders `ensureQueryData`, components `useSuspenseQuery`; the router dehydrates the cache for SSR
-  (`src/router.tsx`). Writes go through `useServerMutation(fn, { invalidates })`.
+  separate map of keys. Loaders load with `queryClient.query({ ...options, staleTime: 'static' })`
+  (`ensureQueryData` is deprecated), components `useSuspenseQuery`; the router dehydrates the cache
+  for SSR (`src/router.tsx`). Writes go through `useServerMutation(fn, { invalidates })`.
 - Style: const arrow functions everywhere (oxlint `func-style` rejects `function` declarations;
   for overloads use a const with a call-signature type). Compose classes with `cn` from
   `#/lib/cn`, variants with `cva` in `src/components/ui/`. Define components first and

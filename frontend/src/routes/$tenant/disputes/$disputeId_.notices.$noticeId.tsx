@@ -63,6 +63,9 @@ const NoticePage = () => {
 
 export const Route = createFileRoute('/$tenant/disputes/$disputeId_/notices/$noticeId')({
   loader: ({ params, context }) =>
-    context.queryClient.ensureQueryData(noticeQuery(params.disputeId, Number(params.noticeId))),
+    context.queryClient.query({
+      ...noticeQuery(params.disputeId, Number(params.noticeId)),
+      staleTime: 'static',
+    }),
   component: NoticePage,
 })

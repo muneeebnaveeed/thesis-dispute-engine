@@ -240,6 +240,7 @@ const Field = ({ label, value, mono = false }: { label: string; value: string; m
 
 // First paint comes from the server with the session's token; actions go straight from the browser to the API.
 export const Route = createFileRoute('/$tenant/disputes/$disputeId')({
-  loader: ({ params, context }) => context.queryClient.ensureQueryData(disputeQuery(params.disputeId)),
+  loader: ({ params, context }) =>
+    context.queryClient.query({ ...disputeQuery(params.disputeId), staleTime: 'static' }),
   component: DisputePage,
 })

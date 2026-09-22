@@ -100,6 +100,6 @@ const TemplatesPage = () => {
 }
 
 export const Route = createFileRoute('/$tenant/templates')({
-  loader: ({ context }) => context.queryClient.ensureQueryData(tenantTemplatesQuery()),
+  loader: ({ context }) => context.queryClient.query({ ...tenantTemplatesQuery(), staleTime: 'static' }),
   component: TemplatesPage,
 })

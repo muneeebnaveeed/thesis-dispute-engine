@@ -179,6 +179,6 @@ const KeyTable = ({
 
 // Tenant admins manage the keys their own systems use; the secret is shown exactly once.
 export const Route = createFileRoute('/$tenant/keys')({
-  loader: ({ context }) => context.queryClient.ensureQueryData(tenantKeysQuery()),
+  loader: ({ context }) => context.queryClient.query({ ...tenantKeysQuery(), staleTime: 'static' }),
   component: KeysPage,
 })

@@ -268,6 +268,6 @@ export const Route = createFileRoute('/$tenant/')({
     ...(s.overdue === true || s.overdue === 'true' ? { overdue: true } : {}),
   }),
   loaderDeps: ({ search }) => search,
-  loader: ({ deps, context }) => context.queryClient.ensureQueryData(disputesQuery(deps)),
+  loader: ({ deps, context }) => context.queryClient.query({ ...disputesQuery(deps), staleTime: 'static' }),
   component: Workbench,
 })

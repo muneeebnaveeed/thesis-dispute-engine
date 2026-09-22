@@ -57,7 +57,8 @@ API client as `context.api`; each function validates its input with a TypeBox sc
 problem+json answer.
 
 Reads are TanStack Query options in `src/queries/index.ts`, one per server function; route loaders
-`ensureQueryData` them, components `useSuspenseQuery` them, and `src/router.tsx` wires
+load them with `queryClient.query({ ...options, staleTime: 'static' })` (`ensureQueryData` is
+deprecated), components `useSuspenseQuery` them, and `src/router.tsx` wires
 `@tanstack/react-router-ssr-query` so the cache filled during SSR is dehydrated into the page and
 the browser refetches through the same server functions. The options are the only source of key
 truth: pass `null` for the identifying argument to get the invalidation prefix
