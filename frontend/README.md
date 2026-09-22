@@ -72,8 +72,8 @@ invalidates the prefixes the caller names.
 ## Components
 
 `src/components/shadcn/` is vendored from the shadcn registry (`components.json`: radix base, nova
-preset, Tailwind v4 tokens in `src/styles.css`); add to it with
-`pnpm dlx shadcn@latest add <component>`, which needs an interactive terminal. It is upstream code and
+preset, phosphor icons, Tailwind v4 tokens in `src/styles.css`); add to it with `pnpm shadcn add
+<component>`, a wrapper that normalises the imports the CLI writes against our alias. It is upstream code and
 is kept that way. `src/components/ui/` is our own design system on top of it, and it is what pages
 import; `src/components/{layout,disputes,comms}/` are the application components.
 

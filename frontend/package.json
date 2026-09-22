@@ -22,6 +22,7 @@
     "test:watch": "vitest",
     "generate": "node scripts/generate-api.ts && oxfmt src/api",
     "generate:check": "bash scripts/generate-check.sh",
+    "shadcn": "node scripts/shadcn.ts",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui"
   },
@@ -34,6 +35,7 @@
     "@opentelemetry/resources": "^2.11.0",
     "@opentelemetry/sdk-node": "^0.222.0",
     "@opentelemetry/semantic-conventions": "^1.43.0",
+    "@phosphor-icons/react": "^2.1.10",
     "@sinclair/typebox": "^0.34.52",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-form": "^1.33.5",
@@ -44,7 +46,6 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "jose": "^6.2.12",
-    "lucide-react": "^1.47.0",
     "nitro": "3.0.260610-beta",
     "openapi-fetch": "^0.17.0",
     "openid-client": "^6.8.8",
