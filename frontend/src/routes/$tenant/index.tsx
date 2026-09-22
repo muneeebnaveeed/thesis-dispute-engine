@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { classify, type Failure } from '#/api/failure'
 import { CreateDisputeRequest } from '#/api/schemas.gen'
 import { AppShell } from '#/components/app-shell'
+import { formatMoney } from '#/money'
 import { DeadlineBadge, remaining } from '#/components/deadlines'
 import { RiskBadge } from '#/components/risk'
 import { FailureBanner, FieldError } from '#/components/failure-banner'
@@ -152,9 +153,7 @@ function Workbench() {
                     </td>
                     <td className="py-1 pr-4 font-mono">{d.state}</td>
                     <td className="py-1 pr-4 font-mono">{d.regime}</td>
-                    <td className="py-1 pr-4">
-                      {d.disputedAmount} {d.currency}
-                    </td>
+                    <td className="py-1 pr-4">{formatMoney(d.disputedAmount, d.currency)}</td>
                     <td className="py-1 pr-4">
                       {d.riskTier ? (
                         <RiskBadge tier={d.riskTier} score={d.riskScore} />

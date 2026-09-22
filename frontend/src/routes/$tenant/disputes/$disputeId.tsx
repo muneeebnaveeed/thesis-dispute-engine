@@ -5,6 +5,7 @@ import { createBrowserApi } from '#/api/browser'
 import { call } from '#/api/call'
 import { classify, type Failure } from '#/api/failure'
 import { AppShell } from '#/components/app-shell'
+import { formatMoney } from '#/money'
 import { Deadlines } from '#/components/deadlines'
 import { EventLog } from '#/components/event-log'
 import { FailureBanner, FieldError } from '#/components/failure-banner'
@@ -97,7 +98,7 @@ function DisputePage() {
         <Field label="State" value={d.state} mono />
         <Field label="Regime" value={d.regime} mono />
         <Field label="Reason" value={d.reason} mono />
-        <Field label="Amount" value={`${d.disputedAmount} ${d.currency}`} />
+        <Field label="Amount" value={formatMoney(d.disputedAmount, d.currency)} />
         <Field label="Appeals used" value={String(d.appeals)} />
       </dl>
 

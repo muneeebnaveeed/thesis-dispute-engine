@@ -762,7 +762,7 @@ components:
         kind: { $ref: "#/components/schemas/PostingKind" }
         debit: { $ref: "#/components/schemas/LedgerAccount" }
         credit: { $ref: "#/components/schemas/LedgerAccount" }
-        amount: { type: string, description: Decimal as a string; never a float. }
+        amount: { type: string, description: Decimal as a string at the currency's minor unit; never a float. }
         currency: { type: string, minLength: 3, maxLength: 3 }
         reference: { type: string, description: Unique per posting; what the banking core is told. }
         postedAt: { type: string, format: date-time }
@@ -806,7 +806,7 @@ components:
         reason: { $ref: "#/components/schemas/DisputeReason" }
         state: { $ref: "#/components/schemas/DisputeState" }
         transactionId: { type: string, format: uuid }
-        disputedAmount: { type: string, description: Decimal as a string; never a float. }
+        disputedAmount: { type: string, description: Decimal as a string at the currency's minor unit; never a float. }
         currency: { type: string, minLength: 3, maxLength: 3 }
         openedAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -835,7 +835,7 @@ components:
         version: { type: integer, format: int64 }
         transactionId: { type: string, format: uuid }
         accountId: { type: string, format: uuid }
-        disputedAmount: { type: string, description: "Decimal as a string; never a float.", example: "125.4000" }
+        disputedAmount: { type: string, description: "Decimal as a string at the currency's minor unit; never a float.", example: "125.40" }
         currency: { type: string, minLength: 3, maxLength: 3 }
         openedAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }

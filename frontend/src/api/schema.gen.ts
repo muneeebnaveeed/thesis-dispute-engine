@@ -550,7 +550,7 @@ export type components = {
       kind: components['schemas']['PostingKind']
       debit: components['schemas']['LedgerAccount']
       credit: components['schemas']['LedgerAccount']
-      /** @description Decimal as a string; never a float. */
+      /** @description Decimal as a string at the currency's minor unit; never a float. */
       amount: string
       currency: string
       /** @description Unique per posting; what the banking core is told. */
@@ -597,7 +597,7 @@ export type components = {
       state: components['schemas']['DisputeState']
       /** Format: uuid */
       transactionId: string
-      /** @description Decimal as a string; never a float. */
+      /** @description Decimal as a string at the currency's minor unit; never a float. */
       disputedAmount: string
       currency: string
       /** Format: date-time */
@@ -628,8 +628,8 @@ export type components = {
       /** Format: uuid */
       accountId: string
       /**
-       * @description Decimal as a string; never a float.
-       * @example 125.4000
+       * @description Decimal as a string at the currency's minor unit; never a float.
+       * @example 125.40
        */
       disputedAmount: string
       currency: string
