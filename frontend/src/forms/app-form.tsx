@@ -3,7 +3,7 @@ import type { ComponentProps, FormEvent, InputHTMLAttributes, ReactNode } from '
 
 import { Button } from '#/components/ui/button'
 import { FieldError, inputVariants } from '#/components/ui/field'
-import { cn } from '#/lib/cn'
+import { cn } from '#/lib/utils'
 import { asFieldErrors } from '#/queries/use-server-mutation'
 
 const { fieldContext, formContext, useFieldContext, useFormContext } = createFormHookContexts()

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { describe, reference, retryAfter, type Failure } from '#/api/failure'
 import { Button } from '#/components/ui/button'
-import { cn } from '#/lib/cn'
+import { cn } from '#/lib/utils'
 
 export const FailureBanner = ({ failure, onRetry }: { failure: Failure; onRetry?: () => void }) => {
   const { title, hint } = describe(failure)

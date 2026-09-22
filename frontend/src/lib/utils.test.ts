@@ -1,4 +1,4 @@
-import { cn } from './cn'
+import { cn } from './utils'
 
 test('merges conditionals and resolves Tailwind conflicts in favour of the last class', () => {
   const hidden = false as boolean

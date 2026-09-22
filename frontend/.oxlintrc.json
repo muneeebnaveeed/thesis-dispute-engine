@@ -58,6 +58,14 @@
         "typescript/no-unsafe-type-assertion": "off",
         "eslint/no-await-in-loop": "off"
       }
+    },
+    {
+      "files": ["src/components/shadcn/**"],
+      "rules": {
+        "func-style": "off",
+        "react/no-array-index-key": "off",
+        "jsx-a11y/prefer-tag-over-role": "off"
+      }
     }
   ]
 }

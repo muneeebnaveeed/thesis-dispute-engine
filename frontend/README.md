@@ -69,6 +69,14 @@ truth: pass `null` for the identifying argument to get the invalidation prefix
 (`src/queries/use-server-mutation.ts`), which maps the outcome onto the failure taxonomy of docs/adr/0012 and
 invalidates the prefixes the caller names.
 
+## Components
+
+`src/components/shadcn/` is vendored from the shadcn registry (`components.json`: radix base, nova
+preset, Tailwind v4 tokens in `src/styles.css`); add to it with
+`pnpm dlx shadcn@latest add <component>`, which needs an interactive terminal. It is upstream code and
+is kept that way. `src/components/ui/` is our own design system on top of it, and it is what pages
+import; `src/components/{layout,disputes,comms}/` are the application components.
+
 ## Forms
 
 TanStack Form through `useAppForm` (`src/forms/app-form.tsx`): bound field components carry the

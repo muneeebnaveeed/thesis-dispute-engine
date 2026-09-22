@@ -2,7 +2,7 @@ import { Link, useRouteContext, useRouter } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 
 import { Button, buttonVariants } from '#/components/ui/button'
-import { cn } from '#/lib/cn'
+import { cn } from '#/lib/utils'
 import { logout } from '#/server/functions/session'
 
 const navLinkClass = cn(buttonVariants({ variant: 'link', size: 'bare' }), 'mr-3')
