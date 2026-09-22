@@ -1079,3 +1079,14 @@ func (h *Handler) SuggestSearchFilters(ctx context.Context, req oapi.SuggestSear
 	out.Overdue = filters.Overdue
 	return oapi.SuggestSearchFilters200JSONResponse(out), nil
 }
+
+// SuggestDisputeReason reads a customer's words as one of the four reasons, for the analyst to confirm.
+func (h *Handler) SuggestDisputeReason(ctx context.Context, req oapi.SuggestDisputeReasonRequestObject) (oapi.SuggestDisputeReasonResponseObject, error) {
+	proposal := h.svc.SuggestDisputeReason(ctx, req.Body.Description)
+	var out oapi.DisputeReasonSuggestion
+	if proposal.Confident {
+		reason := oapi.DisputeReason(proposal.Reason)
+		out.Reason, out.Probability = &reason, &proposal.Probability
+	}
+	return oapi.SuggestDisputeReason200JSONResponse(out), nil
+}

@@ -397,6 +397,29 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+  /suggestions/dispute-reason:
+    post:
+      operationId: suggestDisputeReason
+      summary: Read what a customer wrote as a dispute reason
+      description: >
+        A convenience, never a decision. The reason comes back only when the model is sure enough, and the
+        analyst confirms it before a dispute is opened; the description is read and not stored, so the
+        record still holds only what a person chose.
+      tags: [suggestions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DisputeReasonSuggestionRequest" }
+      responses:
+        "200":
+          description: The reason the description appears to describe, absent when the model was unsure
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DisputeReasonSuggestion" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /tenant:
     get:
       operationId: getTenant
@@ -793,6 +816,28 @@ components:
     Regime:
       type: string
       enum: [EU_SEPA_DIRECT_DEBIT, EU_PSD2_CARD, US_REG_E, US_REG_Z]
+    DisputeReasonSuggestionRequest:
+      type: object
+      required: [description]
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: What the customer said, in any language.
+      additionalProperties: false
+    DisputeReasonSuggestion:
+      type: object
+      description: An absent reason means the model was not sure enough to offer one.
+      properties:
+        reason: { $ref: "#/components/schemas/DisputeReason" }
+        probability:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          description: How sure the model was, recorded with the dispute when the analyst accepts it.
+      additionalProperties: false
     SearchFilterSuggestionRequest:
       type: object
       required: [query]

@@ -35,6 +35,44 @@ func reasonOptions() map[string]string {
 	return out
 }
 
+// ReasonProposal is a reason the model offered and how sure it was. Confident is false when it offered
+// nothing, which is the normal case for prose that does not clearly describe one of the four.
+type ReasonProposal struct {
+	Reason      domain.Reason
+	Probability float64
+	Confident   bool
+}
+
+// SuggestDisputeReason reads what a customer wrote as one of the four reasons. The description is read and
+// not stored: the record holds the reason a person chose, never the prose the machine read (ADR 0024).
+func (s *Service) SuggestDisputeReason(ctx context.Context, description string) ReasonProposal {
+	answer, ok := Propose(ctx, s.decisions, map[string]string{"complaint": description}, "reason", Question{
+		Kind:    KindChoice,
+		Ask:     "Why is the customer disputing this payment?",
+		Options: intakeOptions(),
+	})
+	if !ok || answer.Value == noneOption {
+		return ReasonProposal{}
+	}
+	reason, err := domain.ParseReason(answer.Value)
+	if err != nil {
+		return ReasonProposal{}
+	}
+	return ReasonProposal{Reason: reason, Probability: answer.Probability, Confident: true}
+}
+
+// noneOption is how the model says the text describes no dispute at all. Without it a forced choice makes
+// something up: "I have a question about my account" came back as an unauthorised payment, confidently.
+const noneOption = "none"
+
+func intakeOptions() map[string]string {
+	out := map[string]string{noneOption: "the text does not describe a disputed payment at all"}
+	for _, r := range domain.AllReasons() {
+		out[string(r)] = domain.ReasonMeaning(r)
+	}
+	return out
+}
+
 // SuggestSearchFilters reads a sentence as filters. It asks all three questions in one pass, which is what
 // the model is for, and returns only the answers that cleared the confidence gate (ADR 0024).
 func (s *Service) SuggestSearchFilters(ctx context.Context, query string) SearchFilters {

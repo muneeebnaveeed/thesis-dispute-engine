@@ -264,6 +264,26 @@ export type paths = {
     patch?: never
     trace?: never
   }
+  '/suggestions/dispute-reason': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Read what a customer wrote as a dispute reason
+     * @description A convenience, never a decision. The reason comes back only when the model is sure enough, and the analyst confirms it before a dispute is opened; the description is read and not stored, so the record still holds only what a person chose.
+     */
+    post: operations['suggestDisputeReason']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/tenant': {
     parameters: {
       query?: never
@@ -552,6 +572,19 @@ export type components = {
     }
     /** @enum {string} */
     Regime: 'EU_SEPA_DIRECT_DEBIT' | 'EU_PSD2_CARD' | 'US_REG_E' | 'US_REG_Z'
+    DisputeReasonSuggestionRequest: {
+      /** @description What the customer said, in any language. */
+      description: string
+    }
+    /** @description An absent reason means the model was not sure enough to offer one. */
+    DisputeReasonSuggestion: {
+      reason?: components['schemas']['DisputeReason']
+      /**
+       * Format: double
+       * @description How sure the model was, recorded with the dispute when the analyst accepts it.
+       */
+      probability?: number
+    }
     SearchFilterSuggestionRequest: {
       /** @description What the analyst typed, in any language. */
       query: string
@@ -1511,6 +1544,33 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['SearchFilterSuggestion']
+        }
+      }
+      400: components['responses']['BadRequest']
+      401: components['responses']['Unauthorized']
+      429: components['responses']['TooManyRequests']
+    }
+  }
+  suggestDisputeReason: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DisputeReasonSuggestionRequest']
+      }
+    }
+    responses: {
+      /** @description The reason the description appears to describe, absent when the model was unsure */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DisputeReasonSuggestion']
         }
       }
       400: components['responses']['BadRequest']

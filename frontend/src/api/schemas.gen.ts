@@ -462,6 +462,44 @@ export type DisputePage = Static<typeof DisputePage>
 const _DisputePage: Same<DisputePage, components['schemas']['DisputePage']> = true
 void _DisputePage
 
+export const DisputeReasonSuggestion = Type.Object(
+  {
+    reason: Type.Optional(DisputeReason),
+    probability: Type.Optional(
+      Type.Number({
+        description: 'How sure the model was, recorded with the dispute when the analyst accepts it.',
+        format: 'double',
+        minimum: 0,
+        maximum: 1,
+      }),
+    ),
+  },
+  { additionalProperties: false },
+)
+export type DisputeReasonSuggestion = Static<typeof DisputeReasonSuggestion>
+const _DisputeReasonSuggestion: Same<
+  DisputeReasonSuggestion,
+  components['schemas']['DisputeReasonSuggestion']
+> = true
+void _DisputeReasonSuggestion
+
+export const DisputeReasonSuggestionRequest = Type.Object(
+  {
+    description: Type.String({
+      description: 'What the customer said, in any language.',
+      minLength: 1,
+      maxLength: 2000,
+    }),
+  },
+  { additionalProperties: false },
+)
+export type DisputeReasonSuggestionRequest = Static<typeof DisputeReasonSuggestionRequest>
+const _DisputeReasonSuggestionRequest: Same<
+  DisputeReasonSuggestionRequest,
+  components['schemas']['DisputeReasonSuggestionRequest']
+> = true
+void _DisputeReasonSuggestionRequest
+
 export const FieldType = Type.Union(
   [
     Type.Literal('TEXT'),

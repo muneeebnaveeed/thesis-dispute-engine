@@ -1,5 +1,5 @@
 import { createFormHook, createFormHookContexts, type AnyFormApi } from '@tanstack/react-form'
-import type { ComponentProps, FormEvent, InputHTMLAttributes, ReactNode } from 'react'
+import type { ComponentProps, FocusEvent, FormEvent, InputHTMLAttributes, ReactNode } from 'react'
 
 import { Button } from '#/components/ui/button'
 import { FieldError, inputVariants } from '#/components/ui/field'
@@ -73,7 +73,14 @@ const TextareaField = ({
   mono = false,
   inputClassName,
   disabled,
-}: LabelProps & { rows?: number; mono?: boolean; inputClassName?: string; disabled?: boolean }) => {
+  onBlur,
+}: LabelProps & {
+  rows?: number
+  mono?: boolean
+  inputClassName?: string
+  disabled?: boolean
+  onBlur?: (event: FocusEvent<HTMLTextAreaElement>) => void
+}) => {
   const { field, message, id, inputProps } = useBoundInput()
   return (
     <label className={cn('field text-[11px]', className)}>
@@ -87,6 +94,10 @@ const TextareaField = ({
           rows={rows}
           disabled={disabled}
           onChange={(event) => field.handleChange(event.target.value)}
+          onBlur={(event) => {
+            inputProps.onBlur?.()
+            onBlur?.(event)
+          }}
           className={cn(inputVariants({ invalid: Boolean(message), mono }), inputClassName)}
         />
         <FieldError id={id} message={message} />
@@ -106,12 +117,14 @@ const SelectField = ({
   mono = false,
   inputClassName,
   disabled,
+  onChange,
 }: LabelProps & {
   options: Option[]
   placeholder?: string
   mono?: boolean
   inputClassName?: string
   disabled?: boolean
+  onChange?: (value: string) => void
 }) => {
   const { field, message, id, inputProps } = useBoundInput()
   return (
@@ -124,7 +137,10 @@ const SelectField = ({
         <select
           {...inputProps}
           disabled={disabled}
-          onChange={(event) => field.handleChange(event.target.value)}
+          onChange={(event) => {
+            field.handleChange(event.target.value)
+            onChange?.(event.target.value)
+          }}
           className={cn(inputVariants({ invalid: Boolean(message), mono }), inputClassName)}
         >
           {placeholder !== undefined && <option value="">{placeholder}</option>}
