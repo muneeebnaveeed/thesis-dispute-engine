@@ -74,13 +74,18 @@ mutation.mutateAsync(...))`, which puts an API validation refusal on the fields 
   `openDisputeMutation`, never `segments`, `res`, `fields`, `open`, `d`, `e`, `v`. A comment is a
   terse one-liner that says why (a constraint, a trap, a decision), never what the code does, and
   never a doc block on every export.
-- shadcn is configured through `components.json` (radix base, nova preset, Tailwind v4 tokens in
-  `src/styles.css`). `pnpm dlx shadcn@latest add <component>` puts registry components in
+- shadcn is configured through `components.json` (radix base, nova preset, phosphor icons, Tailwind v4
+  tokens in `src/styles.css`). Add components with `pnpm shadcn add <component>`, never the CLI directly:
+  the wrapper normalises the two imports the CLI gets wrong against our `#/` alias (it emits a bare `cn`
+  specifier and installs an unrelated package of that name). It puts registry components in
   `src/components/shadcn/`, which is vendored code: keep it as upstream writes it so
   `shadcn add --diff` stays readable, never import it from a page, and let `src/components/ui/`
   wrap it for everything the app uses. That directory is exempt from `func-style` and two a11y
   rules in `.oxlintrc.json` and is an entry point in `knip.json` for the same reason. The CLI needs
-  a real terminal for its prompts; it cannot be driven from here.
+  a real terminal for its prompts (`init` only; `add` is fine), so ask for it to be run by hand.
+- Icons come from `@phosphor-icons/react`, named `*Icon` (`CaretDownIcon`, not `ChevronDown`). Six weights
+  are available through the `weight` prop; never set a size class on an icon inside a shadcn component,
+  which sizes its own icons.
 - `pnpm knip` fails on unused files, exports, types and dependencies (`knip.json`). Remove the
   dead code rather than adding an ignore; an export used only in its own file loses the `export`.
 - Server-only code (cookies, OIDC, the sealed store) lives in modules route files never import
