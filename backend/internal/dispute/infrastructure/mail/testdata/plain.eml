@@ -1,0 +1,19 @@
+From: disputes@dispute-engine.local
+To: anna.kovacs@example.com
+Subject: Your refund
+Date: Tue, 22 Sep 2026 12:00:00 +0000
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary=alt1790078400000000000
+
+--alt1790078400000000000
+Content-Type: text/plain; charset=utf-8
+
+Dear Kovács Anna,
+
+We have refunded 1849.00 EUR.
+
+--alt1790078400000000000
+Content-Type: text/html; charset=utf-8
+
+<html><body>We have refunded 1849.00 EUR.</body></html>
+--alt1790078400000000000--

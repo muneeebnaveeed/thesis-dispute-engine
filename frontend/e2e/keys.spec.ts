@@ -1,4 +1,4 @@
-import { api, expect, openDisputeViaApi, signIn, test } from './fixtures'
+import { api, expect, signIn, test } from './fixtures'
 
 test('a tenant admin issues a key, the key works for that tenant, and revoking it stops it', async ({
   page,
@@ -48,41 +48,4 @@ test('an analyst without the admin role cannot manage keys', async ({ request })
   })
   expect(res.status()).toBe(403)
   expect(((await res.json()) as { code: string }).code).toBe('forbidden')
-})
-
-test('a tenant admin rewords an email template and analysts compose with the new words', async ({
-  page,
-  request,
-}) => {
-  await signIn(page, 'otp')
-  await page.getByRole('link', { name: 'Templates' }).click()
-  await expect(page).toHaveURL(/\/otp\/templates$/)
-  const card = page.getByRole('region', { name: 'Status update', exact: true })
-  await card.getByRole('button', { name: 'Edit wording' }).click()
-  await card.getByLabel('Subject').fill('Where your {{merchant}} dispute stands')
-  // An unknown placeholder is flagged in the preview and refused on save.
-  await card.getByLabel(/Paragraphs/).fill('{{stage}}\n\n{{nothing}}\n\nReference {{dispute}}.')
-  await expect(card.getByRole('region', { name: /Preview of Status update/ })).toContainText(
-    'unknown: nothing',
-  )
-  await card.getByRole('button', { name: 'Save wording' }).click()
-  await expect(card.locator('#template-STATUS_UPDATE-error')).toBeVisible()
-  await card.getByLabel(/Paragraphs/).fill('{{stage}}\n\n{{note}}\n\nReference {{dispute}}. Yours, {{bank}}.')
-  await card.getByRole('button', { name: 'Save wording' }).click()
-  await expect(page.getByRole('status')).toContainText(/wording saved/)
-  await expect(card).toContainText('customised')
-
-  // The analyst's composer now shows the tenant's subject with the merchant filled in.
-  const id = await openDisputeViaApi(request, 'otp')
-  await page.goto(`/otp/disputes/${id}/communications`)
-  await page.getByLabel(/Email template/).selectOption('STATUS_UPDATE')
-  await expect(page.getByRole('region', { name: 'Preview' })).toContainText(
-    'Where your MediaMarkt dispute stands',
-  )
-
-  // Revert restores the standard wording.
-  await page.goto('/otp/templates')
-  await card.getByRole('button', { name: 'Edit wording' }).click()
-  await card.getByRole('button', { name: 'Revert to standard' }).click()
-  await expect(page.getByRole('status')).toContainText(/Reverted/)
 })

@@ -1,0 +1,11 @@
+Thank you, we have your documents
+
+Thank you for sending us the following about your dispute of the 1899.00 EUR payment to MediaMarkt:
+
+{{received}}
+
+{{#missing}}We are still missing:{{/missing}}
+
+{{missing}}
+
+We will let you know as soon as our investigation is complete. Dispute reference 01a0c601-0000-7000-8000-000000000001.

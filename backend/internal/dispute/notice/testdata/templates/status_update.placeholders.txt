@@ -1,0 +1,9 @@
+An update on your dispute
+
+{{stage}}
+
+{{note}}
+
+{{#nextBy}}We will write to you again by {{nextBy}}.{{/nextBy}}
+
+There is nothing you need to do now. Dispute reference 01a0c601-0000-7000-8000-000000000001.
