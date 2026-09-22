@@ -53,12 +53,3 @@ const useCountdown = (seconds: number): number => {
   }, [seconds])
   return secondsLeft
 }
-
-export const FieldError = ({ id, message }: { id: string; message?: string | undefined }) => {
-  if (!message) return null
-  return (
-    <p id={id} className="mt-1 text-xs text-red-700">
-      {message}
-    </p>
-  )
-}

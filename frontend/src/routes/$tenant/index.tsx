@@ -2,7 +2,6 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, useNavigate, useRouteContext } from '@tanstack/react-router'
 import type { Static } from '@sinclair/typebox'
 import { Value } from '@sinclair/typebox/value'
-import { useState } from 'react'
 
 import {
   CreateDisputeRequest,
@@ -13,20 +12,24 @@ import type { DisputeState } from '#/api/views'
 import { DeadlineBadge, daysRemaining } from '#/components/disputes/deadlines'
 import { RiskBadge } from '#/components/disputes/risk'
 import { AppShell } from '#/components/layout/app-shell'
-import { FailureBanner, FieldError } from '#/components/layout/failure-banner'
+import { FailureBanner } from '#/components/layout/failure-banner'
 import { TenantMismatch } from '#/components/layout/tenant-mismatch'
-import { Button } from '#/components/ui/button'
-import { inputVariants, invalidProps } from '#/components/ui/field'
-import { serverFieldErrors, validateForm } from '#/forms/validate-form'
-import { cn } from '#/lib/cn'
+import { submitTo, submitting, useAppForm } from '#/forms/app-form'
+import { parsed, schemaValidator } from '#/forms/schema'
 import { formatMoney } from '#/lib/money'
 import { disputeQuery, disputesQuery, type DisputeListSearch } from '#/queries/disputes'
-import { fieldErrorsOf, useServerMutation } from '#/queries/use-server-mutation'
+import { useServerMutation } from '#/queries/use-server-mutation'
 import { openDispute } from '#/server/functions/disputes'
 
 // from the generated schema, so the filter cannot offer a state the API lacks
-const DISPUTE_STATES = DisputeStateSchema.anyOf.map((literal) => literal.const)
-const DISPUTE_REASONS = DisputeReasonSchema.anyOf.map((literal) => literal.const)
+const DISPUTE_STATES = DisputeStateSchema.anyOf.map((literal) => ({
+  value: literal.const,
+  label: literal.const,
+}))
+const DISPUTE_REASONS = DisputeReasonSchema.anyOf.map((literal) => ({
+  value: literal.const,
+  label: literal.const,
+}))
 const isDisputeState = (value: unknown): value is DisputeState =>
   typeof value === 'string' && Value.Check(DisputeStateSchema, value)
 
@@ -38,73 +41,68 @@ const Workbench = () => {
   const { data: loadedPage } = useSuspenseQuery(disputesQuery(search))
   const activeFilters = { ...(state ? { state } : {}), ...(overdue ? { overdue: true } : {}) }
   const navigate = useNavigate()
-  const [clientFieldErrors, setClientFieldErrors] = useState<Record<string, string>>({})
   const openDisputeMutation = useServerMutation(
-    (request: Static<typeof CreateDisputeRequest>) => openDispute({ data: request }),
+    (request: Static<typeof CreateDisputeRequest>) => openDispute({ data: { ...request, actor: 'analyst' } }),
     {
       invalidates: () => [disputeQuery(null).queryKey],
       onSuccess: (openedDispute) =>
         navigate({ to: '/$tenant/disputes/$disputeId', params: { tenant, disputeId: openedDispute.id } }),
     },
   )
+  const openForm = useAppForm({
+    defaultValues: { transactionId: '', reason: 'UNAUTHORISED' },
+    validators: { onSubmit: schemaValidator(CreateDisputeRequest) },
+    onSubmit: ({ value, formApi }) =>
+      submitTo(formApi, () => openDisputeMutation.mutateAsync(parsed(CreateDisputeRequest, value))),
+  })
+  const filterForm = useAppForm({
+    defaultValues: { state: state ?? '', overdue: overdue ?? false },
+    onSubmit: ({ value }) =>
+      navigate({
+        to: '/$tenant',
+        params: { tenant },
+        search: {
+          ...(isDisputeState(value.state) ? { state: value.state } : {}),
+          ...(value.overdue ? { overdue: true } : {}),
+        },
+      }),
+  })
+  const findForm = useAppForm({
+    defaultValues: { disputeId: '' },
+    onSubmit: ({ value }) => {
+      const disputeId = value.disputeId.trim()
+      if (disputeId) return navigate({ to: '/$tenant/disputes/$disputeId', params: { tenant, disputeId } })
+      return undefined
+    },
+  })
   const openFailure = openDisputeMutation.failure
-  const fieldErrors = {
-    ...clientFieldErrors,
-    ...fieldErrorsOf(openFailure),
-    ...(openFailure?.kind === 'validation' ? serverFieldErrors(openFailure.problem) : {}),
-  }
   if (viewer && viewer.tenantSlug !== tenant) return <TenantMismatch wanted={tenant} />
-
-  const openFromForm = (form: FormData) => {
-    const validated = validateForm(CreateDisputeRequest, form)
-    setClientFieldErrors(validated.fields)
-    if (validated.value) openDisputeMutation.mutate({ ...validated.value, actor: 'analyst' })
-  }
 
   return (
     <AppShell title="Disputes">
       <section className="mb-10">
         <div className="mb-3 flex items-baseline justify-between">
           <h2 className="text-lg font-medium">Recent disputes</h2>
-          <form
-            className="flex items-center gap-2 text-sm"
-            onSubmit={(event) => {
-              event.preventDefault()
-              const filterForm = new FormData(event.currentTarget)
-              const chosenState = filterForm.get('state')
-              void navigate({
-                to: '/$tenant',
-                params: { tenant },
-                search: {
-                  ...(isDisputeState(chosenState) ? { state: chosenState } : {}),
-                  ...(filterForm.get('overdue') ? { overdue: true } : {}),
-                },
-              })
-            }}
-          >
-            <label htmlFor="state-filter" className="text-neutral-600">
-              State
-            </label>
-            <select
-              id="state-filter"
-              name="state"
-              defaultValue={state ?? ''}
-              className={cn(inputVariants(), 'mt-0 w-auto')}
-            >
-              <option value="">any</option>
-              {DISPUTE_STATES.map((disputeState) => (
-                <option key={disputeState} value={disputeState}>
-                  {disputeState}
-                </option>
-              ))}
-            </select>
-            <label className="flex items-center gap-1 text-neutral-600">
-              <input type="checkbox" name="overdue" defaultChecked={overdue ?? false} />
-              overdue only
-            </label>
-            <Button type="submit" variant="secondary" size="xs">
-              Filter
-            </Button>
+          <form className="flex items-end gap-2 text-sm" onSubmit={submitting(filterForm)}>
+            <filterForm.AppField name="state">
+              {(field) => (
+                <field.SelectField
+                  label="State"
+                  options={DISPUTE_STATES}
+                  placeholder="any"
+                  className="text-neutral-600"
+                  inputClassName="mt-0 w-auto"
+                />
+              )}
+            </filterForm.AppField>
+            <filterForm.AppField name="overdue">
+              {(field) => <field.CheckboxField label="overdue only" className="mb-1 text-neutral-600" />}
+            </filterForm.AppField>
+            <filterForm.AppForm>
+              <filterForm.SubmitButton variant="secondary" size="xs">
+                Filter
+              </filterForm.SubmitButton>
+            </filterForm.AppForm>
           </form>
         </div>
         {loadedPage.failure ? (
@@ -193,46 +191,27 @@ const Workbench = () => {
       <div className="grid gap-8 md:grid-cols-2">
         <section>
           <h2 className="mb-3 text-lg font-medium">Open a dispute</h2>
-          <form
-            className="space-y-3"
-            onSubmit={(event) => {
-              event.preventDefault()
-              openFromForm(new FormData(event.currentTarget))
-            }}
-          >
-            <label className="block text-sm">
-              Transaction ID
-              <input
-                name="transactionId"
-                className={cn(
-                  inputVariants({ invalid: Boolean(fieldErrors.transactionId), mono: true }),
-                  'px-3 py-2',
-                )}
-                placeholder="00000000-0000-8000-8000-000000000101"
-                {...invalidProps('transactionId', fieldErrors.transactionId)}
-              />
-            </label>
-            <FieldError id="transactionId-error" message={fieldErrors.transactionId} />
-            <label className="block text-sm">
-              Reason
-              <select
-                name="reason"
-                defaultValue="UNAUTHORISED"
-                className={cn(inputVariants({ mono: true }), 'px-3 py-2')}
-              >
-                {DISPUTE_REASONS.map((reason) => (
-                  <option key={reason} value={reason}>
-                    {reason}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <FieldError id="reason-error" message={fieldErrors.reason} />
-            <Button type="submit" disabled={openDisputeMutation.isPending}>
-              Open
-            </Button>
+          <form className="space-y-3" onSubmit={submitting(openForm)}>
+            <openForm.AppField name="transactionId">
+              {(field) => (
+                <field.TextField
+                  label="Transaction ID"
+                  mono
+                  inputClassName="px-3 py-2"
+                  placeholder="00000000-0000-8000-8000-000000000101"
+                />
+              )}
+            </openForm.AppField>
+            <openForm.AppField name="reason">
+              {(field) => (
+                <field.SelectField label="Reason" options={DISPUTE_REASONS} mono inputClassName="px-3 py-2" />
+              )}
+            </openForm.AppField>
+            <openForm.AppForm>
+              <openForm.SubmitButton busy={openDisputeMutation.isPending}>Open</openForm.SubmitButton>
+            </openForm.AppForm>
           </form>
-          {openFailure && (openFailure.kind !== 'validation' || Object.keys(fieldErrors).length === 0) && (
+          {openFailure && openFailure.kind !== 'validation' && (
             <div className="mt-4">
               <FailureBanner failure={openFailure} />
             </div>
@@ -240,21 +219,13 @@ const Workbench = () => {
         </section>
         <section>
           <h2 className="mb-3 text-lg font-medium">Find a dispute</h2>
-          <form
-            className="space-y-3"
-            onSubmit={(event) => {
-              event.preventDefault()
-              const typed = new FormData(event.currentTarget).get('disputeId')
-              const disputeId = typeof typed === 'string' ? typed.trim() : ''
-              if (disputeId)
-                void navigate({ to: '/$tenant/disputes/$disputeId', params: { tenant, disputeId } })
-            }}
-          >
-            <label className="block text-sm">
-              Dispute ID
-              <input name="disputeId" className={cn(inputVariants({ mono: true }), 'px-3 py-2')} />
-            </label>
-            <Button type="submit">Show</Button>
+          <form className="space-y-3" onSubmit={submitting(findForm)}>
+            <findForm.AppField name="disputeId">
+              {(field) => <field.TextField label="Dispute ID" mono inputClassName="px-3 py-2" />}
+            </findForm.AppField>
+            <findForm.AppForm>
+              <findForm.SubmitButton>Show</findForm.SubmitButton>
+            </findForm.AppForm>
           </form>
         </section>
       </div>

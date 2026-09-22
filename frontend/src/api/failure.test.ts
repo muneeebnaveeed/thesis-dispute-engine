@@ -1,11 +1,10 @@
 import {
-  classify,
   describe,
   fieldErrors,
   fromProblem,
   isRetryable,
-  localValidation,
   retryAfter,
+  unreachable,
   type Problem,
 } from './failure'
 
@@ -70,14 +69,12 @@ test('every contract code lands in a kind with the right retry semantics', () =>
   expect(isRetryable(fromProblem({ ...base, code: 'concurrent-update' }))).toBe(false)
 })
 
-test('non-problem failures are classified too', () => {
-  expect(classify({ thrown: new TypeError('Failed to fetch') })).toMatchObject({ kind: 'unreachable' })
-  expect(classify({ error: '<html>', response: new Response('', { status: 502 }) })).toMatchObject({
-    kind: 'unexpected',
-    status: 502,
+test('a throw from the call itself is the service being unreachable', () => {
+  expect(unreachable(new TypeError('Failed to fetch'))).toEqual({
+    kind: 'unreachable',
+    message: 'Failed to fetch',
   })
-  expect(classify({ error: undefined })).toBeNull()
-  expect(describe(localValidation({ label: 'required' })).hint).toMatch(/highlighted/)
+  expect(describe(unreachable('x')).title).toMatch(/Cannot reach/)
 })
 
 test('ledger refusals point at the fact in the payload', () => {

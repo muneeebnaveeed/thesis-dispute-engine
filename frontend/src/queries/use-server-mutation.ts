@@ -2,7 +2,7 @@ import { useMutation, useQueryClient, type QueryKey } from '@tanstack/react-quer
 import { isRedirect, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 
-import { classify, fromProblem, type Failure } from '#/api/failure'
+import { fromProblem, isFailure, unreachable, type Failure } from '#/api/failure'
 import type { ApiResult } from '#/api/views'
 
 export const useServerMutation = <TVariables, TData>(
@@ -27,12 +27,9 @@ export const useServerMutation = <TVariables, TData>(
           await router.navigate(router.resolveRedirect(thrown).options)
           throw thrown
         }
-        const unreachable = classify({ thrown }) ?? {
-          kind: 'unreachable' as const,
-          message: 'the server could not be reached',
-        }
-        setFailure(unreachable)
-        throw unreachable
+        const failed = unreachable(thrown)
+        setFailure(failed)
+        throw failed
       }
       if (result.error) {
         const refused = fromProblem(result.error)
@@ -62,3 +59,8 @@ export const fieldErrorsOf = (failure: Failure | null): Record<string, string> =
       message,
     ]),
   )
+
+// for a form's onSubmitAsync: run the mutation, hand a validation refusal back as field errors, leave every other
+// failure to the banner (it is already in `failure`)
+export const asFieldErrors = (thrown: unknown): { fields: Record<string, string> } | undefined =>
+  isFailure(thrown) && thrown.kind === 'validation' ? { fields: fieldErrorsOf(thrown) } : undefined

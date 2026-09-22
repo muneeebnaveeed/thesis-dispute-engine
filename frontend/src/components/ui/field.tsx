@@ -11,5 +11,9 @@ export const inputVariants = cva(
   },
 )
 
-export const invalidProps = (id: string, message: string | undefined) =>
-  message ? { 'aria-invalid': true as const, 'aria-describedby': `${id}-error` } : {}
+export const FieldError = ({ id, message }: { id: string; message?: string | undefined }) =>
+  message ? (
+    <p id={id} className="mt-1 text-xs text-red-700">
+      {message}
+    </p>
+  ) : null
