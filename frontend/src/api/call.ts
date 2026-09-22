@@ -7,10 +7,10 @@ type Outcome<T> = { data?: T | undefined; error?: unknown; response?: Response |
  * aborted) become failures too. When `idempotent` is true the call is repeated once after a short retryable
  * failure: every mutation carries an Idempotency-Key, so the repeat cannot double-apply.
  */
-export async function call<T>(
+export const call = async <T>(
   run: () => Promise<Outcome<T>>,
   opts: { idempotent?: boolean; maxWaitSeconds?: number } = {},
-): Promise<{ data: T; failure: null } | { data: null; failure: Failure }> {
+): Promise<{ data: T; failure: null } | { data: null; failure: Failure }> => {
   const once = async (): Promise<{ data: T; failure: null } | { data: null; failure: Failure }> => {
     let out: Outcome<T>
     try {

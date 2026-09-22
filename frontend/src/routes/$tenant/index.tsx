@@ -1,72 +1,62 @@
+import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, useNavigate, useRouteContext } from '@tanstack/react-router'
+import type { Static } from '@sinclair/typebox'
+import { Value } from '@sinclair/typebox/value'
 import { useState } from 'react'
 
-import { classify, type Failure } from '#/api/failure'
-import { CreateDisputeRequest } from '#/api/schemas.gen'
-import { AppShell } from '#/components/app-shell'
-import { formatMoney } from '#/money'
-import { DeadlineBadge, remaining } from '#/components/deadlines'
-import { RiskBadge } from '#/components/risk'
-import { FailureBanner, FieldError } from '#/components/failure-banner'
-import { TenantMismatch } from '#/components/tenant-mismatch'
+import { classify } from '#/api/failure'
+import {
+  CreateDisputeRequest,
+  DisputeReason as DisputeReasonSchema,
+  DisputeState as DisputeStateSchema,
+} from '#/api/schemas.gen'
+import type { DisputeState } from '#/api/views'
+import { DeadlineBadge, remaining } from '#/components/disputes/deadlines'
+import { RiskBadge } from '#/components/disputes/risk'
+import { AppShell } from '#/components/layout/app-shell'
+import { FailureBanner, FieldError } from '#/components/layout/failure-banner'
+import { TenantMismatch } from '#/components/layout/tenant-mismatch'
+import { Button } from '#/components/ui/button'
+import { inputVariants, invalidProps } from '#/components/ui/field'
 import { serverFields, validateForm } from '#/forms/validate-form'
-import { createDispute } from '#/server/disputes'
-import { Value } from '@sinclair/typebox/value'
-
-import { DisputeReason as DisputeReasonSchema, DisputeState as DisputeStateSchema } from '#/api/schemas.gen'
-import { listDisputes, type DisputeState } from '#/server/disputes-list'
-
-type Search = { state?: DisputeState; cursor?: string; overdue?: boolean }
-
-// The workbench: open a dispute, find one, and the tenant's newest disputes with a state filter and paging.
-export const Route = createFileRoute('/$tenant/')({
-  validateSearch: (s: Record<string, unknown>): Search => ({
-    ...(isState(s.state) ? { state: s.state } : {}),
-    ...(typeof s.cursor === 'string' ? { cursor: s.cursor } : {}),
-    ...(s.overdue === true || s.overdue === 'true' ? { overdue: true } : {}),
-  }),
-  loaderDeps: ({ search }) => search,
-  loader: ({ deps }) => listDisputes({ data: deps }),
-  component: Workbench,
-})
+import { cn } from '#/lib/cn'
+import { formatMoney } from '#/lib/money'
+import { disputeQuery, disputesQuery, type ListSearch } from '#/queries'
+import { fieldsOf, useServerMutation } from '#/queries/mutation'
+import { openDispute } from '#/server/functions/mutations'
 
 // The generated schema is the source of truth for the enum, so the filter can never offer a state the API lacks.
 const STATES = DisputeStateSchema.anyOf.map((l) => l.const)
 const REASONS = DisputeReasonSchema.anyOf.map((l) => l.const)
 const isState = (v: unknown): v is DisputeState => typeof v === 'string' && Value.Check(DisputeStateSchema, v)
 
-const input =
-  'w-full rounded-md border border-neutral-300 px-3 py-2 font-mono text-sm focus:border-neutral-500 focus:outline-none'
-const button =
-  'rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50'
-
-function Workbench() {
+const Workbench = () => {
   const { tenant } = Route.useParams()
-  const page = Route.useLoaderData()
-  const { state, cursor, overdue } = Route.useSearch()
+  const search = Route.useSearch()
+  const { state, cursor, overdue } = search
+  const { viewer } = useRouteContext({ from: '__root__' })
+  const { data: page } = useSuspenseQuery(disputesQuery(search))
   // The list's own filters, minus the cursor: what the paging and reset links carry along.
   const filters = { ...(state ? { state } : {}), ...(overdue ? { overdue: true } : {}) }
-  const { viewer } = useRouteContext({ from: '__root__' })
   const navigate = useNavigate()
-  const [failure, setFailure] = useState<Failure | null>(null)
-  const [fields, setFields] = useState<Record<string, string>>({})
-  const [busy, setBusy] = useState(false)
+  const [localFields, setLocalFields] = useState<Record<string, string>>({})
+  const open = useServerMutation((body: Static<typeof CreateDisputeRequest>) => openDispute({ data: body }), {
+    invalidates: () => [disputeQuery(null).queryKey],
+    onSuccess: (created) =>
+      navigate({ to: '/$tenant/disputes/$disputeId', params: { tenant, disputeId: created.id } }),
+  })
+  const fields = {
+    ...localFields,
+    ...fieldsOf(open.failure),
+    ...(open.failure?.kind === 'validation' ? serverFields(open.failure.problem) : {}),
+  }
   if (viewer && viewer.tenantSlug !== tenant) return <TenantMismatch wanted={tenant} />
 
   // Validate with the contract's schema before any request; server-side field errors land in the same place.
-  async function open(form: FormData) {
-    setFailure(null)
+  const submit = (form: FormData) => {
     const checked = validateForm(CreateDisputeRequest, form)
-    setFields(checked.fields)
-    if (!checked.value) return
-    setBusy(true)
-    const res = await createDispute({ data: { ...checked.value, actor: 'analyst' } })
-    setBusy(false)
-    if (res.problem) {
-      setFailure(classify({ error: res.problem }))
-      setFields(serverFields(res.problem))
-    } else if (res.value)
-      void navigate({ to: '/$tenant/disputes/$disputeId', params: { tenant, disputeId: res.value.id } })
+    setLocalFields(checked.fields)
+    if (checked.value) open.mutate({ ...checked.value, actor: 'analyst' })
   }
 
   return (
@@ -98,7 +88,7 @@ function Workbench() {
               id="state-filter"
               name="state"
               defaultValue={state ?? ''}
-              className="rounded-md border border-neutral-300 px-2 py-1"
+              className={cn(inputVariants(), 'mt-0 w-auto')}
             >
               <option value="">any</option>
               {STATES.map((s) => (
@@ -111,12 +101,9 @@ function Workbench() {
               <input type="checkbox" name="overdue" defaultChecked={overdue ?? false} />
               overdue only
             </label>
-            <button
-              type="submit"
-              className="rounded-md border border-neutral-300 bg-white px-2 py-1 hover:bg-neutral-100"
-            >
+            <Button type="submit" variant="secondary" size="xs">
               Filter
-            </button>
+            </Button>
           </form>
         </div>
         {page.problem ? (
@@ -209,23 +196,29 @@ function Workbench() {
             className="space-y-3"
             onSubmit={(e) => {
               e.preventDefault()
-              void open(new FormData(e.currentTarget))
+              submit(new FormData(e.currentTarget))
             }}
           >
             <label className="block text-sm">
               Transaction ID
               <input
                 name="transactionId"
-                className={`${input} ${fields.transactionId ? 'border-red-400' : ''}`}
+                className={cn(
+                  inputVariants({ invalid: Boolean(fields.transactionId), mono: true }),
+                  'px-3 py-2',
+                )}
                 placeholder="00000000-0000-8000-8000-000000000101"
-                aria-invalid={fields.transactionId ? true : undefined}
-                aria-describedby={fields.transactionId ? 'transactionId-error' : undefined}
+                {...invalidProps('transactionId', fields.transactionId)}
               />
             </label>
             <FieldError id="transactionId-error" message={fields.transactionId} />
             <label className="block text-sm">
               Reason
-              <select name="reason" defaultValue="UNAUTHORISED" className={input}>
+              <select
+                name="reason"
+                defaultValue="UNAUTHORISED"
+                className={cn(inputVariants({ mono: true }), 'px-3 py-2')}
+              >
                 {REASONS.map((r) => (
                   <option key={r} value={r}>
                     {r}
@@ -234,13 +227,13 @@ function Workbench() {
               </select>
             </label>
             <FieldError id="reason-error" message={fields.reason} />
-            <button type="submit" className={button} disabled={busy}>
+            <Button type="submit" disabled={open.isPending}>
               Open
-            </button>
+            </Button>
           </form>
-          {failure && (failure.kind !== 'validation' || Object.keys(fields).length === 0) && (
+          {open.failure && (open.failure.kind !== 'validation' || Object.keys(fields).length === 0) && (
             <div className="mt-4">
-              <FailureBanner failure={failure} />
+              <FailureBanner failure={open.failure} />
             </div>
           )}
         </section>
@@ -257,14 +250,24 @@ function Workbench() {
           >
             <label className="block text-sm">
               Dispute ID
-              <input name="disputeId" className={input} />
+              <input name="disputeId" className={cn(inputVariants({ mono: true }), 'px-3 py-2')} />
             </label>
-            <button type="submit" className={button}>
-              Show
-            </button>
+            <Button type="submit">Show</Button>
           </form>
         </section>
       </div>
     </AppShell>
   )
 }
+
+// The workbench: open a dispute, find one, and the tenant's newest disputes with a state filter and paging.
+export const Route = createFileRoute('/$tenant/')({
+  validateSearch: (s: Record<string, unknown>): ListSearch => ({
+    ...(isState(s.state) ? { state: s.state } : {}),
+    ...(typeof s.cursor === 'string' ? { cursor: s.cursor } : {}),
+    ...(s.overdue === true || s.overdue === 'true' ? { overdue: true } : {}),
+  }),
+  loaderDeps: ({ search }) => search,
+  loader: ({ deps, context }) => context.queryClient.ensureQueryData(disputesQuery(deps)),
+  component: Workbench,
+})

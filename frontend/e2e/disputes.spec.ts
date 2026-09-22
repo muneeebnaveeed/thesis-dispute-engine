@@ -17,17 +17,15 @@ test('an analyst opens a dispute and drives it through allowed transitions from 
   await expect(state).toHaveText('INITIATED')
   await expect(page.getByRole('definition').filter({ hasText: 'EU_PSD2_CARD' })).toBeVisible()
 
-  // Actions go straight from the browser to the API with a bearer token the server handed out.
+  // Everything goes through the app server (ADR 0020): the browser never talks to the API and never holds a token.
   const direct: string[] = []
   page.on('request', (r) => {
-    if (r.url().startsWith(api) && r.method() === 'POST') direct.push(r.headers().authorization ?? '')
+    if (r.url().startsWith(api)) direct.push(`${r.method()} ${r.url()}`)
   })
   await page.getByRole('button', { name: 'OPEN_INVESTIGATION' }).click()
   await expect(state).toHaveText('INVESTIGATING')
   await expect(page.getByRole('table', { name: 'Event log' }).getByRole('row')).toHaveCount(3) // header + OPENED + OPEN_INVESTIGATION
-  expect(direct.length).toBeGreaterThan(0)
-  expect(direct[0]).toMatch(/^Bearer ey/)
-  expect(direct[0]).not.toContain('tk_')
+  expect(direct).toEqual([])
 
   await page.getByRole('button', { name: 'ISSUE_REFUND' }).click()
   await expect(state).toHaveText('FAST_REFUND_ISSUED')

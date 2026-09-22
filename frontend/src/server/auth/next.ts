@@ -1,5 +1,5 @@
 /** Only same-origin paths may be a post-login destination; anything else falls back to the tenant's home. */
-export function safeNext(raw: unknown, slug: string): string {
+export const safeNext = (raw: unknown, slug: string): string => {
   const home = `/${slug}`
   if (typeof raw !== 'string' || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/auth/'))
     return home

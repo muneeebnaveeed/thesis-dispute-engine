@@ -6,7 +6,7 @@ How to work in this repo. What the system does is in `README.md` and `docs/adr/`
 
 - `backend/`: Go 1.27 (pinned in `mise.toml`), standard-library HTTP, PostgreSQL via sqlc,
   `shopspring/decimal` for money, OpenTelemetry, golangci-lint v2.
-- `frontend/`: TypeScript, TanStack Start (React 19, SSR via Nitro), Tailwind v4, oxlint and oxfmt,
+- `frontend/`: TypeScript, TanStack Start and Query (React 19, SSR via Nitro), Tailwind v4, oxlint and oxfmt,
   vitest; Node and pnpm pinned in `mise.toml`.
 - `docs/thesis/`: long-form design document; tooling not yet decided.
 - `deploy/`: Docker Compose for local dependencies; distroless image in `backend/Dockerfile`.

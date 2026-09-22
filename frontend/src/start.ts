@@ -1,6 +1,6 @@
 import { createMiddleware, createStart } from '@tanstack/react-start'
 
-import { securityHeaders } from './server/security-headers'
+import { securityHeaders } from './server/runtime/security-headers'
 
 // Every response, including server-function calls, passes through here.
 const headers = createMiddleware({ type: 'request' }).server(async ({ next }) => {

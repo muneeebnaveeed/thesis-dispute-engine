@@ -2,7 +2,7 @@
 import { deleteCookie, getCookie, setCookie } from '@tanstack/react-start/server'
 import * as client from 'openid-client'
 
-import { serverEnv } from '../env'
+import { serverEnv } from '#/server/runtime/env'
 import { realmConfig, scopes } from './oidc'
 import * as store from './store'
 
@@ -10,7 +10,7 @@ export const cookieName = 'de_session'
 /** Long-lived, non-secret: which tenant this browser signed in to last, so the root can skip the question. */
 export const rememberedTenantCookie = 'de_tenant'
 
-function cookieOptions(maxAge = serverEnv().sessionTtlSeconds) {
+const cookieOptions = (maxAge = serverEnv().sessionTtlSeconds) => {
   return { httpOnly: true, sameSite: 'lax' as const, secure: serverEnv().secureCookies, path: '/', maxAge }
 }
 
@@ -24,7 +24,7 @@ export type Viewer = {
 }
 
 /** Only same-origin paths may be a post-login destination; anything else falls back to home. */
-export function safeNext(raw: unknown): string {
+export const safeNext = (raw: unknown): string => {
   return typeof raw === 'string' && raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/t/')
     ? raw
     : '/'
@@ -34,7 +34,7 @@ type Live = { id: string; session: store.Session & { identity: NonNullable<store
 
 // A live session, with the sliding idle rule applied: too long unused and it is gone; otherwise its last-seen mark
 // moves forward (at most once a minute, to keep writes rare).
-async function current(): Promise<Live | null> {
+const current = async (): Promise<Live | null> => {
   const id = getCookie(cookieName)
   if (!id) return null
   const session = await store.get(id)
@@ -54,7 +54,7 @@ async function current(): Promise<Live | null> {
   return { id, session: { ...session, identity: session.identity } }
 }
 
-export async function viewer(): Promise<Viewer | null> {
+export const viewer = async (): Promise<Viewer | null> => {
   const live = await current()
   if (!live) return null
   const { identity } = live.session
@@ -68,7 +68,7 @@ export async function viewer(): Promise<Viewer | null> {
 }
 
 /** Step 1 of login: remember state, PKCE and where to go afterwards, then hand the browser to the tenant's realm. */
-export async function begin(data: { slug: string; next?: string }): Promise<{ url: string }> {
+export const begin = async (data: { slug: string; next?: string }): Promise<{ url: string }> => {
   const env = serverEnv()
   const config = await realmConfig(data.slug)
   const verifier = client.randomPKCECodeVerifier()
@@ -93,7 +93,7 @@ export async function begin(data: { slug: string; next?: string }): Promise<{ ur
 }
 
 /** Step 2, run by /auth/callback with the full callback URL. Returns the path to send the browser to. */
-export async function completeLogin(callbackUrl: URL): Promise<string> {
+export const completeLogin = async (callbackUrl: URL): Promise<string> => {
   const env = serverEnv()
   const pendingId = getCookie(cookieName)
   if (!pendingId) throw new Error('no sign-in in progress')
@@ -138,7 +138,7 @@ export async function completeLogin(callbackUrl: URL): Promise<string> {
   return pending.next
 }
 
-function toTokens(t: client.TokenEndpointResponse): NonNullable<store.Session['tokens']> {
+const toTokens = (t: client.TokenEndpointResponse): NonNullable<store.Session['tokens']> => {
   const ttl = typeof t.expires_in === 'number' ? t.expires_in : 300
   return {
     access: t.access_token,
@@ -149,7 +149,7 @@ function toTokens(t: client.TokenEndpointResponse): NonNullable<store.Session['t
 }
 
 /** The browser asks for this before calling the API directly; refresh happens here, never in the browser. */
-export async function accessToken(): Promise<{ token: string; expiresAt: string } | null> {
+export const accessToken = async (): Promise<{ token: string; expiresAt: string } | null> => {
   const live = await current()
   const tokens = live?.session.tokens
   if (!live || !tokens) return null
@@ -175,12 +175,12 @@ export async function accessToken(): Promise<{ token: string; expiresAt: string 
 }
 
 /** Server-side callers (SSR loaders) get the same token the browser would, with the same refresh rule. */
-export async function accessTokenForRequest(): Promise<string | null> {
+export const accessTokenForRequest = async (): Promise<string | null> => {
   const res = await accessToken()
   return res?.token ?? null
 }
 
-export async function endSession(): Promise<{ url: string }> {
+export const endSession = async (): Promise<{ url: string }> => {
   const env = serverEnv()
   const live = await current()
   deleteCookie(cookieName, { path: '/' })

@@ -17,7 +17,8 @@
     "react/rules-of-hooks": "error",
     "import/no-cycle": "error",
     "unicorn/no-null": "off",
-    "react/react-in-jsx-scope": "off"
+    "react/react-in-jsx-scope": "off",
+    "func-style": ["error", "expression"]
   },
   "ignorePatterns": [
     "dist",

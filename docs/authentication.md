@@ -23,10 +23,10 @@ validator enforces it.
 3. The callback validates the ID token, mints a fresh session id, seals identity and tokens with `SESSION_SECRET`
    (AES-256-GCM) and stores the blob through `/internal/sessions/{id}`; the browser gets an HttpOnly, SameSite=Lax
    cookie (Secure when served over https).
-4. Pages render server-side with the session's access token. Browser actions call the API directly with a token
-   obtained from `getAccessToken`, kept in memory only, re-fetched near expiry or on 401; refresh happens only on
-   the server. When refresh fails the browser is sent back through the front door, which is silent while the
-   realm's SSO session lives.
+4. Pages render server-side with the session's access token, and every later action is a server function that
+   reads the same token on the server (docs/adr/0020); the browser never sees a token and never calls the API.
+   Refresh happens only on the server. When refresh fails the browser is sent back through the front door, which
+   is silent while the realm's SSO session lives.
 5. Sessions end by sign-out (also ends the Keycloak session), by the idle timeout (`SESSION_IDLE_SECONDS`, 30 min),
    by the absolute TTL (`SESSION_TTL_SECONDS`, 10 h), or by Keycloak's back-channel logout to
    `/auth/backchannel-logout` (admin action, SSO logout, disabled user), which ends every session for that realm
@@ -34,7 +34,7 @@ validator enforces it.
 
 ## Protections in place
 
-- No token in browser storage; the access token lives in memory for at most its five-minute lifetime.
+- No token in the browser at all, in storage or in memory; the only browser credential is the session cookie.
 - PKCE, `state` and `nonce` on the code flow; the pre-login cookie can never become a live session.
 - Sealed session payloads: the API and a database dump hold ciphertext only.
 - The token's issuer chooses the realm keys; unknown issuers, wrong audience, expired tokens, tokens signed by another

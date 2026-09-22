@@ -2,7 +2,7 @@ import { createRemoteJWKSet, decodeJwt, jwtVerify, type JWTPayload, type JWTVeri
 import createClient from 'openapi-fetch'
 
 import type { paths } from '#/api/schema.gen'
-import { serverEnv } from '../env'
+import { serverEnv } from '#/server/runtime/env'
 import { realmConfig } from './oidc'
 
 const jwksByIssuer = new Map<string, ReturnType<typeof createRemoteJWKSet>>()
@@ -15,10 +15,10 @@ type Deps = { jwks: (issuer: string, slug: string) => Promise<JWTVerifyGetKey> }
 // OpenID Connect Back-Channel Logout 1.0: an id_token-like JWT with the logout event, sid and/or sub, no nonce.
 // The issuer must be one of our realms: the slug is read from the token, the expected issuer is rebuilt from
 // configuration, and the two must agree before any key is fetched.
-export async function verifyLogoutToken(
+export const verifyLogoutToken = async (
   raw: string,
   deps: Deps = { jwks: jwksFor },
-): Promise<LogoutTarget | null> {
+): Promise<LogoutTarget | null> => {
   let claimedIssuer: string
   try {
     const iss = decodeJwt(raw).iss
@@ -44,7 +44,7 @@ export async function verifyLogoutToken(
   }
 }
 
-function targetOf(p: JWTPayload): LogoutTarget | null {
+const targetOf = (p: JWTPayload): LogoutTarget | null => {
   const events = p.events
   if (
     !events ||
@@ -59,7 +59,7 @@ function targetOf(p: JWTPayload): LogoutTarget | null {
   return null
 }
 
-async function jwksFor(issuer: string, slug: string) {
+const jwksFor = async (issuer: string, slug: string) => {
   let set = jwksByIssuer.get(issuer)
   if (!set) {
     const config = await realmConfig(slug)
@@ -72,7 +72,7 @@ async function jwksFor(issuer: string, slug: string) {
 }
 
 /** Ends the sessions a valid logout token names through the API's internal endpoint. */
-export async function handleBackchannelLogout(raw: string): Promise<boolean> {
+export const handleBackchannelLogout = async (raw: string): Promise<boolean> => {
   const target = await verifyLogoutToken(raw)
   if (!target) return false
   const env = serverEnv()

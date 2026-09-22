@@ -1,7 +1,7 @@
 import { CreateDisputeRequest } from '#/api/schemas.gen'
 import { formValues, validateForm } from './validate-form'
 
-function fd(entries: Record<string, string>) {
+const fd = (entries: Record<string, string>) => {
   const f = new FormData()
   for (const [k, v] of Object.entries(entries)) f.set(k, v)
   return f

@@ -1,96 +1,98 @@
-import { Link, createFileRoute, useRouteContext, useRouter } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { Link, createFileRoute, useRouteContext } from '@tanstack/react-router'
+import { useState } from 'react'
 
-import { createBrowserApi } from '#/api/browser'
-import { call } from '#/api/call'
-import { classify, type Failure } from '#/api/failure'
-import { AppShell } from '#/components/app-shell'
-import { formatMoney } from '#/money'
-import { Deadlines } from '#/components/deadlines'
-import { EventLog } from '#/components/event-log'
-import { FailureBanner, FieldError } from '#/components/failure-banner'
-import { Ledger } from '#/components/ledger'
-import { Notices } from '#/components/notices'
-import { QuestionnairePanel } from '#/components/questionnaire'
-import { RiskPanel } from '#/components/risk'
-import { TenantMismatch } from '#/components/tenant-mismatch'
-import { getDispute, type Dispute } from '#/server/disputes'
+import { classify } from '#/api/failure'
+import type { Dispute } from '#/api/views'
+import { Deadlines } from '#/components/disputes/deadlines'
+import { EventLog } from '#/components/disputes/event-log'
+import { Ledger } from '#/components/disputes/ledger'
+import { Notices } from '#/components/disputes/notices'
+import { QuestionnairePanel } from '#/components/disputes/questionnaire'
+import { RiskPanel } from '#/components/disputes/risk'
+import { AppShell } from '#/components/layout/app-shell'
+import { FailureBanner, FieldError } from '#/components/layout/failure-banner'
+import { TenantMismatch } from '#/components/layout/tenant-mismatch'
+import { Button } from '#/components/ui/button'
+import { inputVariants, invalidProps } from '#/components/ui/field'
+import { cn } from '#/lib/cn'
+import { formatMoney } from '#/lib/money'
+import { disputeQuery } from '#/queries'
+import { fieldsOf, useServerMutation } from '#/queries/mutation'
+import { applyEvent } from '#/server/functions/mutations'
 
-// First paint comes from the server with the session's token; actions go straight from the browser to the API.
-export const Route = createFileRoute('/$tenant/disputes/$disputeId')({
-  loader: ({ params }) => getDispute({ data: params.disputeId }),
-  component: DisputePage,
-})
+type Event = Dispute['allowedEvents'][number]
 
-function DisputePage() {
-  const outcome = Route.useLoaderData()
-  const { tenant } = Route.useParams()
-  const { config, viewer } = useRouteContext({ from: '__root__' })
-  const api = useMemo(
-    () =>
-      createBrowserApi(config.apiUrl, () =>
-        window.location.assign(`/${tenant}?next=${encodeURIComponent(window.location.pathname)}`),
-      ),
-    [config.apiUrl, tenant],
-  )
-  const router = useRouter()
-  const [failure, setFailure] = useState<Failure | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
-  // Facts an action may carry: the customer's share of a refund, and how an outstanding advance clears on close.
+const DisputePage = () => {
+  const { tenant, disputeId } = Route.useParams()
+  const { viewer } = useRouteContext({ from: '__root__' })
+  const { data: outcome } = useSuspenseQuery(disputeQuery(disputeId))
+  const queryClient = useQueryClient()
+  // Facts an action may carry: the customer's share of a refund, why a HIGH-risk credit goes out, how an advance clears.
   const [liability, setLiability] = useState('')
   const [settlement, setSettlement] = useState('')
   const [riskOverride, setRiskOverride] = useState('')
+  const [busyEvent, setBusyEvent] = useState<Event | null>(null)
+
+  // The idempotency key makes the call safe to repeat, so a short outage or budget hit is retried once for the person.
+  const apply = useServerMutation(
+    (vars: { event: Event; payload: Record<string, unknown> }) =>
+      applyEvent({
+        data: { disputeId, body: { event: vars.event, actor: 'analyst', payload: vars.payload } },
+      }),
+    {
+      invalidates: () => [disputeQuery(null).queryKey],
+      onSuccess: () => {
+        setLiability('')
+        setSettlement('')
+        setRiskOverride('')
+      },
+    },
+  )
+  const fields = fieldsOf(apply.failure)
 
   if (viewer && viewer.tenantSlug !== tenant) return <TenantMismatch wanted={tenant} />
   if (outcome.problem || !outcome.value) {
     const f = outcome.problem ? classify({ error: outcome.problem }) : null
     return (
       <AppShell title="Dispute">
-        {f && <FailureBanner failure={f} onRetry={() => void router.invalidate()} />}
+        {f && (
+          <FailureBanner
+            failure={f}
+            onRetry={() => void queryClient.invalidateQueries({ queryKey: disputeQuery(disputeId).queryKey })}
+          />
+        )}
       </AppShell>
     )
   }
   const d = outcome.value
   const canRefund = d.allowedEvents.includes('ISSUE_REFUND')
   const canSettle = d.allowedEvents.includes('CLOSE') && Number(d.balances.suspense) > 0
-  // Every fact an action carries lives under payload; the inputs are named without that prefix.
-  const fields: Record<string, string> = Object.fromEntries(
-    Object.entries(failure?.kind === 'validation' ? failure.fields : {}).map(([k, v]) => [
-      k.replace(/^payload\./, ''),
-      v,
-    ]),
-  )
 
-  // The idempotency key makes the call safe to repeat, so a short outage or budget hit is retried once for the person.
-  async function apply(event: Dispute['allowedEvents'][number], extra: Record<string, unknown> = {}) {
-    setBusy(event)
-    setFailure(null)
-    const key = crypto.randomUUID()
+  const run = (event: Event, extra: Record<string, unknown> = {}) => {
     const payload: Record<string, unknown> = { ...extra }
     if (event === 'ISSUE_REFUND' && liability.trim()) payload.liability = liability.trim()
     if (event === 'ISSUE_REFUND' && riskOverride.trim()) payload.riskOverride = riskOverride.trim()
     if (event === 'CLOSE' && settlement) payload.settlement = settlement
-    const res = await call(
-      () =>
-        api.POST('/disputes/{disputeId}/events', {
-          params: { path: { disputeId: d.id } },
-          body: { event, actor: 'analyst', payload },
-          headers: { 'Idempotency-Key': key },
-        }),
-      { idempotent: true },
+    setBusyEvent(event)
+    apply.mutate(
+      { event, payload },
+      {
+        onSettled: (_data, error) => {
+          setBusyEvent(null)
+          // A conflict means the state moved under us; show the truth alongside the message.
+          if (error && apply.failure?.kind === 'conflict')
+            void queryClient.invalidateQueries({ queryKey: disputeQuery(disputeId).queryKey })
+        },
+      },
     )
-    setBusy(null)
-    if (res.failure) {
-      setFailure(res.failure)
-      // A conflict means the state moved under us; show the truth alongside the message.
-      if (res.failure.kind === 'conflict') await router.invalidate()
-    } else {
-      setLiability('')
-      setSettlement('')
-      setRiskOverride('')
-      await router.invalidate()
-    }
   }
+  const fieldFailure = Boolean(
+    fields.liability ||
+    fields.riskOverride ||
+    fields.settlement ||
+    Object.keys(fields).some((k) => k.startsWith('answers.')),
+  )
 
   return (
     <AppShell title={`Dispute ${d.id.slice(0, 8)}`}>
@@ -121,8 +123,8 @@ function DisputePage() {
             questionnaire={d.questionnaire}
             canReceive={d.allowedEvents.includes('RECEIVE_QUESTIONNAIRE')}
             fields={fields}
-            busy={busy !== null}
-            onReceive={(answers) => void apply('RECEIVE_QUESTIONNAIRE', { answers })}
+            busy={apply.isPending}
+            onReceive={(answers) => run('RECEIVE_QUESTIONNAIRE', { answers })}
           />
         </section>
       )}
@@ -136,15 +138,15 @@ function DisputePage() {
             {d.allowedEvents
               .filter((ev) => ev !== 'RECEIVE_QUESTIONNAIRE')
               .map((ev) => (
-                <button
+                <Button
                   key={ev}
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={() => void apply(ev)}
-                  className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 font-mono text-sm hover:bg-neutral-100 disabled:opacity-50"
+                  variant="action"
+                  size="sm"
+                  disabled={apply.isPending}
+                  onClick={() => run(ev)}
                 >
-                  {busy === ev ? '...' : ev}
-                </button>
+                  {busyEvent === ev && apply.isPending ? '...' : ev}
+                </Button>
               ))}
           </div>
         )}
@@ -158,9 +160,8 @@ function DisputePage() {
                   onChange={(e) => setLiability(e.target.value)}
                   inputMode="decimal"
                   placeholder="0.00"
-                  aria-invalid={fields.liability ? true : undefined}
-                  aria-describedby={fields.liability ? 'liability-error' : undefined}
-                  className={`mt-1 block w-40 rounded-md border px-2 py-1 font-mono ${fields.liability ? 'border-red-400' : 'border-neutral-300'}`}
+                  className={cn(inputVariants({ invalid: Boolean(fields.liability), mono: true }), 'w-40')}
+                  {...invalidProps('liability', fields.liability)}
                 />
                 <FieldError id="liability-error" message={fields.liability} />
               </label>
@@ -172,9 +173,8 @@ function DisputePage() {
                   value={riskOverride}
                   onChange={(e) => setRiskOverride(e.target.value)}
                   rows={2}
-                  aria-invalid={fields.riskOverride ? true : undefined}
-                  aria-describedby={fields.riskOverride ? 'riskOverride-error' : undefined}
-                  className={`mt-1 block w-full max-w-xl rounded-md border px-2 py-1 ${fields.riskOverride ? 'border-red-400' : 'border-neutral-300'}`}
+                  className={cn(inputVariants({ invalid: Boolean(fields.riskOverride) }), 'max-w-xl')}
+                  {...invalidProps('riskOverride', fields.riskOverride)}
                 />
                 <FieldError id="riskOverride-error" message={fields.riskOverride} />
               </label>
@@ -185,8 +185,8 @@ function DisputePage() {
                 <select
                   value={settlement}
                   onChange={(e) => setSettlement(e.target.value)}
-                  aria-invalid={fields.settlement ? true : undefined}
-                  className="mt-1 block rounded-md border border-neutral-300 px-2 py-1"
+                  className={cn(inputVariants({ invalid: Boolean(fields.settlement) }), 'w-auto')}
+                  {...invalidProps('settlement', fields.settlement)}
                 >
                   <option value="">regime default</option>
                   <option value="RECOVERED">recovered</option>
@@ -197,17 +197,11 @@ function DisputePage() {
             )}
           </div>
         )}
-        {failure &&
-          !(
-            fields.liability ||
-            fields.riskOverride ||
-            fields.settlement ||
-            Object.keys(fields).some((k) => k.startsWith('answers.'))
-          ) && (
-            <div className="mt-4">
-              <FailureBanner failure={failure} onRetry={() => setFailure(null)} />
-            </div>
-          )}
+        {apply.failure && !fieldFailure && (
+          <div className="mt-4">
+            <FailureBanner failure={apply.failure} onRetry={apply.clearFailure} />
+          </div>
+        )}
       </section>
 
       <section className="mb-8">
@@ -237,11 +231,15 @@ function DisputePage() {
   )
 }
 
-function Field({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div>
-      <dt className="text-neutral-500">{label}</dt>
-      <dd className={mono ? 'font-mono' : ''}>{value}</dd>
-    </div>
-  )
-}
+const Field = ({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) => (
+  <div>
+    <dt className="text-neutral-500">{label}</dt>
+    <dd className={cn(mono && 'font-mono')}>{value}</dd>
+  </div>
+)
+
+// First paint comes from the server with the session's token; actions go straight from the browser to the API.
+export const Route = createFileRoute('/$tenant/disputes/$disputeId')({
+  loader: ({ params, context }) => context.queryClient.ensureQueryData(disputeQuery(params.disputeId)),
+  component: DisputePage,
+})
