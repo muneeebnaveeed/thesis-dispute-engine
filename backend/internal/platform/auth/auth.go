@@ -16,6 +16,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
+	"go.opentelemetry.io/otel"
+
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/httpserver"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
@@ -110,6 +112,8 @@ func Bearer(keys Resolver, oidc *OIDC) httpserver.Middleware {
 				next.ServeHTTP(w, r.WithContext(context.WithValue(ctx, ctxKey{}, ErrUnauthenticated)))
 				return
 			}
+			// its own span, so the waterfall shows the credential check apart from the work it guards
+			authCtx, span := otel.Tracer("auth").Start(ctx, "auth.authenticate")
 			var id uuid.UUID
 			var err error
 			kind := "key"
@@ -118,15 +122,17 @@ func Bearer(keys Resolver, oidc *OIDC) httpserver.Middleware {
 				var p Principal
 				if oidc == nil {
 					err = ErrUnauthenticated
-				} else if p, err = oidc.Verify(ctx, cred); err == nil {
+				} else if p, err = oidc.Verify(authCtx, cred); err == nil {
 					id = p.Tenant
 					ctx = WithPrincipal(ctx, p)
 					trace.SpanFromContext(ctx).SetAttributes(attribute.String("enduser.id", p.Subject))
 					httpserver.Annotate(ctx, "user", p.Subject)
 				}
 			} else {
-				id, err = keys.TenantForKeyHash(ctx, HashKey(cred))
+				id, err = keys.TenantForKeyHash(authCtx, HashKey(cred))
 			}
+			span.SetAttributes(attribute.String("auth.kind", kind), attribute.Bool("auth.accepted", err == nil))
+			span.End()
 			if err != nil {
 				if errs.KindOf(err) == errs.NotFound {
 					err = ErrUnauthenticated

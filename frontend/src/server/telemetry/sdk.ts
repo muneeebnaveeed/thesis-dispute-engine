@@ -3,6 +3,8 @@ import { logs, type Logger } from '@opentelemetry/api-logs'
 import { UndiciInstrumentation } from '@opentelemetry/instrumentation-undici'
 import { resourceFromAttributes } from '@opentelemetry/resources'
 import { NodeSDK } from '@opentelemetry/sdk-node'
+import { hostname } from 'node:os'
+
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION, ATTR_URL_FULL } from '@opentelemetry/semantic-conventions'
 
 const SCOPE = 'dispute-workbench'
@@ -22,9 +24,13 @@ const maskedUrl = (request: { origin: string; path: string }) => ({
 export const startTelemetry = (): void => {
   if (started || !process.env.OTEL_EXPORTER_OTLP_ENDPOINT) return
   started = new NodeSDK({
+    // the default detectors stamp a dozen process.* and host.* attributes on every record, which then show up as
+    // fields on every log line in Loki; the service and the host are all an operator ever filters on
+    autoDetectResources: false,
     resource: resourceFromAttributes({
       [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME ?? SCOPE,
       [ATTR_SERVICE_VERSION]: process.env.APP_VERSION ?? 'dev',
+      'host.name': hostname(),
     }),
     instrumentations: [new UndiciInstrumentation({ requireParentforSpans: true, startSpanHook: maskedUrl })],
   })

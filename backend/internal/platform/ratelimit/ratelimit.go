@@ -12,6 +12,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres/sqlcgen"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/httpserver"
@@ -58,7 +61,10 @@ func Middleware(counter Counter, perMinute int, log *slog.Logger) httpserver.Mid
 			}
 			now := time.Now()
 			window := now.Truncate(time.Minute)
-			n, err := counter.Bump(r.Context(), id, window)
+			bumpCtx, span := otel.Tracer("ratelimit").Start(r.Context(), "ratelimit.bump")
+			n, err := counter.Bump(bumpCtx, id, window)
+			span.SetAttributes(attribute.Int("ratelimit.count", int(n)), attribute.Int("ratelimit.limit", perMinute))
+			span.End()
 			if err != nil {
 				log.WarnContext(r.Context(), "rate limit counter", "err", err)
 				next.ServeHTTP(w, r)
