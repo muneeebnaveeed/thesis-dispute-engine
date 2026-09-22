@@ -8,7 +8,7 @@ import { AppShell } from '#/components/layout/app-shell'
 import { FailureBanner } from '#/components/layout/failure-banner'
 import { TenantMismatch } from '#/components/layout/tenant-mismatch'
 import { tenantTemplatesQuery } from '#/queries/tenant-templates'
-import { fieldErrorsOf, useServerMutation } from '#/queries/use-server-mutation'
+import { useServerMutation } from '#/queries/use-server-mutation'
 import { deleteTenantTemplate, putTenantTemplate } from '#/server/functions/tenant-templates'
 
 type NoticeKind = components['schemas']['NoticeKind']
@@ -33,7 +33,6 @@ const TemplatesPage = () => {
     onSuccess: () => setSavedNote('Reverted to the standard wording.'),
   })
   const failure = saveMutation.failure ?? revertMutation.failure
-  const fieldErrors = fieldErrorsOf(failure)
 
   if (viewer && viewer.tenantSlug !== tenant) return <TenantMismatch wanted={tenant} />
 
@@ -70,11 +69,11 @@ const TemplatesPage = () => {
               <TemplateEditor
                 key={setting.base.kind}
                 setting={setting}
-                fields={fieldErrors}
+                failure={failure}
                 busy={saveMutation.isPending || revertMutation.isPending}
                 onSave={(override) => {
                   setSavedNote(null)
-                  saveMutation.mutate({ kind: setting.base.kind, override })
+                  return saveMutation.mutateAsync({ kind: setting.base.kind, override })
                 }}
                 onRevert={() => {
                   setSavedNote(null)

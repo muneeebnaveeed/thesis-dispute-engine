@@ -95,7 +95,7 @@ const CommunicationsPage = () => {
     )
   }
   const dispute = loadedDispute.value
-  const fieldErrors = fieldErrorsOf(failure)
+  const attachmentError = fieldErrorsOf(uploadMutation.failure).attachments
   const tabClass = (tab: CommunicationsTab) =>
     cn(
       'border-b-2 px-3 py-2 text-sm',
@@ -152,9 +152,9 @@ const CommunicationsPage = () => {
           <EmailComposer
             templates={loadedCatalogue.value.templates}
             facts={loadedCatalogue.value.facts}
-            fields={fieldErrors}
+            attachmentError={attachmentError}
             busy={busy}
-            onSend={(template, fields) => sendMutation.mutate({ template, fields })}
+            onSend={(template, fields) => sendMutation.mutateAsync({ template, fields })}
             attachmentDrafts={attachmentDrafts}
             onUpload={(file) => uploadMutation.mutate(file)}
             onRemoveAttachmentDraft={(draftId) =>

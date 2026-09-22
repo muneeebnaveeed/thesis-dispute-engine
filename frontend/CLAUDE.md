@@ -55,6 +55,14 @@ lint and format fixes. `make fe-dev` for the dev server on :3002. Inside `fronte
   for overloads use a const with a call-signature type). Compose classes with `cn` from
   `#/lib/cn`, variants with `cva` in `src/components/ui/`; no hand-written button or input class
   strings. Define components first and `export const Route` at the bottom of a route file.
+- Forms are TanStack Form through `useAppForm` (`src/forms/app-form.tsx`, ADR 0021): bound fields
+  (`field.TextField`, `SelectField`, `TextareaField`, `CheckboxField`, `CheckboxGroupField`) own the
+  label, the cva class, the a11y wiring and the error line; the `<form>` uses `submitting(form)`;
+  a contract schema validates through `validators: { onSubmit: schemaValidator(schema) }` and the
+  mutation receives `parsed(schema, value)`; writes run inside `submitTo(formApi, () =>
+mutation.mutateAsync(...))`, which puts an API validation refusal on the fields it names. Field
+  names mirror the API's error pointers (`answers.<id>`, `fields.<id>`). Never read `FormData` or
+  keep form values in `useState`.
 - Names carry the meaning, comments do not: `emailLineSegments`, `requestsToApi`, `fieldErrors`,
   `openDisputeMutation`, never `segments`, `res`, `fields`, `open`, `d`, `e`, `v`. A comment is a
   terse one-liner that says why (a constraint, a trap, a decision), never what the code does, and

@@ -2,7 +2,8 @@ import { act, render, screen } from '@testing-library/react'
 import { vi } from 'vitest'
 
 import { fromProblem, type Problem } from '#/api/failure'
-import { FailureBanner, FieldError } from '#/components/layout/failure-banner'
+import { FailureBanner } from '#/components/layout/failure-banner'
+import { FieldError } from '#/components/ui/field'
 
 const base: Problem = {
   type: 'urn:x',

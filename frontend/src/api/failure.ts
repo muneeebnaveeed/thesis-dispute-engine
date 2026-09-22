@@ -14,7 +14,9 @@ export type Failure =
   | { kind: 'unavailable'; problem: Problem; retryAfterSeconds: number }
   | { kind: 'internal'; problem: Problem }
   | { kind: 'unreachable'; message: string }
-  | { kind: 'unexpected'; status: number; message: string }
+
+export const isFailure = (thrown: unknown): thrown is Failure =>
+  typeof thrown === 'object' && thrown !== null && 'kind' in thrown && typeof thrown.kind === 'string'
 
 export const isRetryable = (failure: Failure): boolean =>
   failure.kind === 'rate-limited' || failure.kind === 'unavailable' || failure.kind === 'unreachable'
@@ -110,45 +112,11 @@ export const fromProblem = (problem: Problem): Failure => {
   }
 }
 
-export const classify = (input: {
-  error?: unknown
-  response?: Response | undefined
-  thrown?: unknown
-}): Failure | null => {
-  if (input.thrown !== undefined) {
-    const message = input.thrown instanceof Error ? input.thrown.message : 'the service could not be reached'
-    return { kind: 'unreachable', message }
-  }
-  if (input.error === undefined || input.error === null) return null
-  if (isProblem(input.error)) return fromProblem(input.error)
-  const status = input.response?.status ?? 0
-  return {
-    kind: 'unexpected',
-    status,
-    message: status ? `unexpected response (${status})` : 'unexpected response',
-  }
-}
-
-const isProblem = (body: unknown): body is Problem =>
-  !!body &&
-  typeof body === 'object' &&
-  typeof (body as { code?: unknown }).code === 'string' &&
-  typeof (body as { status?: unknown }).status === 'number' &&
-  typeof (body as { retryable?: unknown }).retryable === 'boolean'
-
-export const localValidation = (fields: Record<string, string>): Failure => {
-  const problem: Problem = {
-    type: 'urn:dispute-engine:error:contract-violation',
-    title: 'The request is not valid',
-    status: 400,
-    code: 'contract-violation',
-    retryable: false,
-    requestId: 'local',
-    detail: 'Some fields need attention.',
-    errors: Object.entries(fields).map(([field, message]) => ({ field: `/${field}`, message })),
-  }
-  return { kind: 'validation', problem, fields }
-}
+// what a server function call itself can fail with: a thrown error is the network or the server being down
+export const unreachable = (thrown: unknown): Failure => ({
+  kind: 'unreachable',
+  message: thrown instanceof Error ? thrown.message : 'the service could not be reached',
+})
 
 // never the raw payload, never internal detail beyond the reference
 export const describe = (failure: Failure): { title: string; hint: string } => {
@@ -199,8 +167,6 @@ export const describe = (failure: Failure): { title: string; hint: string } => {
       }
     case 'unreachable':
       return { title: 'Cannot reach the service.', hint: 'Check your connection and try again.' }
-    case 'unexpected':
-      return { title: failure.message, hint: 'Reload the page; if it persists, contact support.' }
     default:
       return { title: 'Something went wrong.', hint: 'Reload the page.' }
   }

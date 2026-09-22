@@ -10,44 +10,59 @@ import { Notices } from '#/components/disputes/notices'
 import { QuestionnairePanel } from '#/components/disputes/questionnaire'
 import { RiskPanel } from '#/components/disputes/risk'
 import { AppShell } from '#/components/layout/app-shell'
-import { FailureBanner, FieldError } from '#/components/layout/failure-banner'
+import { FailureBanner } from '#/components/layout/failure-banner'
 import { TenantMismatch } from '#/components/layout/tenant-mismatch'
 import { Button } from '#/components/ui/button'
-import { inputVariants, invalidProps } from '#/components/ui/field'
+import { submitTo, submitting, useAppForm } from '#/forms/app-form'
 import { cn } from '#/lib/cn'
 import { formatMoney } from '#/lib/money'
 import { disputeQuery } from '#/queries/disputes'
-import { fieldErrorsOf, useServerMutation } from '#/queries/use-server-mutation'
+import { useServerMutation } from '#/queries/use-server-mutation'
 import { applyEvent } from '#/server/functions/disputes'
 
 type DisputeEvent = Dispute['allowedEvents'][number]
+
+type ActionFacts = { liability: string; riskOverride: string; settlement: string }
+const NO_FACTS: ActionFacts = { liability: '', riskOverride: '', settlement: '' }
 
 const DisputePage = () => {
   const { tenant, disputeId } = Route.useParams()
   const { viewer } = useRouteContext({ from: '__root__' })
   const { data: loadedDispute } = useSuspenseQuery(disputeQuery(disputeId))
   const queryClient = useQueryClient()
-  const [liability, setLiability] = useState('')
-  const [settlement, setSettlement] = useState('')
-  const [riskOverride, setRiskOverride] = useState('')
   const [eventInFlight, setEventInFlight] = useState<DisputeEvent | null>(null)
+  const refreshDispute = () =>
+    void queryClient.invalidateQueries({ queryKey: disputeQuery(disputeId).queryKey })
 
   const applyEventMutation = useServerMutation(
     ({ event, payload }: { event: DisputeEvent; payload: Record<string, unknown> }) =>
       applyEvent({ data: { disputeId, body: { event, actor: 'analyst', payload } } }),
     {
       invalidates: () => [disputeQuery(null).queryKey],
-      onSuccess: () => {
-        setLiability('')
-        setSettlement('')
-        setRiskOverride('')
-      },
+      onSuccess: () => actionForm.reset(),
     },
   )
+  // the facts an action may carry; which ones travel depends on the button pressed, so the event is submit meta
+  const actionForm = useAppForm({
+    defaultValues: NO_FACTS,
+    onSubmitMeta: { event: 'CLOSE' as DisputeEvent, payload: {} as Record<string, unknown> },
+    onSubmit: ({ value, meta: { event, payload }, formApi }) => {
+      const facts: Record<string, unknown> = { ...payload }
+      if (event === 'ISSUE_REFUND' && value.liability.trim()) facts.liability = value.liability.trim()
+      if (event === 'ISSUE_REFUND' && value.riskOverride.trim())
+        facts.riskOverride = value.riskOverride.trim()
+      if (event === 'CLOSE' && value.settlement) facts.settlement = value.settlement
+      setEventInFlight(event)
+      return submitTo(formApi, () => applyEventMutation.mutateAsync({ event, payload: facts })).finally(
+        () => {
+          setEventInFlight(null)
+          // conflict: the state moved under us, show the truth next to the message
+          if (applyEventMutation.failure?.kind === 'conflict') refreshDispute()
+        },
+      )
+    },
+  })
   const applyFailure = applyEventMutation.failure
-  const fieldErrors = fieldErrorsOf(applyFailure)
-  const refreshDispute = () =>
-    void queryClient.invalidateQueries({ queryKey: disputeQuery(disputeId).queryKey })
 
   if (viewer && viewer.tenantSlug !== tenant) return <TenantMismatch wanted={tenant} />
   if (loadedDispute.failure) {
@@ -60,30 +75,8 @@ const DisputePage = () => {
   const dispute = loadedDispute.value
   const canRefund = dispute.allowedEvents.includes('ISSUE_REFUND')
   const canSettle = dispute.allowedEvents.includes('CLOSE') && Number(dispute.balances.suspense) > 0
-
-  const applyWithFormFacts = (event: DisputeEvent, payloadExtras: Record<string, unknown> = {}) => {
-    const payload: Record<string, unknown> = { ...payloadExtras }
-    if (event === 'ISSUE_REFUND' && liability.trim()) payload.liability = liability.trim()
-    if (event === 'ISSUE_REFUND' && riskOverride.trim()) payload.riskOverride = riskOverride.trim()
-    if (event === 'CLOSE' && settlement) payload.settlement = settlement
-    setEventInFlight(event)
-    applyEventMutation.mutate(
-      { event, payload },
-      {
-        onSettled: (_data, error) => {
-          setEventInFlight(null)
-          // conflict: the state moved under us, show the truth next to the message
-          if (error && applyEventMutation.failure?.kind === 'conflict') refreshDispute()
-        },
-      },
-    )
-  }
-  const failureShownAtField = Boolean(
-    fieldErrors.liability ||
-    fieldErrors.riskOverride ||
-    fieldErrors.settlement ||
-    Object.keys(fieldErrors).some((fieldPath) => fieldPath.startsWith('answers.')),
-  )
+  const apply = (event: DisputeEvent, payload: Record<string, unknown> = {}) =>
+    void actionForm.handleSubmit({ event, payload })
 
   return (
     <AppShell title={`Dispute ${dispute.id.slice(0, 8)}`}>
@@ -113,9 +106,10 @@ const DisputePage = () => {
           <QuestionnairePanel
             questionnaire={dispute.questionnaire}
             canReceive={dispute.allowedEvents.includes('RECEIVE_QUESTIONNAIRE')}
-            fields={fieldErrors}
             busy={applyEventMutation.isPending}
-            onReceive={(answers) => applyWithFormFacts('RECEIVE_QUESTIONNAIRE', { answers })}
+            onReceive={(answers) =>
+              applyEventMutation.mutateAsync({ event: 'RECEIVE_QUESTIONNAIRE', payload: { answers } })
+            }
           />
         </section>
       )}
@@ -134,7 +128,7 @@ const DisputePage = () => {
                   variant="action"
                   size="sm"
                   disabled={applyEventMutation.isPending}
-                  onClick={() => applyWithFormFacts(event)}
+                  onClick={() => apply(event)}
                 >
                   {eventInFlight === event && applyEventMutation.isPending ? '...' : event}
                 </Button>
@@ -142,56 +136,56 @@ const DisputePage = () => {
           </div>
         )}
         {(canRefund || canSettle) && (
-          <div className="mt-3 flex flex-wrap gap-6 text-sm">
+          <form
+            className="mt-3 flex flex-wrap gap-6 text-sm"
+            onSubmit={submitting({
+              handleSubmit: () =>
+                actionForm.handleSubmit({ event: canRefund ? 'ISSUE_REFUND' : 'CLOSE', payload: {} }),
+            })}
+          >
             {canRefund && (
-              <label className="block">
-                Customer liability ({dispute.currency}, optional)
-                <input
-                  value={liability}
-                  onChange={(event) => setLiability(event.target.value)}
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  className={cn(
-                    inputVariants({ invalid: Boolean(fieldErrors.liability), mono: true }),
-                    'w-40',
-                  )}
-                  {...invalidProps('liability', fieldErrors.liability)}
-                />
-                <FieldError id="liability-error" message={fieldErrors.liability} />
-              </label>
+              <actionForm.AppField name="liability">
+                {(field) => (
+                  <field.TextField
+                    label={`Customer liability (${dispute.currency}, optional)`}
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    mono
+                    inputClassName="w-40"
+                  />
+                )}
+              </actionForm.AppField>
             )}
             {canRefund && dispute.risk?.tier === 'HIGH' && (
-              <label className="block basis-full">
-                Justification for crediting despite the HIGH risk score
-                <textarea
-                  value={riskOverride}
-                  onChange={(event) => setRiskOverride(event.target.value)}
-                  rows={2}
-                  className={cn(inputVariants({ invalid: Boolean(fieldErrors.riskOverride) }), 'max-w-xl')}
-                  {...invalidProps('riskOverride', fieldErrors.riskOverride)}
-                />
-                <FieldError id="riskOverride-error" message={fieldErrors.riskOverride} />
-              </label>
+              <actionForm.AppField name="riskOverride">
+                {(field) => (
+                  <field.TextareaField
+                    label="Justification for crediting despite the HIGH risk score"
+                    rows={2}
+                    className="basis-full"
+                    inputClassName="max-w-xl"
+                  />
+                )}
+              </actionForm.AppField>
             )}
             {canSettle && (
-              <label className="block">
-                Outstanding advance on close
-                <select
-                  value={settlement}
-                  onChange={(event) => setSettlement(event.target.value)}
-                  className={cn(inputVariants({ invalid: Boolean(fieldErrors.settlement) }), 'w-auto')}
-                  {...invalidProps('settlement', fieldErrors.settlement)}
-                >
-                  <option value="">regime default</option>
-                  <option value="RECOVERED">recovered</option>
-                  <option value="WRITTEN_OFF">written off</option>
-                </select>
-                <FieldError id="settlement-error" message={fieldErrors.settlement} />
-              </label>
+              <actionForm.AppField name="settlement">
+                {(field) => (
+                  <field.SelectField
+                    label="Outstanding advance on close"
+                    placeholder="regime default"
+                    options={[
+                      { value: 'RECOVERED', label: 'recovered' },
+                      { value: 'WRITTEN_OFF', label: 'written off' },
+                    ]}
+                    inputClassName="w-auto"
+                  />
+                )}
+              </actionForm.AppField>
             )}
-          </div>
+          </form>
         )}
-        {applyFailure && !failureShownAtField && (
+        {applyFailure && applyFailure.kind !== 'validation' && (
           <div className="mt-4">
             <FailureBanner failure={applyFailure} onRetry={applyEventMutation.clearFailure} />
           </div>

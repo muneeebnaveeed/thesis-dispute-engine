@@ -26,9 +26,8 @@ test('composer preview markup', () => {
         },
       ]}
       facts={{ customer: 'Kovács Anna', bank: 'OTP Bank', today: '2026-09-22' }}
-      fields={{}}
       busy={false}
-      onSend={() => {}}
+      onSend={() => Promise.resolve()}
       attachmentDrafts={[{ id: 'a1', filename: 'statement.pdf', size: 2048 }]}
     />,
   )

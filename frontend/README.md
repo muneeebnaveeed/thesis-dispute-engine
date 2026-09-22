@@ -69,6 +69,13 @@ truth: pass `null` for the identifying argument to get the invalidation prefix
 (`src/queries/use-server-mutation.ts`), which maps the outcome onto the failure taxonomy of docs/adr/0012 and
 invalidates the prefixes the caller names.
 
+## Forms
+
+TanStack Form through `useAppForm` (`src/forms/app-form.tsx`): bound field components carry the
+label, styling, a11y wiring and error line; the contract's TypeBox schemas validate on submit via
+`schemaValidator`; a mutation runs inside `submitTo`, which lands an API validation refusal on the
+fields it names so server and client errors look the same (docs/adr/0021).
+
 ## Authentication
 
 Analysts sign in through their tenant's Keycloak realm at `/<slug>`, the tenant's front door (docs/adr/0010,

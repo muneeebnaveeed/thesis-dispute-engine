@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useStore } from '@tanstack/react-form'
+import { useMemo } from 'react'
 
-import { FieldError } from '#/components/layout/failure-banner'
-import { Button } from '#/components/ui/button'
-import { inputVariants, invalidProps } from '#/components/ui/field'
+import { FieldError } from '#/components/ui/field'
+import { submitTo, submitting, useAppForm, type BoundFieldComponents } from '#/forms/app-form'
 import {
   emailLineSegments,
   renderEmailPreview,
@@ -15,10 +15,16 @@ export type AttachmentDraft = { id: string; filename: string; size: number }
 const NO_ATTACHMENT_DRAFTS: AttachmentDraft[] = []
 const MAX_ATTACHMENTS = 3
 
+const blankInputs = (template: EmailTemplate | undefined): Record<string, string> =>
+  Object.fromEntries((template?.fields ?? []).map((field) => [field.id, '']))
+
+const filledOnly = (inputs: Record<string, string>) =>
+  Object.fromEntries(Object.entries(inputs).filter(([, value]) => value.trim() !== ''))
+
 export const EmailComposer = ({
   templates,
   facts,
-  fields: fieldErrors,
+  attachmentError,
   busy,
   onSend,
   attachmentDrafts = NO_ATTACHMENT_DRAFTS,
@@ -27,15 +33,22 @@ export const EmailComposer = ({
 }: {
   templates: EmailTemplate[]
   facts: EmailFacts
-  fields: Record<string, string>
+  attachmentError?: string | undefined
   busy: boolean
-  onSend: (templateKind: EmailTemplate['kind'], analystInputs: Record<string, string>) => void
+  onSend: (templateKind: EmailTemplate['kind'], analystInputs: Record<string, string>) => Promise<unknown>
   attachmentDrafts?: AttachmentDraft[]
   onUpload?: (file: File) => void
   onRemoveAttachmentDraft?: (draftId: string) => void
 }) => {
-  const [selectedKind, setSelectedKind] = useState<EmailTemplate['kind']>(templates[0]?.kind ?? 'CUSTOM')
-  const [analystInputs, setAnalystInputs] = useState<Record<string, string>>({})
+  const composer = useAppForm({
+    defaultValues: {
+      template: templates[0]?.kind ?? ('CUSTOM' as EmailTemplate['kind']),
+      fields: blankInputs(templates[0]),
+    },
+    onSubmit: ({ value, formApi }) =>
+      submitTo(formApi, () => onSend(value.template, filledOnly(value.fields))),
+  })
+  const { template: selectedKind, fields: analystInputs } = useStore(composer.store, (state) => state.values)
   const selectedTemplate = templates.find((template) => template.kind === selectedKind) ?? templates[0]
   const today = useMemo(() => new Date(`${facts.today}T00:00:00Z`), [facts.today])
   const renderedEmail = useMemo(
@@ -45,52 +58,39 @@ export const EmailComposer = ({
   if (!selectedTemplate || !renderedEmail) {
     return <p className="text-sm text-neutral-600">No templates are available.</p>
   }
-  const fieldErrorFor = (fieldId: string) => fieldErrors[`fields.${fieldId}`] ?? fieldErrors[fieldId]
-  const setAnalystInput = (fieldId: string, value: string) =>
-    setAnalystInputs((current) => ({ ...current, [fieldId]: value }))
-  const filledInputs = () =>
-    Object.fromEntries(Object.entries(analystInputs).filter(([, value]) => value.trim() !== ''))
 
   return (
     <div className="grid gap-8 lg:grid-cols-2">
-      <form
-        className="space-y-4 text-sm"
-        onSubmit={(event) => {
-          event.preventDefault()
-          onSend(selectedTemplate.kind, filledInputs())
-        }}
-      >
-        <label className="block">
-          Email template
-          <select
-            value={selectedTemplate.kind}
-            onChange={(event) => {
-              const nextTemplate = templates.find((template) => template.kind === event.target.value)
-              if (nextTemplate) setSelectedKind(nextTemplate.kind)
-              setAnalystInputs({})
-            }}
-            className={inputVariants()}
-          >
-            {templates.map((template) => (
-              <option key={template.kind} value={template.kind}>
-                {template.label}
-              </option>
-            ))}
-          </select>
-          <span className="mt-1 block text-xs text-neutral-500">
-            {selectedTemplate.description}
-            {selectedTemplate.letter &&
-              ' Also goes out as a letter where the regime requires written notices.'}
-          </span>
-        </label>
-        {selectedTemplate.fields.map((field) => (
-          <TemplateFieldInput
-            key={field.id}
-            field={field}
-            value={analystInputs[field.id] ?? ''}
-            error={fieldErrorFor(field.id)}
-            onChange={(value) => setAnalystInput(field.id, value)}
-          />
+      <form className="space-y-4 text-sm" onSubmit={submitting(composer)}>
+        <composer.AppField
+          name="template"
+          listeners={{
+            // a new template means a new form: its fields are different, the old answers mean nothing
+            onChange: ({ value }) =>
+              composer.setFieldValue(
+                'fields',
+                blankInputs(templates.find((template) => template.kind === value)),
+              ),
+          }}
+        >
+          {(field) => (
+            <field.SelectField
+              label="Email template"
+              options={templates.map((template) => ({ value: template.kind, label: template.label }))}
+              hint={
+                <span className="mt-1 block text-xs text-neutral-500">
+                  {selectedTemplate.description}
+                  {selectedTemplate.letter &&
+                    ' Also goes out as a letter where the regime requires written notices.'}
+                </span>
+              }
+            />
+          )}
+        </composer.AppField>
+        {selectedTemplate.fields.map((templateField) => (
+          <composer.AppField key={templateField.id} name={`fields.${templateField.id}`}>
+            {(field) => <TemplateFieldInput templateField={templateField} field={field} />}
+          </composer.AppField>
         ))}
         {onUpload && (
           <div>
@@ -132,12 +132,12 @@ export const EmailComposer = ({
                 ))}
               </ul>
             )}
-            <FieldError id="field-attachments-error" message={fieldErrors.attachments} />
+            <FieldError id="attachments-error" message={attachmentError} />
           </div>
         )}
-        <Button type="submit" disabled={busy}>
-          {busy ? 'Sending...' : 'Send email'}
-        </Button>
+        <composer.AppForm>
+          <composer.SubmitButton busy={busy}>{busy ? 'Sending...' : 'Send email'}</composer.SubmitButton>
+        </composer.AppForm>
       </form>
 
       <section
@@ -198,111 +198,48 @@ const EmailLineWithUnfilledMarked = ({ renderedLine }: { renderedLine: string })
 )
 
 const TemplateFieldInput = ({
+  templateField,
   field,
-  value,
-  error,
-  onChange,
 }: {
-  field: TemplateField
-  value: string
-  error: string | undefined
-  onChange: (value: string) => void
+  templateField: TemplateField
+  field: BoundFieldComponents
 }) => {
-  const inputClass = inputVariants({ invalid: Boolean(error) })
-  const a11y = invalidProps(`field-${field.id}`, error)
-  const fieldLabel = (
+  const label = (
     <>
-      {field.label}
-      {field.required && <span className="text-neutral-400"> (required)</span>}
+      {templateField.label}
+      {templateField.required && <span className="text-neutral-400"> (required)</span>}
     </>
   )
-  if (field.type === 'MULTISELECT') {
-    const chosenOptionKeys = new Set(value.split(',').filter(Boolean))
+  if (templateField.type === 'MULTISELECT')
     return (
-      <fieldset aria-describedby={a11y['aria-describedby']}>
-        <legend className="mb-1">{fieldLabel}</legend>
-        <div className="space-y-1">
-          {field.options?.map((option) => (
-            <label key={option.key} className="flex items-start gap-2">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={chosenOptionKeys.has(option.key)}
-                onChange={(event) => {
-                  const nextChosen = new Set(chosenOptionKeys)
-                  if (event.target.checked) nextChosen.add(option.key)
-                  else nextChosen.delete(option.key)
-                  onChange([...nextChosen].join(','))
-                }}
-              />
-              <span>
-                {option.label}
-                <span className="block text-xs text-neutral-500">{option.text}</span>
-              </span>
-            </label>
-          ))}
-        </div>
-        <FieldError id={`field-${field.id}-error`} message={error} />
-      </fieldset>
+      <field.CheckboxGroupField
+        label={label}
+        options={(templateField.options ?? []).map((option) => ({
+          key: option.key,
+          label: option.label,
+          description: option.text,
+        }))}
+      />
     )
-  }
-  return (
-    <label className="block">
-      {fieldLabel}
-      {field.type === 'SELECT' && (
-        <select
-          {...a11y}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className={inputClass}
-        >
-          <option value="">choose</option>
-          {field.options?.map((option) => (
-            <option key={option.key} value={option.key}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      )}
-      {field.type === 'TEXTAREA' && (
-        <textarea
-          {...a11y}
-          value={value}
-          rows={3}
-          onChange={(event) => onChange(event.target.value)}
-          className={inputClass}
-        />
-      )}
-      {field.type === 'TEXT' && (
-        <input
-          {...a11y}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className={inputClass}
-        />
-      )}
-      {field.type === 'NUMBER' && (
-        <input
-          {...a11y}
-          type="number"
-          value={value}
-          placeholder={field.default}
-          min={field.min}
-          max={field.max}
-          onChange={(event) => onChange(event.target.value)}
-          className={inputClass}
-        />
-      )}
-      {field.type === 'DATE' && (
-        <input
-          {...a11y}
-          type="date"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className={inputClass}
-        />
-      )}
-      <FieldError id={`field-${field.id}-error`} message={error} />
-    </label>
-  )
+  if (templateField.type === 'SELECT')
+    return (
+      <field.SelectField
+        label={label}
+        placeholder="choose"
+        options={(templateField.options ?? []).map((option) => ({ value: option.key, label: option.label }))}
+      />
+    )
+  if (templateField.type === 'TEXTAREA') return <field.TextareaField label={label} rows={3} />
+  if (templateField.type === 'NUMBER')
+    return (
+      <field.TextField
+        label={label}
+        type="number"
+        placeholder={templateField.default}
+        min={templateField.min}
+        max={templateField.max}
+      />
+    )
+  if (templateField.type === 'DATE') return <field.TextField label={label} type="date" />
+  return <field.TextField label={label} />
 }

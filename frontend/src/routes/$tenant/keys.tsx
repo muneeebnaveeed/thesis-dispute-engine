@@ -5,14 +5,13 @@ import { useState } from 'react'
 import type { components } from '#/api/schema.gen'
 import { CreateTenantKeyRequest } from '#/api/schemas.gen'
 import { AppShell } from '#/components/layout/app-shell'
-import { FailureBanner, FieldError } from '#/components/layout/failure-banner'
+import { FailureBanner } from '#/components/layout/failure-banner'
 import { TenantMismatch } from '#/components/layout/tenant-mismatch'
 import { Button } from '#/components/ui/button'
-import { inputVariants, invalidProps } from '#/components/ui/field'
-import { serverFieldErrors, validateForm } from '#/forms/validate-form'
-import { cn } from '#/lib/cn'
+import { submitTo, submitting, useAppForm } from '#/forms/app-form'
+import { parsed, schemaValidator } from '#/forms/schema'
 import { tenantKeysQuery } from '#/queries/tenant-keys'
-import { fieldErrorsOf, useServerMutation } from '#/queries/use-server-mutation'
+import { useServerMutation } from '#/queries/use-server-mutation'
 import { issueTenantKey, revokeTenantKey } from '#/server/functions/tenant-keys'
 
 type TenantKey = components['schemas']['TenantKey']
@@ -21,32 +20,26 @@ const KeysPage = () => {
   const { tenant } = Route.useParams()
   const { viewer } = useRouteContext({ from: '__root__' })
   const { data: loadedKeys } = useSuspenseQuery(tenantKeysQuery())
-  const [clientFieldErrors, setClientFieldErrors] = useState<Record<string, string>>({})
   const [issuedKey, setIssuedKey] = useState<{ label: string; secret: string } | null>(null)
   const issueMutation = useServerMutation((request: { label: string }) => issueTenantKey({ data: request }), {
     invalidates: () => [tenantKeysQuery().queryKey],
     onSuccess: (issued) => setIssuedKey({ label: issued.label, secret: issued.secret }),
   })
+  const issueForm = useAppForm({
+    defaultValues: { label: '' },
+    validators: { onSubmit: schemaValidator(CreateTenantKeyRequest) },
+    onSubmit: ({ value, formApi }) => {
+      setIssuedKey(null)
+      return submitTo(formApi, () => issueMutation.mutateAsync(parsed(CreateTenantKeyRequest, value)))
+    },
+  })
   const revokeMutation = useServerMutation((keyId: string) => revokeTenantKey({ data: keyId }), {
     invalidates: () => [tenantKeysQuery().queryKey],
   })
-  const issueFailure = issueMutation.failure
-  const fieldErrors = {
-    ...clientFieldErrors,
-    ...fieldErrorsOf(issueFailure),
-    ...(issueFailure?.kind === 'validation' ? serverFieldErrors(issueFailure.problem) : {}),
-  }
-  const failure = issueFailure ?? revokeMutation.failure
+  const failure = issueMutation.failure ?? revokeMutation.failure
 
   if (viewer && viewer.tenantSlug !== tenant) return <TenantMismatch wanted={tenant} />
   const isAdmin = viewer?.roles.includes('tenant-admin') ?? false
-
-  const issueFromForm = (form: FormData) => {
-    setIssuedKey(null)
-    const validated = validateForm(CreateTenantKeyRequest, form)
-    setClientFieldErrors(validated.fields)
-    if (validated.value) issueMutation.mutate(validated.value)
-  }
 
   return (
     <AppShell title="Tenant keys">
@@ -60,25 +53,20 @@ const KeysPage = () => {
               One key per system that calls the API. The key is shown once; store it in that system's
               configuration.
             </p>
-            <form
-              className="flex gap-2"
-              onSubmit={(event) => {
-                event.preventDefault()
-                issueFromForm(new FormData(event.currentTarget))
-              }}
-            >
-              <input
-                name="label"
-                className={cn(inputVariants({ invalid: Boolean(fieldErrors.label) }), 'mt-0 px-3 py-2')}
-                placeholder="core banking production"
-                aria-label="Label"
-                {...invalidProps('label', fieldErrors.label)}
-              />
-              <Button type="submit" disabled={issueMutation.isPending}>
-                Issue
-              </Button>
+            <form className="flex items-start gap-2" onSubmit={submitting(issueForm)}>
+              <issueForm.AppField name="label">
+                {(field) => (
+                  <field.TextField
+                    label={<span className="sr-only">Label</span>}
+                    inputClassName="mt-0 px-3 py-2"
+                    placeholder="core banking production"
+                  />
+                )}
+              </issueForm.AppField>
+              <issueForm.AppForm>
+                <issueForm.SubmitButton busy={issueMutation.isPending}>Issue</issueForm.SubmitButton>
+              </issueForm.AppForm>
             </form>
-            <FieldError id="label-error" message={fieldErrors.label} />
             {issuedKey && (
               <output className="mt-4 block rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm">
                 <p className="font-medium">

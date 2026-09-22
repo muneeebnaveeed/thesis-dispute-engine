@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 
+import type { Failure, Problem } from '#/api/failure'
 import { QuestionnairePanel } from './questionnaire'
 
 const sent = {
@@ -19,28 +20,43 @@ const sent = {
   sentAt: '2026-09-22T10:00:00Z',
 }
 
-test('an unanswered questionnaire is a form that sends only what was filled in', () => {
-  const onReceive = vi.fn<(answers: Record<string, string>) => void>()
-  render(
-    <QuestionnairePanel questionnaire={sent} canReceive fields={{}} busy={false} onReceive={onReceive} />,
-  )
+test('an unanswered questionnaire is a form that sends only what was filled in', async () => {
+  const onReceive = vi
+    .fn<(answers: Record<string, string>) => Promise<unknown>>()
+    .mockResolvedValue(undefined)
+  render(<QuestionnairePanel questionnaire={sent} canReceive busy={false} onReceive={onReceive} />)
   fireEvent.change(screen.getByLabelText(/same merchant/), { target: { value: 'no' } })
   fireEvent.change(screen.getByLabelText(/did authorise/), { target: { value: '2026-09-10' } })
   fireEvent.click(screen.getByRole('button', { name: 'Record answers' }))
-  expect(onReceive).toHaveBeenCalledWith({ original_on: '2026-09-10', same_merchant: 'no' })
+  await waitFor(() =>
+    expect(onReceive).toHaveBeenCalledWith({ original_on: '2026-09-10', same_merchant: 'no' }),
+  )
 })
 
-test('server field errors land under the question they are about', () => {
+test('server field errors land under the question they are about', async () => {
+  const problem: Problem = {
+    type: 'urn:dispute-engine:error:invalid-answers',
+    title: 'invalid answers',
+    status: 422,
+    code: 'invalid-answers',
+    retryable: false,
+    requestId: 'r1',
+  }
+  const refused: Failure = {
+    kind: 'validation',
+    problem,
+    fields: { 'answers.original_on': 'must be a date as YYYY-MM-DD' },
+  }
   render(
     <QuestionnairePanel
       questionnaire={sent}
       canReceive
-      fields={{ 'answers.original_on': 'must be a date as YYYY-MM-DD' }}
       busy={false}
-      onReceive={() => {}}
+      onReceive={() => Promise.reject(refused)}
     />,
   )
-  expect(screen.getByLabelText(/did authorise/)).toHaveAttribute('aria-invalid', 'true')
+  fireEvent.click(screen.getByRole('button', { name: 'Record answers' }))
+  await waitFor(() => expect(screen.getByLabelText(/did authorise/)).toHaveAttribute('aria-invalid', 'true'))
   expect(screen.getByText('must be a date as YYYY-MM-DD')).toBeInTheDocument()
 })
 
@@ -54,9 +70,8 @@ test('a received questionnaire shows the answers and any contradictions', () => 
         inconsistencies: ['a duplicate is claimed against a different merchant'],
       }}
       canReceive={false}
-      fields={{}}
       busy={false}
-      onReceive={() => {}}
+      onReceive={() => Promise.resolve()}
     />,
   )
   expect(screen.getByRole('list', { name: 'Inconsistencies' })).toHaveTextContent(/different merchant/)

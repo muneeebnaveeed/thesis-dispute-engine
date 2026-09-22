@@ -1,29 +1,35 @@
-import { useState } from 'react'
-
 import type { Dispute } from '#/api/views'
-import { FieldError } from '#/components/layout/failure-banner'
-import { Button } from '#/components/ui/button'
-import { inputVariants, invalidProps } from '#/components/ui/field'
+import { submitTo, submitting, useAppForm } from '#/forms/app-form'
 
 type Questionnaire = NonNullable<Dispute['questionnaire']>
-type Question = Questionnaire['questions'][number]
+
+const YES_NO = [
+  { value: 'yes', label: 'yes' },
+  { value: 'no', label: 'no' },
+]
 
 export const QuestionnairePanel = ({
   questionnaire,
   canReceive,
-  fields: fieldErrors,
   busy,
   onReceive,
 }: {
   questionnaire: Questionnaire
   canReceive: boolean
-  fields: Record<string, string>
   busy: boolean
-  onReceive: (answers: Record<string, string>) => void
+  onReceive: (answers: Record<string, string>) => Promise<unknown>
 }) => {
-  const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({})
-  const answerErrorFor = (questionId: string) =>
-    fieldErrors[`answers.${questionId}`] ?? fieldErrors[questionId]
+  const answersForm = useAppForm({
+    defaultValues: {
+      answers: Object.fromEntries(questionnaire.questions.map((question) => [question.id, ''])),
+    },
+    onSubmit: ({ value, formApi }) =>
+      submitTo(formApi, () =>
+        onReceive(
+          Object.fromEntries(Object.entries(value.answers).filter(([, answer]) => answer.trim() !== '')),
+        ),
+      ),
+  })
 
   if (questionnaire.receivedAt) {
     return (
@@ -54,78 +60,46 @@ export const QuestionnairePanel = ({
   }
 
   return (
-    <form
-      className="space-y-3 text-sm"
-      onSubmit={(event) => {
-        event.preventDefault()
-        onReceive(
-          Object.fromEntries(Object.entries(draftAnswers).filter(([, answer]) => answer.trim() !== '')),
-        )
-      }}
-    >
+    <form className="space-y-3 text-sm" onSubmit={submitting(answersForm)}>
       <p className="text-neutral-600">
         Sent {questionnaire.sentAt.slice(0, 10)}; awaiting the customer. Record the answers as they come in.
       </p>
-      {questionnaire.questions.map((question) => (
-        <label key={question.id} className="block">
-          {question.text}
-          {question.required && <span className="text-neutral-400"> (required)</span>}
-          <AnswerInput
-            question={question}
-            value={draftAnswers[question.id] ?? ''}
-            error={answerErrorFor(question.id)}
-            disabled={!canReceive || busy}
-            onChange={(answer) => setDraftAnswers((current) => ({ ...current, [question.id]: answer }))}
-          />
-          <FieldError id={`answer-${question.id}-error`} message={answerErrorFor(question.id)} />
-        </label>
-      ))}
+      {questionnaire.questions.map((question) => {
+        const label = (
+          <>
+            {question.text}
+            {question.required && <span className="text-neutral-400"> (required)</span>}
+          </>
+        )
+        const disabled = !canReceive || busy
+        return (
+          <answersForm.AppField key={question.id} name={`answers.${question.id}`}>
+            {(field) => {
+              if (question.type === 'YES_NO')
+                return (
+                  <field.SelectField
+                    label={label}
+                    options={YES_NO}
+                    placeholder="choose"
+                    disabled={disabled}
+                  />
+                )
+              if (question.type === 'DATE')
+                return <field.TextField label={label} type="date" disabled={disabled} />
+              if (question.type === 'AMOUNT')
+                return (
+                  <field.TextField label={label} inputMode="decimal" placeholder="0.00" disabled={disabled} />
+                )
+              return <field.TextareaField label={label} rows={2} disabled={disabled} />
+            }}
+          </answersForm.AppField>
+        )
+      })}
       {canReceive && (
-        <Button type="submit" disabled={busy}>
-          Record answers
-        </Button>
+        <answersForm.AppForm>
+          <answersForm.SubmitButton busy={busy}>Record answers</answersForm.SubmitButton>
+        </answersForm.AppForm>
       )}
     </form>
   )
-}
-
-const AnswerInput = ({
-  question,
-  value,
-  error,
-  disabled,
-  onChange,
-}: {
-  question: Question
-  value: string
-  error: string | undefined
-  disabled: boolean
-  onChange: (answer: string) => void
-}) => {
-  const shared = {
-    value,
-    disabled,
-    className: inputVariants({ invalid: Boolean(error) }),
-    ...invalidProps(`answer-${question.id}`, error),
-  }
-  if (question.type === 'YES_NO')
-    return (
-      <select {...shared} onChange={(event) => onChange(event.target.value)}>
-        <option value="">choose</option>
-        <option value="yes">yes</option>
-        <option value="no">no</option>
-      </select>
-    )
-  if (question.type === 'DATE')
-    return <input {...shared} type="date" onChange={(event) => onChange(event.target.value)} />
-  if (question.type === 'AMOUNT')
-    return (
-      <input
-        {...shared}
-        inputMode="decimal"
-        placeholder="0.00"
-        onChange={(event) => onChange(event.target.value)}
-      />
-    )
-  return <textarea {...shared} rows={2} onChange={(event) => onChange(event.target.value)} />
 }
