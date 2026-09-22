@@ -1,8 +1,8 @@
 import { Outlet, createFileRoute, notFound, redirect } from '@tanstack/react-router'
 
-import { AppShell } from '#/components/app-shell'
-import { beginLogin } from '#/server/auth/session'
-import { tenantExists } from '#/server/discovery'
+import { AppShell } from '#/components/layout/app-shell'
+import { beginLogin } from '#/server/functions/session'
+import { tenantExists } from '#/server/functions/discovery'
 
 // Everything under /<tenant> belongs to one customer. No session: straight to that tenant's realm (silent when the
 // realm's SSO cookie is still alive). A session for a different tenant: say so rather than mixing them.

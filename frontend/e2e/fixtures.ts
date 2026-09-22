@@ -9,10 +9,10 @@ export const tenants = {
 export const analyst = { username: 'analyst', password: 'analyst' }
 
 /** Opens a dispute the way a tenant's own system would, so tests have something to protect and act on. */
-export async function openDisputeViaApi(
+export const openDisputeViaApi = async (
   request: APIRequestContext,
   tenant: keyof typeof tenants,
-): Promise<string> {
+): Promise<string> => {
   const t = tenants[tenant]
   const res = await request.post(`${api}/disputes`, {
     headers: { Authorization: `Bearer ${t.key}`, 'Idempotency-Key': crypto.randomUUID() },
@@ -26,7 +26,7 @@ export async function openDisputeViaApi(
 }
 
 /** Fills Keycloak's login page if the browser is on it; a live realm SSO session skips it entirely. */
-export async function completeKeycloakLogin(page: Page) {
+export const completeKeycloakLogin = async (page: Page) => {
   await page.waitForURL(/\/protocol\/openid-connect\/|localhost:3002/)
   if (page.url().includes('/protocol/openid-connect/')) {
     await page.fill('#username', analyst.username)
@@ -39,7 +39,7 @@ export async function completeKeycloakLogin(page: Page) {
 }
 
 /** Visits the tenant's front door and signs in; the app never asks for the tenant. */
-export async function signIn(page: Page, slug: string, path = `/${slug}`) {
+export const signIn = async (page: Page, slug: string, path = `/${slug}`) => {
   await page.goto(path)
   await completeKeycloakLogin(page)
 }

@@ -1,49 +1,32 @@
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 
-import { AppShell } from '#/components/app-shell'
-import { findTenantByEmail, rememberedTenant } from '#/server/discovery'
+import { AppShell } from '#/components/layout/app-shell'
+import { FieldError } from '#/components/layout/failure-banner'
+import { Button } from '#/components/ui/button'
+import { inputVariants, invalidProps } from '#/components/ui/field'
+import { FindTenantInput } from '#/forms/schemas'
+import { validateForm } from '#/forms/validate-form'
+import { cn } from '#/lib/cn'
+import { findTenantByEmail, rememberedTenant } from '#/server/functions/discovery'
 
 type Search = { error?: string; next?: string }
 
-// The root only decides where to go: a remembered tenant takes over, otherwise a work email finds the tenant.
-export const Route = createFileRoute('/')({
-  validateSearch: (s: Record<string, unknown>): Search => ({
-    ...(typeof s.error === 'string' ? { error: s.error } : {}),
-    ...(typeof s.next === 'string' ? { next: s.next } : {}),
-  }),
-  beforeLoad: async ({ context, search }) => {
-    if (context.viewer) throw redirect({ to: '/$tenant', params: { tenant: context.viewer.tenantSlug } })
-    if (search.error) return
-    const slug = await rememberedTenant()
-    if (slug)
-      throw redirect({
-        to: '/$tenant',
-        params: { tenant: slug },
-        search: search.next ? { next: search.next } : {},
-      })
-  },
-  component: Discover,
-})
-
-const input =
-  'w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none'
-const button =
-  'rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50'
-
-function Discover() {
+const Discover = () => {
   const navigate = useNavigate()
   const { error, next } = Route.useSearch()
   const [message, setMessage] = useState<string | null>(null)
+  const [fields, setFields] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
 
-  async function find(form: FormData) {
-    const raw = form.get('email')
-    const email = typeof raw === 'string' ? raw.trim() : ''
-    if (!email) return
-    setBusy(true)
+  // The same schema path as every other form: structure here, meaning (does the domain belong to a tenant) there.
+  const find = async (form: FormData) => {
     setMessage(null)
-    const res = await findTenantByEmail({ data: email })
+    const checked = validateForm(FindTenantInput, form)
+    setFields(checked.fields)
+    if (!checked.value) return
+    setBusy(true)
+    const res = await findTenantByEmail({ data: checked.value })
     setBusy(false)
     if ('error' in res) setMessage(res.error)
     else void navigate({ to: '/$tenant', params: { tenant: res.slug }, search: next ? { next } : {} })
@@ -72,17 +55,39 @@ function Discover() {
             <input
               name="email"
               type="email"
-              className={input}
+              className={cn(inputVariants({ invalid: Boolean(fields.email) }), 'px-3 py-2')}
               placeholder="you@yourbank.example"
               autoComplete="email"
+              {...invalidProps('email', fields.email)}
             />
           </label>
-          <button type="submit" className={button} disabled={busy}>
+          <FieldError id="email-error" message={fields.email} />
+          <Button type="submit" disabled={busy}>
             Continue
-          </button>
+          </Button>
         </form>
         {message && <output className="block text-sm text-neutral-700">{message}</output>}
       </div>
     </AppShell>
   )
 }
+
+// The root only decides where to go: a remembered tenant takes over, otherwise a work email finds the tenant.
+export const Route = createFileRoute('/')({
+  validateSearch: (s: Record<string, unknown>): Search => ({
+    ...(typeof s.error === 'string' ? { error: s.error } : {}),
+    ...(typeof s.next === 'string' ? { next: s.next } : {}),
+  }),
+  beforeLoad: async ({ context, search }) => {
+    if (context.viewer) throw redirect({ to: '/$tenant', params: { tenant: context.viewer.tenantSlug } })
+    if (search.error) return
+    const slug = await rememberedTenant()
+    if (slug)
+      throw redirect({
+        to: '/$tenant',
+        params: { tenant: slug },
+        search: search.next ? { next: search.next } : {},
+      })
+  },
+  component: Discover,
+})

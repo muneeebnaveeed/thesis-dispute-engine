@@ -31,7 +31,7 @@ const opt = (n: Node, keys: string[]) => {
   for (const k of keys) if (n[k] !== undefined) o[k] = n[k]
   return Object.keys(o).length ? `, ${JSON.stringify(o)}` : ''
 }
-function emit(n: Node): string {
+const emit = (n: Node): string => {
   if (typeof n.$ref === 'string') return n.$ref.replace('#/components/schemas/', '')
   if (Array.isArray(n.allOf)) return `Type.Intersect([${(n.allOf as Node[]).map(emit).join(', ')}])`
   const meta = opt(n, [

@@ -5,7 +5,7 @@ import { verifyLogoutToken } from './backchannel'
 const issuer = 'http://localhost:8180/realms/otp'
 const event = { 'http://schemas.openid.net/event/backchannel-logout': {} }
 
-async function realm() {
+const realm = async () => {
   const { publicKey, privateKey } = await generateKeyPair('RS256')
   const jwk = { ...(await exportJWK(publicKey)), kid: 'k1', alg: 'RS256', use: 'sig' }
   const jwks = createLocalJWKSet({ keys: [jwk] })

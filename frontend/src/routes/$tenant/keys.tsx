@@ -1,79 +1,51 @@
-import { createFileRoute, useRouteContext, useRouter } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { useSuspenseQuery } from '@tanstack/react-query'
+import { createFileRoute, useRouteContext } from '@tanstack/react-router'
+import { useState } from 'react'
 
-import { createBrowserApi } from '#/api/browser'
-import { call } from '#/api/call'
-import { classify, type Failure } from '#/api/failure'
-import { CreateTenantKeyRequest } from '#/api/schemas.gen'
+import { classify } from '#/api/failure'
 import type { components } from '#/api/schema.gen'
-import { AppShell } from '#/components/app-shell'
-import { FailureBanner, FieldError } from '#/components/failure-banner'
+import { CreateTenantKeyRequest } from '#/api/schemas.gen'
+import { AppShell } from '#/components/layout/app-shell'
+import { FailureBanner, FieldError } from '#/components/layout/failure-banner'
+import { TenantMismatch } from '#/components/layout/tenant-mismatch'
+import { Button } from '#/components/ui/button'
+import { inputVariants, invalidProps } from '#/components/ui/field'
 import { serverFields, validateForm } from '#/forms/validate-form'
-import { TenantMismatch } from '#/components/tenant-mismatch'
-import { listTenantKeys } from '#/server/tenant-keys'
+import { cn } from '#/lib/cn'
+import { tenantKeysQuery } from '#/queries'
+import { fieldsOf, useServerMutation } from '#/queries/mutation'
+import { issueTenantKey, revokeTenantKey } from '#/server/functions/mutations'
 
 type TenantKey = components['schemas']['TenantKey']
 
-// Tenant admins manage the keys their own systems use. The first paint lists them server-side; creating and
-// revoking go straight from the browser to the API with the analyst's token, and the secret is shown exactly once.
-export const Route = createFileRoute('/$tenant/keys')({
-  loader: () => listTenantKeys(),
-  component: KeysPage,
-})
-
-const input =
-  'w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none'
-const button =
-  'rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50'
-
-function KeysPage() {
-  const outcome = Route.useLoaderData()
+const KeysPage = () => {
   const { tenant } = Route.useParams()
-  const { config, viewer } = useRouteContext({ from: '__root__' })
-  const router = useRouter()
-  const api = useMemo(
-    () =>
-      createBrowserApi(config.apiUrl, () =>
-        window.location.assign(`/${tenant}?next=${encodeURIComponent(window.location.pathname)}`),
-      ),
-    [config.apiUrl, tenant],
-  )
-  const [failure, setFailure] = useState<Failure | null>(null)
-  const [fields, setFields] = useState<Record<string, string>>({})
+  const { viewer } = useRouteContext({ from: '__root__' })
+  const { data: outcome } = useSuspenseQuery(tenantKeysQuery())
+  const [localFields, setLocalFields] = useState<Record<string, string>>({})
   const [issued, setIssued] = useState<{ label: string; secret: string } | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
+  const issue = useServerMutation((body: { label: string }) => issueTenantKey({ data: body }), {
+    invalidates: () => [tenantKeysQuery().queryKey],
+    onSuccess: (key) => setIssued({ label: key.label, secret: key.secret }),
+  })
+  const revoke = useServerMutation((id: string) => revokeTenantKey({ data: id }), {
+    invalidates: () => [tenantKeysQuery().queryKey],
+  })
+  const fields = {
+    ...localFields,
+    ...fieldsOf(issue.failure),
+    ...(issue.failure?.kind === 'validation' ? serverFields(issue.failure.problem) : {}),
+  }
+  const failure = issue.failure ?? revoke.failure
 
   if (viewer && viewer.tenantSlug !== tenant) return <TenantMismatch wanted={tenant} />
   const isAdmin = viewer?.roles.includes('tenant-admin') ?? false
 
-  async function create(form: FormData) {
-    setFailure(null)
+  const submit = (form: FormData) => {
     setIssued(null)
     const checked = validateForm(CreateTenantKeyRequest, form)
-    setFields(checked.fields)
-    if (!checked.value) return
-    setBusy('create')
-    const res = await call(() => api.POST('/tenant-keys', { body: checked.value }))
-    setBusy(null)
-    if (res.failure) {
-      setFailure(res.failure)
-      if (res.failure.kind === 'validation')
-        setFields({ ...res.failure.fields, ...serverFields(res.failure.problem) })
-    } else {
-      setIssued({ label: res.data.label, secret: res.data.secret })
-      await router.invalidate()
-    }
-  }
-
-  async function revoke(id: string) {
-    setBusy(id)
-    setFailure(null)
-    const res = await call(() => api.DELETE('/tenant-keys/{keyId}', { params: { path: { keyId: id } } }), {
-      idempotent: true,
-    })
-    setBusy(null)
-    if (res.failure) setFailure(res.failure)
-    else await router.invalidate()
+    setLocalFields(checked.fields)
+    if (checked.value) issue.mutate(checked.value)
   }
 
   return (
@@ -92,20 +64,19 @@ function KeysPage() {
               className="flex gap-2"
               onSubmit={(e) => {
                 e.preventDefault()
-                void create(new FormData(e.currentTarget))
+                submit(new FormData(e.currentTarget))
               }}
             >
               <input
                 name="label"
-                className={`${input} ${fields.label ? 'border-red-400' : ''}`}
+                className={cn(inputVariants({ invalid: Boolean(fields.label) }), 'mt-0 px-3 py-2')}
                 placeholder="core banking production"
                 aria-label="Label"
-                aria-invalid={fields.label ? true : undefined}
-                aria-describedby={fields.label ? 'label-error' : undefined}
+                {...invalidProps('label', fields.label)}
               />
-              <button type="submit" className={button} disabled={busy !== null}>
+              <Button type="submit" disabled={issue.isPending}>
                 Issue
-              </button>
+              </Button>
             </form>
             <FieldError id="label-error" message={fields.label} />
             {issued && (
@@ -120,7 +91,13 @@ function KeysPage() {
             )}
             {failure && failure.kind !== 'validation' && (
               <div className="mt-4">
-                <FailureBanner failure={failure} onRetry={() => setFailure(null)} />
+                <FailureBanner
+                  failure={failure}
+                  onRetry={() => {
+                    issue.clearFailure()
+                    revoke.clearFailure()
+                  }}
+                />
               </div>
             )}
           </section>
@@ -137,7 +114,11 @@ function KeysPage() {
                 }
               />
             ) : (
-              <KeyTable keys={outcome.value ?? []} busy={busy} onRevoke={(id) => void revoke(id)} />
+              <KeyTable
+                keys={outcome.value ?? []}
+                busy={revoke.isPending}
+                onRevoke={(id) => revoke.mutate(id)}
+              />
             )}
           </section>
         </div>
@@ -148,15 +129,15 @@ function KeysPage() {
 
 const day = (s?: string) => (s ? s.slice(0, 10) : '-')
 
-function KeyTable({
+const KeyTable = ({
   keys,
   busy,
   onRevoke,
 }: {
   keys: TenantKey[]
-  busy: string | null
+  busy: boolean
   onRevoke: (id: string) => void
-}) {
+}) => {
   if (keys.length === 0) return <p className="text-sm text-neutral-600">No keys yet.</p>
   return (
     <table className="w-full text-left text-sm">
@@ -184,14 +165,9 @@ function KeyTable({
             <td className="py-1 pr-4">{k.status}</td>
             <td className="py-1 text-right">
               {k.status === 'live' && (
-                <button
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={() => onRevoke(k.id)}
-                  className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs hover:bg-neutral-100 disabled:opacity-50"
-                >
+                <Button variant="secondary" size="xs" disabled={busy} onClick={() => onRevoke(k.id)}>
                   Revoke
-                </button>
+                </Button>
               )}
             </td>
           </tr>
@@ -200,3 +176,9 @@ function KeyTable({
     </table>
   )
 }
+
+// Tenant admins manage the keys their own systems use; the secret is shown exactly once.
+export const Route = createFileRoute('/$tenant/keys')({
+  loader: ({ context }) => context.queryClient.query({ ...tenantKeysQuery(), staleTime: 'static' }),
+  component: KeysPage,
+})

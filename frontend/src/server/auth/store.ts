@@ -3,7 +3,7 @@ import { type Static, Type } from '@sinclair/typebox'
 import { Value } from '@sinclair/typebox/value'
 import createClient from 'openapi-fetch'
 
-import { serverEnv } from '../env'
+import { serverEnv } from '#/server/runtime/env'
 import { open, seal } from './crypto'
 
 /** The session payload. It never leaves this process in clear text; the API holds only the ciphertext. */
@@ -35,7 +35,7 @@ const SessionSchema = Type.Object({
 export type Session = Static<typeof SessionSchema>
 
 // The internal endpoints take the service key instead of a bearer credential.
-function internal() {
+const internal = () => {
   const env = serverEnv()
   const client = createClient<paths>({ baseUrl: env.apiUrl })
   client.use({
@@ -47,7 +47,7 @@ function internal() {
   return client
 }
 
-export async function put(id: string, session: Session, ttlSeconds: number): Promise<void> {
+export const put = async (id: string, session: Session, ttlSeconds: number): Promise<void> => {
   // Subject and sid travel in the clear beside the blob so a user's or a realm session's rows can be ended.
   const body = {
     ciphertext: Buffer.from(await seal(session)).toString('base64'),
@@ -62,7 +62,7 @@ export async function put(id: string, session: Session, ttlSeconds: number): Pro
   if (!response.ok) throw new Error(`session store: put ${response.status}`)
 }
 
-export async function get(id: string): Promise<Session | null> {
+export const get = async (id: string): Promise<Session | null> => {
   const { data, response } = await internal().GET('/internal/sessions/{sessionId}', {
     params: { path: { sessionId: id } },
   })
@@ -76,11 +76,11 @@ export async function get(id: string): Promise<Session | null> {
   }
 }
 
-export async function remove(id: string): Promise<void> {
+export const remove = async (id: string): Promise<void> => {
   await internal().DELETE('/internal/sessions/{sessionId}', { params: { path: { sessionId: id } } })
 }
 
 // Shape check on what we ourselves sealed; a payload from an older build that no longer fits is treated as no session.
-function asSession(v: unknown): Session | null {
+const asSession = (v: unknown): Session | null => {
   return Value.Check(SessionSchema, v) ? v : null
 }

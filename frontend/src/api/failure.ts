@@ -21,23 +21,23 @@ export type Failure =
   | { kind: 'unexpected'; status: number; message: string }
 
 /** True for kinds where the same request may succeed later without the person changing anything. */
-export function isRetryable(f: Failure): boolean {
+export const isRetryable = (f: Failure): boolean => {
   return f.kind === 'rate-limited' || f.kind === 'unavailable' || f.kind === 'unreachable'
 }
 
 /** Seconds to wait before a retry makes sense; 0 when a retry is pointless or may happen at once. */
-export function retryAfter(f: Failure): number {
+export const retryAfter = (f: Failure): number => {
   if (f.kind === 'rate-limited' || f.kind === 'unavailable') return f.retryAfterSeconds
   return f.kind === 'unreachable' ? 3 : 0
 }
 
 /** The problem's request reference when there is one; the thing to quote to support. */
-export function reference(f: Failure): string | null {
+export const reference = (f: Failure): string | null => {
   return 'problem' in f && f.problem.requestId !== 'local' ? f.problem.requestId : null
 }
 
 /** Field errors keyed by field name: "/transactionId" and "body.transactionId" both become "transactionId". */
-export function fieldErrors(p: Problem): Record<string, string> {
+export const fieldErrors = (p: Problem): Record<string, string> => {
   const out: Record<string, string> = {}
   for (const e of p.errors ?? []) {
     const key = e.field.replace(/^\/|^(body|query|path|header)\./, '').replace(/\//g, '.')
@@ -47,7 +47,7 @@ export function fieldErrors(p: Problem): Record<string, string> {
 }
 
 /** Classifies a problem+json body by its code, which is the only thing the contract promises to keep stable. */
-export function fromProblem(p: Problem): Failure {
+export const fromProblem = (p: Problem): Failure => {
   switch (p.code) {
     case 'contract-violation':
     case 'malformed-request':
@@ -107,11 +107,11 @@ export function fromProblem(p: Problem): Failure {
 }
 
 /** Classifies whatever openapi-fetch handed back: a typed problem, a non-problem response, or a thrown fetch error. */
-export function classify(input: {
+export const classify = (input: {
   error?: unknown
   response?: Response | undefined
   thrown?: unknown
-}): Failure | null {
+}): Failure | null => {
   if (input.thrown !== undefined) {
     const message = input.thrown instanceof Error ? input.thrown.message : 'the service could not be reached'
     return { kind: 'unreachable', message }
@@ -126,7 +126,7 @@ export function classify(input: {
   }
 }
 
-export function isProblem(v: unknown): v is Problem {
+export const isProblem = (v: unknown): v is Problem => {
   return (
     !!v &&
     typeof v === 'object' &&
@@ -137,7 +137,7 @@ export function isProblem(v: unknown): v is Problem {
 }
 
 /** A locally produced validation failure, shaped like the server's so pages have one path. */
-export function localValidation(fields: Record<string, string>): Failure {
+export const localValidation = (fields: Record<string, string>): Failure => {
   const problem: Problem = {
     type: 'urn:dispute-engine:error:contract-violation',
     title: 'The request is not valid',
@@ -152,7 +152,7 @@ export function localValidation(fields: Record<string, string>): Failure {
 }
 
 /** What to tell a person, per kind. Never the raw payload; never internal detail beyond the reference. */
-export function describe(f: Failure): { title: string; hint: string } {
+export const describe = (f: Failure): { title: string; hint: string } => {
   switch (f.kind) {
     case 'validation':
       return {
