@@ -69,10 +69,9 @@ const Workbench = () => {
   })
   const findForm = useAppForm({
     defaultValues: { disputeId: '' },
-    onSubmit: ({ value }) => {
+    onSubmit: async ({ value }) => {
       const disputeId = value.disputeId.trim()
-      if (disputeId) return navigate({ to: '/$tenant/disputes/$disputeId', params: { tenant, disputeId } })
-      return undefined
+      if (disputeId) await navigate({ to: '/$tenant/disputes/$disputeId', params: { tenant, disputeId } })
     },
   })
   const openFailure = openDisputeMutation.failure

@@ -67,7 +67,7 @@ export const TemplateEditor = ({
       paragraphs: effective.paragraphs.join('\n\n'),
       optionTexts: initialOptionTexts,
     },
-    onSubmit: ({ value, formApi }) => {
+    onSubmit: async ({ value, formApi }) => {
       const changedOptionTexts: Record<string, string> = {}
       for (const field of base.fields) {
         for (const option of field.options ?? []) {
@@ -77,7 +77,7 @@ export const TemplateEditor = ({
         }
       }
       const paragraphs = splitParagraphs(value.paragraphs)
-      return submitTo(formApi, () =>
+      await submitTo(formApi, () =>
         onSave({
           ...(value.label !== base.label ? { label: value.label } : {}),
           ...(value.description !== base.description ? { description: value.description } : {}),
