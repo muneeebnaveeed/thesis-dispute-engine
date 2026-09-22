@@ -11,7 +11,7 @@ import { getAttachment } from '#/server/functions/notices'
 
 type Notice = Dispute['notices'][number]
 
-type AttachmentBytes = NonNullable<Awaited<ReturnType<typeof getAttachment>>['value']>
+type AttachmentBytes = NonNullable<Awaited<ReturnType<typeof getAttachment>>['data']>
 
 const saveToDisk = ({ base64, contentType }: AttachmentBytes, filename: string) => {
   const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))

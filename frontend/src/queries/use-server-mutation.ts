@@ -3,10 +3,10 @@ import { isRedirect, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import { classify, fromProblem, type Failure } from '#/api/failure'
-import type { Outcome } from '#/api/views'
+import type { ApiResult } from '#/api/views'
 
 export const useServerMutation = <TVariables, TData>(
-  run: (variables: TVariables) => Promise<Outcome<TData>>,
+  run: (variables: TVariables) => Promise<ApiResult<TData>>,
   options: {
     invalidates?: (variables: TVariables, data: TData) => QueryKey[]
     onSuccess?: (data: TData, variables: TVariables) => void | Promise<void>
@@ -18,9 +18,9 @@ export const useServerMutation = <TVariables, TData>(
   const mutation = useMutation({
     mutationFn: async (variables: TVariables): Promise<TData> => {
       setFailure(null)
-      let outcome: Outcome<TData>
+      let result: ApiResult<TData>
       try {
-        outcome = await run(variables)
+        result = await run(variables)
       } catch (thrown) {
         // the session ended under this tab: the middleware sends us back through the front door
         if (isRedirect(thrown)) {
@@ -34,12 +34,12 @@ export const useServerMutation = <TVariables, TData>(
         setFailure(unreachable)
         throw unreachable
       }
-      if (outcome.problem) {
-        const refused = fromProblem(outcome.problem)
+      if (result.error) {
+        const refused = fromProblem(result.error)
         setFailure(refused)
         throw refused
       }
-      return outcome.value
+      return result.data
     },
     onSuccess: async (data, variables) => {
       await Promise.all(

@@ -3,15 +3,18 @@ import type { components } from '#/api/schema.gen'
 
 type ApiDispute = components['schemas']['Dispute']
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json }
+// the contract types an event payload as unknown, which Start's output check cannot accept; the UI never reads it,
+// the walk below exists only to earn the Json type
 export type Dispute = Omit<ApiDispute, 'events'> & {
   events: (Omit<ApiDispute['events'][number], 'payload'> & { payload: Json })[]
 }
 export type DisputeState = components['schemas']['DisputeState']
-// the wire shape of every server function: a Response cannot cross the RPC boundary, a problem+json body can
-export type Outcome<T> = { value: T; problem: null } | { value: null; problem: Problem }
-export type ApiResult<T> = { data: T; error?: undefined } | { data?: undefined; error: Problem }
+// what every server function returns: openapi-fetch's own result, the Response reduced to its status line on the
+// way to the browser by response-adapter.ts
+export type ApiResult<T> =
+  | { data: T; error?: undefined; response: Response }
+  | { data?: undefined; error: Problem; response: Response }
 
-// earn the Json type by walking the value instead of asserting it
 const toJson = (value: unknown): Json => {
   if (
     value === null ||
@@ -28,17 +31,14 @@ const toJson = (value: unknown): Json => {
   return null
 }
 
-const disputeView = (apiDispute: ApiDispute): Dispute => ({
+const serialisableEvents = (apiDispute: ApiDispute): Dispute => ({
   ...apiDispute,
   events: apiDispute.events.map((event) => ({ ...event, payload: toJson(event.payload) })),
 })
 
-export const withDisputeView = async (
+export const withSerialisableEvents = async (
   result: Promise<ApiResult<ApiDispute>>,
 ): Promise<ApiResult<Dispute>> => {
   const settled = await result
-  return settled.error ? { error: settled.error } : { data: disputeView(settled.data) }
+  return settled.error ? settled : { data: serialisableEvents(settled.data), response: settled.response }
 }
-
-export const toOutcome = <T>(result: ApiResult<T>): Outcome<T> =>
-  result.error ? { value: null, problem: result.error } : { value: result.data, problem: null }

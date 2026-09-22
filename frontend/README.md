@@ -54,9 +54,10 @@ Start server function in `src/server/functions/`, one file per domain (`disputes
 two shared bases in `src/server/runtime/fn.ts`,
 `authenticatedGet` and `authenticatedPost`, whose `authed` middleware resolves the session once and supplies an
 API client as `context.api`; each function validates its input with a TypeBox schema
-(`.validator(parse(schema))`) and its handler is `asOutcome((api, input) => ...)`, which returns an
-`Outcome`, a value or a `Problem`, never a throw for a problem+json answer; each query's `select`
-classifies the problem into the failure taxonomy, so pages only ever see `{ value, failure }`.
+(`.validator(parse(schema))`) and its handler returns the openapi-fetch result unchanged, data or a
+`Problem`, never a throw for a problem+json answer; a serialization adapter (`src/api/response-adapter.ts`)
+carries the `Response` across as its status line, and each query's `select` classifies the problem
+into the failure taxonomy, so pages only ever see `{ value, failure }`.
 
 Reads are TanStack Query options in `src/queries/<domain>.ts`, one per server function; route loaders
 load them with `queryClient.query({ ...options, staleTime: 'static' })` (`ensureQueryData` is

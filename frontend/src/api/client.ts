@@ -13,5 +13,3 @@ export const createApi = (baseUrl: string, bearer: string) => {
   client.use(auth)
   return client
 }
-
-export type Api = ReturnType<typeof createApi>
