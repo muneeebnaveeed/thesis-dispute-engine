@@ -1,0 +1,434 @@
+[
+ {
+  "text": "I did not make this payment and I have never heard of this company.",
+  "reason": "UNAUTHORISED",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "There is a charge on my card that is not mine.",
+  "reason": "UNAUTHORISED",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "Someone used my card without my permission.",
+  "reason": "UNAUTHORISED",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "This transaction was not authorised by me.",
+  "reason": "UNAUTHORISED",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "I never approved this payment to anyone.",
+  "reason": "UNAUTHORISED",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "My card details were stolen and used for this purchase.",
+  "reason": "UNAUTHORISED",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "I did not authorise this and my card has never left my wallet.",
+  "reason": "UNAUTHORISED",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "Unknown charge, I did not make it.",
+  "reason": "UNAUTHORISED",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "I paid for a sofa in March and it has still not arrived.",
+  "reason": "NOT_RECEIVED",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "The goods were never delivered.",
+  "reason": "NOT_RECEIVED",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "I ordered a laptop three weeks ago and nothing has come.",
+  "reason": "NOT_RECEIVED",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "Service was paid for but never provided.",
+  "reason": "NOT_RECEIVED",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "The courier never turned up and the parcel is lost.",
+  "reason": "NOT_RECEIVED",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "I paid for a hotel room that the hotel says was never booked.",
+  "reason": "NOT_RECEIVED",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "Nothing was delivered and the seller has stopped replying.",
+  "reason": "NOT_RECEIVED",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "The tickets I paid for never arrived by email.",
+  "reason": "NOT_RECEIVED",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "I was charged twice for the same order.",
+  "reason": "DUPLICATE",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "The same payment appears two times on my statement.",
+  "reason": "DUPLICATE",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "You took the subscription fee twice this month.",
+  "reason": "DUPLICATE",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "Double charge for one purchase at the same shop.",
+  "reason": "DUPLICATE",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "Two identical charges of 42.00 on the same day.",
+  "reason": "DUPLICATE",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "The restaurant billed the same meal twice.",
+  "reason": "DUPLICATE",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "My card was debited twice for one booking.",
+  "reason": "DUPLICATE",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "The same invoice was paid twice by mistake.",
+  "reason": "DUPLICATE",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "I agreed to pay 20 EUR and was charged 45 EUR.",
+  "reason": "AMOUNT_DIFFERS",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "The price on the receipt does not match the charge.",
+  "reason": "AMOUNT_DIFFERS",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "They charged more than the amount I approved.",
+  "reason": "AMOUNT_DIFFERS",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "The quote was 100 and the statement says 137.",
+  "reason": "AMOUNT_DIFFERS",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "I was billed the full price although I had a discount code.",
+  "reason": "AMOUNT_DIFFERS",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "The rental company added charges I never agreed to.",
+  "reason": "AMOUNT_DIFFERS",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "I signed for 9.99 and was taken for 49.99.",
+  "reason": "AMOUNT_DIFFERS",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "The final amount is higher than the one displayed at the till.",
+  "reason": "AMOUNT_DIFFERS",
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "text": "Nem én hajtottam végre ezt a tranzakciót.",
+  "reason": "UNAUTHORISED",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "Valaki az engedélyem nélkül használta a kártyámat.",
+  "reason": "UNAUTHORISED",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "Ismeretlen terhelés van a számlámon, nem én fizettem.",
+  "reason": "UNAUTHORISED",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "Nem engedélyeztem ezt a fizetést.",
+  "reason": "UNAUTHORISED",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "Ellopták a kártyaadataimat és ezzel vásároltak.",
+  "reason": "UNAUTHORISED",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "Kifizettem a bútort, de soha nem érkezett meg.",
+  "reason": "NOT_RECEIVED",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "Az árut nem szállították ki.",
+  "reason": "NOT_RECEIVED",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "Megrendeltem és kifizettem, de semmit nem kaptam.",
+  "reason": "NOT_RECEIVED",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "A szolgáltatást kifizettem, de nem teljesítették.",
+  "reason": "NOT_RECEIVED",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "A csomag soha nem érkezett meg, az eladó nem válaszol.",
+  "reason": "NOT_RECEIVED",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "Kétszer vontak le ugyanazt az összeget.",
+  "reason": "DUPLICATE",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "Ugyanaz a fizetés kétszer szerepel a kivonaton.",
+  "reason": "DUPLICATE",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "Duplán terhelték meg a kártyámat egy vásárlásért.",
+  "reason": "DUPLICATE",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "A havi díjat kétszer vonták le ebben a hónapban.",
+  "reason": "DUPLICATE",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "Két azonos terhelés ugyanattól a kereskedőtől.",
+  "reason": "DUPLICATE",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "Húsz eurót fogadtam el, de negyvenötöt vontak le.",
+  "reason": "AMOUNT_DIFFERS",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "A számlán szereplő összeg nem egyezik a terheléssel.",
+  "reason": "AMOUNT_DIFFERS",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "Többet vontak le, mint amennyit jóváhagytam.",
+  "reason": "AMOUNT_DIFFERS",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "A megadott ár alacsonyabb volt, mint a terhelt összeg.",
+  "reason": "AMOUNT_DIFFERS",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "A kedvezmény ellenére a teljes árat számolták fel.",
+  "reason": "AMOUNT_DIFFERS",
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "text": "I did order something from them last year, but this particular charge I never made.",
+  "reason": "UNAUTHORISED",
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "text": "The amount looks about right for their prices, which is worrying, because I did not buy anything.",
+  "reason": "UNAUTHORISED",
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "text": "They charged me the correct amount, that is not the issue; the issue is that nothing ever arrived.",
+  "reason": "NOT_RECEIVED",
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "text": "I recognise the merchant and the price, I simply never got the goods.",
+  "reason": "NOT_RECEIVED",
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "text": "Both charges are mine and both amounts are correct, but I only placed one order.",
+  "reason": "DUPLICATE",
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "text": "I authorised one payment. The second identical one I did not.",
+  "reason": "DUPLICATE",
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "text": "I did receive the item and I did order it, the charge is simply 30 EUR more than agreed.",
+  "reason": "AMOUNT_DIFFERS",
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "text": "Delivery was fine. The invoice is not.",
+  "reason": "AMOUNT_DIFFERS",
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "text": "My wife says she did not use the card either, so nobody here made this payment.",
+  "reason": "UNAUTHORISED",
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "text": "Part of the order came. The two items I am disputing never did.",
+  "reason": "NOT_RECEIVED",
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "text": "Same shop, same basket, same evening, charged twice, and yes I did shop there.",
+  "reason": "DUPLICATE",
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "text": "The booking was mine and it did arrive, but the final bill included a fee I never saw.",
+  "reason": "AMOUNT_DIFFERS",
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "text": "Valóban vásároltam náluk korábban, de ezt a terhelést nem én indítottam.",
+  "reason": "UNAUTHORISED",
+  "lang": "hu",
+  "band": "hard"
+ },
+ {
+  "text": "Az összeg helyes és a kereskedőt is ismerem, csak éppen semmit nem kaptam.",
+  "reason": "NOT_RECEIVED",
+  "lang": "hu",
+  "band": "hard"
+ },
+ {
+  "text": "Az egyik terhelés jogos, a másik ugyanolyan összegű viszont felesleges.",
+  "reason": "DUPLICATE",
+  "lang": "hu",
+  "band": "hard"
+ },
+ {
+  "text": "A terméket megkaptam, de a felszámított összeg magasabb a megbeszéltnél.",
+  "reason": "AMOUNT_DIFFERS",
+  "lang": "hu",
+  "band": "hard"
+ },
+ {
+  "text": "Nem en voltam, somebody used my card, kerem vizsgaljak ki.",
+  "reason": "UNAUTHORISED",
+  "lang": "mixed",
+  "band": "hard"
+ },
+ {
+  "text": "Ketszer vontak le, same amount twice, please refund one.",
+  "reason": "DUPLICATE",
+  "lang": "mixed",
+  "band": "hard"
+ },
+ {
+  "text": "paid 3 weeks ago still nothing no tracking seller ignores me",
+  "reason": "NOT_RECEIVED",
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "text": "chargd 152 not 120 as agreed pls fix",
+  "reason": "AMOUNT_DIFFERS",
+  "lang": "en",
+  "band": "hard"
+ }
+]

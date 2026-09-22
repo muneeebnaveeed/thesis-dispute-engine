@@ -1,0 +1,371 @@
+[
+ {
+  "query": "show me the overdue disputes",
+  "want": {
+   "overdue": "yes"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "anything past its deadline",
+  "want": {
+   "overdue": "yes"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "what is late",
+  "want": {
+   "overdue": "yes"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "cases that have blown their clock",
+  "want": {
+   "overdue": "yes"
+  },
+  "band": "hard"
+ },
+ {
+  "query": "nothing urgent, just show me everything",
+  "want": {
+   "overdue": "no",
+   "state": "any",
+   "reason": "any"
+  },
+  "band": "hard"
+ },
+ {
+  "query": "closed cases",
+  "want": {
+   "state": "CLOSED"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "everything still open",
+  "want": {
+   "state": "any"
+  },
+  "band": "hard"
+ },
+ {
+  "query": "disputes waiting on a questionnaire",
+  "want": {
+   "state": "QUESTIONNAIRE_SENT"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "questionnaires that came back",
+  "want": {
+   "state": "QUESTIONNAIRE_RECEIVED"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "cases under investigation",
+  "want": {
+   "state": "INVESTIGATING"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "newly opened disputes",
+  "want": {
+   "state": "INITIATED"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "where we filed a chargeback",
+  "want": {
+   "state": "CHARGEBACK_FILED"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "chargebacks the network acknowledged",
+  "want": {
+   "state": "CHARGEBACK_ACKNOWLEDGED"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "chargebacks we won",
+  "want": {
+   "state": "CHARGEBACK_WON"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "chargebacks we lost",
+  "want": {
+   "state": "CHARGEBACK_LOST"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "evidence submitted cases",
+  "want": {
+   "state": "EVIDENCE_SUBMITTED"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "provisional credit issued",
+  "want": {
+   "state": "PROVISIONAL_CREDIT_ISSUED"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "where the provisional credit was taken back",
+  "want": {
+   "state": "PROVISIONAL_CREDIT_REVERSED"
+  },
+  "band": "hard"
+ },
+ {
+  "query": "final credit given",
+  "want": {
+   "state": "FINAL_CREDIT_ISSUED"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "fast refunds",
+  "want": {
+   "state": "FAST_REFUND_ISSUED"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "unauthorised disputes",
+  "want": {
+   "reason": "UNAUTHORISED"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "fraud cases",
+  "want": {
+   "reason": "UNAUTHORISED"
+  },
+  "band": "hard"
+ },
+ {
+  "query": "goods never arrived",
+  "want": {
+   "reason": "NOT_RECEIVED"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "non delivery complaints",
+  "want": {
+   "reason": "NOT_RECEIVED"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "double charges",
+  "want": {
+   "reason": "DUPLICATE"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "duplicates",
+  "want": {
+   "reason": "DUPLICATE"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "wrong amount charged",
+  "want": {
+   "reason": "AMOUNT_DIFFERS"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "price disagreements",
+  "want": {
+   "reason": "AMOUNT_DIFFERS"
+  },
+  "band": "hard"
+ },
+ {
+  "query": "closed unauthorised cases",
+  "want": {
+   "state": "CLOSED",
+   "reason": "UNAUTHORISED"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "overdue not received disputes",
+  "want": {
+   "overdue": "yes",
+   "reason": "NOT_RECEIVED"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "duplicate charges still under investigation",
+  "want": {
+   "state": "INVESTIGATING",
+   "reason": "DUPLICATE"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "late questionnaires on fraud cases",
+  "want": {
+   "overdue": "yes",
+   "state": "QUESTIONNAIRE_SENT",
+   "reason": "UNAUTHORISED"
+  },
+  "band": "hard"
+ },
+ {
+  "query": "everything we have already refunded",
+  "want": {
+   "state": "any"
+  },
+  "band": "hard"
+ },
+ {
+  "query": "show all disputes regardless of state",
+  "want": {
+   "state": "any",
+   "reason": "any",
+   "overdue": "no"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "no filters please",
+  "want": {
+   "state": "any",
+   "reason": "any",
+   "overdue": "no"
+  },
+  "band": "hard"
+ },
+ {
+  "query": "which unauthorised ones are past due",
+  "want": {
+   "overdue": "yes",
+   "reason": "UNAUTHORISED"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "amount disputes we closed",
+  "want": {
+   "state": "CLOSED",
+   "reason": "AMOUNT_DIFFERS"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "anything at all that is overdue, any reason",
+  "want": {
+   "overdue": "yes",
+   "reason": "any"
+  },
+  "band": "plain"
+ },
+ {
+  "query": "mutasd az összes lejárt ügyet",
+  "want": {
+   "overdue": "yes"
+  },
+  "band": "hu"
+ },
+ {
+  "query": "lezárt ügyek",
+  "want": {
+   "state": "CLOSED"
+  },
+  "band": "hu"
+ },
+ {
+  "query": "kártyavisszaélés miatti panaszok",
+  "want": {
+   "reason": "UNAUTHORISED"
+  },
+  "band": "hu"
+ },
+ {
+  "query": "duplán terhelt ügyek",
+  "want": {
+   "reason": "DUPLICATE"
+  },
+  "band": "hu"
+ },
+ {
+  "query": "nem érkezett meg az áru",
+  "want": {
+   "reason": "NOT_RECEIVED"
+  },
+  "band": "hu"
+ },
+ {
+  "query": "vizsgálat alatt lévő ügyek",
+  "want": {
+   "state": "INVESTIGATING"
+  },
+  "band": "hu"
+ },
+ {
+  "query": "kérdőívre váró ügyek",
+  "want": {
+   "state": "QUESTIONNAIRE_SENT"
+  },
+  "band": "hu"
+ },
+ {
+  "query": "overdue ügyek unauthorised okkal",
+  "want": {
+   "overdue": "yes",
+   "reason": "UNAUTHORISED"
+  },
+  "band": "hu"
+ },
+ {
+  "query": "what needs my attention first",
+  "want": {
+   "overdue": "yes"
+  },
+  "band": "hard"
+ },
+ {
+  "query": "nothing is urgent, list the duplicates",
+  "want": {
+   "overdue": "no",
+   "reason": "DUPLICATE"
+  },
+  "band": "hard"
+ },
+ {
+  "query": "cases where the customer never got their goods and we are still investigating",
+  "want": {
+   "state": "INVESTIGATING",
+   "reason": "NOT_RECEIVED"
+  },
+  "band": "hard"
+ },
+ {
+  "query": "open a new dispute",
+  "want": {
+   "state": "any",
+   "reason": "any",
+   "overdue": "no"
+  },
+  "band": "hard"
+ }
+]

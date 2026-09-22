@@ -1,0 +1,200 @@
+[
+  {
+    "checkpoint": "english",
+    "latency_ms": {
+      "one_question_median": 17.4,
+      "five_questions_median": 22.3,
+      "one_question_p90": 17.6
+    },
+    "reason": {
+      "accuracy": 0.597,
+      "n": 72,
+      "by_band": {
+        "plain": "32/52",
+        "hard": "11/20"
+      },
+      "by_lang": {
+        "en": "35/46",
+        "hu": "6/24",
+        "mixed": "2/2"
+      },
+      "ece": 0.401,
+      "confusion": {
+        "AMOUNT_DIFFERS->DUPLICATE": 3,
+        "AMOUNT_DIFFERS->NOT_RECEIVED": 9,
+        "AMOUNT_DIFFERS->UNAUTHORISED": 1,
+        "DUPLICATE->NOT_RECEIVED": 3,
+        "DUPLICATE->UNAUTHORISED": 1,
+        "NOT_RECEIVED->DUPLICATE": 1,
+        "NOT_RECEIVED->UNAUTHORISED": 2,
+        "UNAUTHORISED->AMOUNT_DIFFERS": 1,
+        "UNAUTHORISED->DUPLICATE": 2,
+        "UNAUTHORISED->NOT_RECEIVED": 6
+      }
+    },
+    "questionnaire": {
+      "accuracy": 0.469,
+      "n": 113,
+      "per_question": {
+        "recognise_merchant": "10/22",
+        "card_in_possession": "10/26",
+        "shared_credentials": "12/25",
+        "prior_disputes_merchant": "7/18",
+        "police_report": "14/22"
+      },
+      "by_band": {
+        "plain": "30/65",
+        "indirect": "8/20",
+        "hard": "15/28"
+      },
+      "ece": 0.29
+    },
+    "search": {
+      "field_accuracy": 0.812,
+      "n_fields": 69,
+      "query_exact": "37/50",
+      "per_field": {
+        "overdue": "13/16",
+        "state": "22/28",
+        "reason": "21/25"
+      },
+      "by_band": {
+        "plain": "32/37",
+        "hard": "21/23",
+        "hu": "3/9"
+      }
+    },
+    "vram_gb": 2.45
+  },
+  {
+    "checkpoint": "multilingual",
+    "latency_ms": {
+      "one_question_median": 7.8,
+      "five_questions_median": 9.9,
+      "one_question_p90": 8.0
+    },
+    "reason": {
+      "accuracy": 0.639,
+      "n": 72,
+      "by_band": {
+        "plain": "34/52",
+        "hard": "12/20"
+      },
+      "by_lang": {
+        "en": "31/46",
+        "hu": "14/24",
+        "mixed": "1/2"
+      },
+      "ece": 0.213,
+      "confusion": {
+        "AMOUNT_DIFFERS->DUPLICATE": 2,
+        "AMOUNT_DIFFERS->NOT_RECEIVED": 5,
+        "AMOUNT_DIFFERS->UNAUTHORISED": 2,
+        "DUPLICATE->AMOUNT_DIFFERS": 1,
+        "DUPLICATE->NOT_RECEIVED": 2,
+        "UNAUTHORISED->DUPLICATE": 5,
+        "UNAUTHORISED->NOT_RECEIVED": 9
+      }
+    },
+    "questionnaire": {
+      "accuracy": 0.522,
+      "n": 113,
+      "per_question": {
+        "recognise_merchant": "16/22",
+        "card_in_possession": "11/26",
+        "shared_credentials": "7/25",
+        "prior_disputes_merchant": "13/18",
+        "police_report": "12/22"
+      },
+      "by_band": {
+        "plain": "36/65",
+        "indirect": "8/20",
+        "hard": "15/28"
+      },
+      "ece": 0.272
+    },
+    "search": {
+      "field_accuracy": 0.623,
+      "n_fields": 69,
+      "query_exact": "29/50",
+      "per_field": {
+        "overdue": "7/16",
+        "state": "18/28",
+        "reason": "18/25"
+      },
+      "by_band": {
+        "plain": "30/37",
+        "hard": "9/23",
+        "hu": "4/9"
+      }
+    },
+    "vram_gb": 1.6
+  },
+  {
+    "checkpoint": "typed",
+    "latency_ms": {
+      "one_question_median": 16.3,
+      "five_questions_median": 22.4,
+      "one_question_p90": 17.6
+    },
+    "reason": {
+      "accuracy": 0.639,
+      "n": 72,
+      "by_band": {
+        "plain": "34/52",
+        "hard": "12/20"
+      },
+      "by_lang": {
+        "en": "35/46",
+        "hu": "9/24",
+        "mixed": "2/2"
+      },
+      "ece": 0.595,
+      "confusion": {
+        "AMOUNT_DIFFERS->DUPLICATE": 4,
+        "AMOUNT_DIFFERS->NOT_RECEIVED": 5,
+        "AMOUNT_DIFFERS->UNAUTHORISED": 1,
+        "DUPLICATE->AMOUNT_DIFFERS": 1,
+        "DUPLICATE->NOT_RECEIVED": 4,
+        "DUPLICATE->UNAUTHORISED": 1,
+        "NOT_RECEIVED->UNAUTHORISED": 3,
+        "UNAUTHORISED->AMOUNT_DIFFERS": 2,
+        "UNAUTHORISED->DUPLICATE": 2,
+        "UNAUTHORISED->NOT_RECEIVED": 3
+      }
+    },
+    "questionnaire": {
+      "accuracy": 0.611,
+      "n": 113,
+      "per_question": {
+        "recognise_merchant": "15/22",
+        "card_in_possession": "12/26",
+        "shared_credentials": "14/25",
+        "prior_disputes_merchant": "12/18",
+        "police_report": "16/22"
+      },
+      "by_band": {
+        "plain": "39/65",
+        "indirect": "9/20",
+        "hard": "21/28"
+      },
+      "ece": 0.079
+    },
+    "search": {
+      "field_accuracy": 0.696,
+      "n_fields": 69,
+      "query_exact": "33/50",
+      "per_field": {
+        "overdue": "10/16",
+        "state": "21/28",
+        "reason": "17/25"
+      },
+      "by_band": {
+        "plain": "29/37",
+        "hard": "15/23",
+        "hu": "4/9"
+      }
+    },
+    "vram_gb": 2.46
+  }
+]

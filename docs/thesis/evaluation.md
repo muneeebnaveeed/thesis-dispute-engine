@@ -14,6 +14,8 @@ from a dated run under `data/`, never typed by hand.
 | Is tenant isolation a database guarantee? | cross-tenant reads, writes, replays and raw queries as the API role return nothing | `TestTenantIsolationUnderRLS`, browser suite |
 | How does it perform under sustained load? | p50, p95, p99 latency per route, achieved requests per second, error share, 409 share | `cmd/eval` load run read back from Prometheus |
 | Is it operable? | traces per request with statement spans, problems by code, disputes by state, alert rules | dashboard and alert provisioning; screenshots |
+| Are the model's proposals good enough to show an analyst? | accuracy per use case on a labelled set built from this system's own vocabulary, split by difficulty band and language, with expected calibration error | `eval/decisions/` against its labelled set |
+| Does a proposal actually help? | share of proposals an analyst kept, from the opened event's suggestion block | `dispute_proposals_accepted_total` by field |
 | Can an operator read the signals? | what each panel means, which signal answers which question, four worked situations | `docs/observability.md`, "Interpreting the dashboards" |
 
 ## Running it
