@@ -38,11 +38,11 @@ export const SentEmails = ({
   // newest wins until the analyst picks, so a just-sent email opens selected
   const [pickedNoticeId, setPickedNoticeId] = useState<number | null>(null)
   const selectedNoticeId = pickedNoticeId ?? newestFirst[0]?.id ?? null
-  const { data: documentOutcome } = useQuery({
+  const { data: loadedDocument } = useQuery({
     ...noticeQuery(disputeId, selectedNoticeId ?? 0),
     enabled: selectedNoticeId !== null,
   })
-  const noticeDocument = documentOutcome?.value ?? null
+  const noticeDocument = loadedDocument?.value ?? null
   const selectedNotice = newestFirst.find((notice) => notice.id === selectedNoticeId)
   const downloadMutation = useServerMutation(
     ({ attachmentId }: { attachmentId: string; filename: string }) =>

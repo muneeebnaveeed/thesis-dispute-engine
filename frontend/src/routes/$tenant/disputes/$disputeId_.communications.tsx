@@ -2,7 +2,6 @@ import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, useRouteContext, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 
-import { classify } from '#/api/failure'
 import type { components } from '#/api/schema.gen'
 import { EmailComposer, type AttachmentDraft } from '#/components/comms/email-composer'
 import { SentEmails } from '#/components/comms/sent-emails'
@@ -25,8 +24,8 @@ const CommunicationsPage = () => {
   const { viewer } = useRouteContext({ from: '__root__' })
   const router = useRouter()
   const queryClient = useQueryClient()
-  const { data: disputeOutcome } = useSuspenseQuery(disputeQuery(disputeId))
-  const { data: catalogueOutcome } = useSuspenseQuery(emailTemplatesQuery(disputeId))
+  const { data: loadedDispute } = useSuspenseQuery(disputeQuery(disputeId))
+  const { data: loadedCatalogue } = useSuspenseQuery(emailTemplatesQuery(disputeId))
   const [queuedNote, setQueuedNote] = useState<string | null>(null)
   const [attachmentDrafts, setAttachmentDrafts] = useState<AttachmentDraft[]>([])
 
@@ -85,20 +84,17 @@ const CommunicationsPage = () => {
   const busy = sendMutation.isPending || uploadMutation.isPending || resendMutation.isPending
 
   if (viewer && viewer.tenantSlug !== tenant) return <TenantMismatch wanted={tenant} />
-  if (disputeOutcome.problem || !disputeOutcome.value) {
-    const loadFailure = disputeOutcome.problem ? classify({ error: disputeOutcome.problem }) : null
+  if (loadedDispute.failure) {
     return (
       <AppShell title="Communications">
-        {loadFailure && (
-          <FailureBanner
-            failure={loadFailure}
-            onRetry={() => void queryClient.invalidateQueries({ queryKey: disputeQuery(disputeId).queryKey })}
-          />
-        )}
+        <FailureBanner
+          failure={loadedDispute.failure}
+          onRetry={() => void queryClient.invalidateQueries({ queryKey: disputeQuery(disputeId).queryKey })}
+        />
       </AppShell>
     )
   }
-  const dispute = disputeOutcome.value
+  const dispute = loadedDispute.value
   const fieldErrors = fieldErrorsOf(failure)
   const tabClass = (tab: CommunicationsTab) =>
     cn(
@@ -152,10 +148,10 @@ const CommunicationsPage = () => {
         </div>
       )}
       {activeTab === 'create' ? (
-        catalogueOutcome.value ? (
+        loadedCatalogue.value ? (
           <EmailComposer
-            templates={catalogueOutcome.value.templates}
-            facts={catalogueOutcome.value.facts}
+            templates={loadedCatalogue.value.templates}
+            facts={loadedCatalogue.value.facts}
             fields={fieldErrors}
             busy={busy}
             onSend={(template, fields) => sendMutation.mutate({ template, fields })}
@@ -166,15 +162,7 @@ const CommunicationsPage = () => {
             }
           />
         ) : (
-          <FailureBanner
-            failure={
-              classify({ error: catalogueOutcome.problem }) ?? {
-                kind: 'unexpected',
-                status: 0,
-                message: 'no templates',
-              }
-            }
-          />
+          <FailureBanner failure={loadedCatalogue.failure} />
         )
       ) : (
         <SentEmails

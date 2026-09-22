@@ -2,7 +2,7 @@ import { useMutation, useQueryClient, type QueryKey } from '@tanstack/react-quer
 import { isRedirect, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 
-import { classify, type Failure } from '#/api/failure'
+import { classify, fromProblem, type Failure } from '#/api/failure'
 import type { Outcome } from '#/api/views'
 
 export const useServerMutation = <TVariables, TData>(
@@ -34,12 +34,8 @@ export const useServerMutation = <TVariables, TData>(
         setFailure(unreachable)
         throw unreachable
       }
-      if (outcome.problem || outcome.value === null) {
-        const refused = classify({ error: outcome.problem }) ?? {
-          kind: 'unexpected' as const,
-          status: 0,
-          message: 'no data',
-        }
+      if (outcome.problem) {
+        const refused = fromProblem(outcome.problem)
         setFailure(refused)
         throw refused
       }

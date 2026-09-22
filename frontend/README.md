@@ -52,10 +52,11 @@ The browser never calls the API and never holds a token (docs/adr/0020). Every c
 Start server function in `src/server/functions/`, one file per domain (`disputes.ts`, `notices.ts`,
 `tenant-keys.ts`, `tenant-templates.ts`) plus `session.ts` and `discovery.ts`. They are built from
 two shared bases in `src/server/runtime/fn.ts`,
-`analystGet` and `analystPost`, whose `authed` middleware resolves the session once and supplies an
+`authenticatedGet` and `authenticatedPost`, whose `authed` middleware resolves the session once and supplies an
 API client as `context.api`; each function validates its input with a TypeBox schema
-(`.validator(parse(schema))`) and its handler is `asAnalyst((api, input) => ...)`, which returns an
-`Outcome`, a value or a `Problem`, never a throw for a problem+json answer.
+(`.validator(parse(schema))`) and its handler is `asOutcome((api, input) => ...)`, which returns an
+`Outcome`, a value or a `Problem`, never a throw for a problem+json answer; each query's `select`
+classifies the problem into the failure taxonomy, so pages only ever see `{ value, failure }`.
 
 Reads are TanStack Query options in `src/queries/<domain>.ts`, one per server function; route loaders
 load them with `queryClient.query({ ...options, staleTime: 'static' })` (`ensureQueryData` is

@@ -1,18 +1,18 @@
 import { Type } from '@sinclair/typebox'
 
 import { NoticeKind, TemplateOverride } from '#/api/schemas.gen'
-import { analystGet, analystPost, asAnalyst, parse } from '#/server/runtime/fn'
+import { authenticatedGet, authenticatedPost, asOutcome, parse } from '#/server/runtime/fn'
 
-export const listTenantTemplates = analystGet.handler(asAnalyst((api) => api.GET('/tenant-templates')))
+export const listTenantTemplates = authenticatedGet.handler(asOutcome((api) => api.GET('/tenant-templates')))
 
-export const putTenantTemplate = analystPost
+export const putTenantTemplate = authenticatedPost
   .validator(parse(Type.Object({ kind: NoticeKind, override: TemplateOverride })))
   .handler(
-    asAnalyst((api, { kind, override }) =>
+    asOutcome((api, { kind, override }) =>
       api.PUT('/tenant-templates/{kind}', { params: { path: { kind } }, body: override }),
     ),
   )
 
-export const deleteTenantTemplate = analystPost
+export const deleteTenantTemplate = authenticatedPost
   .validator(parse(NoticeKind))
-  .handler(asAnalyst((api, kind) => api.DELETE('/tenant-templates/{kind}', { params: { path: { kind } } })))
+  .handler(asOutcome((api, kind) => api.DELETE('/tenant-templates/{kind}', { params: { path: { kind } } })))

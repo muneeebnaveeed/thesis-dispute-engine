@@ -30,13 +30,15 @@ lint and format fixes. `make fe-dev` for the dev server on :3002. Inside `fronte
   (`pnpm generate`, committed, diffed in CI); never hand-write request or response shapes. When
   the spec changes, regenerate here and in the backend in the same PR.
 - The browser never calls the API and never holds a token (ADR 0020). Every call is a server
-  function in `src/server/functions/<domain>.ts`, built from `analystGet` or `analystPost`
+  function in `src/server/functions/<domain>.ts`, built from `authenticatedGet` or `authenticatedPost`
   (`src/server/runtime/fn.ts`): the `authed` middleware resolves the session once and provides
   `context.api`; `.validator(parse(schema))` checks the input with a TypeBox schema (the generated
   one where the contract has it) before the handler runs; the handler is always
-  `asAnalyst((api, input) => api.GET(...))`, which turns the result into an `Outcome` (`{ value }` or
-  `{ problem }`, never a throw for problem+json). Endpoints that return a dispute wrap the call in
-  `withDisputeView`. No session (or an API 401) is not an outcome: the middleware throws a redirect
+  `asOutcome((api, input) => api.GET(...))`, which drops the `Response` (it cannot cross the RPC
+  boundary) and returns an `Outcome` (`{ value }` or `{ problem }`, never a throw for problem+json).
+  Endpoints that return a dispute wrap the call in `withDisputeView`. Every `queryOptions` sets
+  `select: classified`, so components receive `Loaded<T>` (`{ value, failure }`) and render
+  `failure` straight into `FailureBanner`; never call `classify` in a component. No session (or an API 401) is not an outcome: the middleware throws a redirect
   through the tenant's front door back to the page (`signInAgain`), loaders follow it by themselves
   and `useServerMutation` follows it for actions, so never call a server function imperatively
   outside that hook.

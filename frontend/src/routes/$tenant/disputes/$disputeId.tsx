@@ -2,7 +2,6 @@ import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, useRouteContext } from '@tanstack/react-router'
 import { useState } from 'react'
 
-import { classify } from '#/api/failure'
 import type { Dispute } from '#/api/views'
 import { Deadlines } from '#/components/disputes/deadlines'
 import { EventLog } from '#/components/disputes/event-log'
@@ -26,7 +25,7 @@ type DisputeEvent = Dispute['allowedEvents'][number]
 const DisputePage = () => {
   const { tenant, disputeId } = Route.useParams()
   const { viewer } = useRouteContext({ from: '__root__' })
-  const { data: disputeOutcome } = useSuspenseQuery(disputeQuery(disputeId))
+  const { data: loadedDispute } = useSuspenseQuery(disputeQuery(disputeId))
   const queryClient = useQueryClient()
   const [liability, setLiability] = useState('')
   const [settlement, setSettlement] = useState('')
@@ -51,15 +50,14 @@ const DisputePage = () => {
     void queryClient.invalidateQueries({ queryKey: disputeQuery(disputeId).queryKey })
 
   if (viewer && viewer.tenantSlug !== tenant) return <TenantMismatch wanted={tenant} />
-  if (disputeOutcome.problem || !disputeOutcome.value) {
-    const loadFailure = disputeOutcome.problem ? classify({ error: disputeOutcome.problem }) : null
+  if (loadedDispute.failure) {
     return (
       <AppShell title="Dispute">
-        {loadFailure && <FailureBanner failure={loadFailure} onRetry={refreshDispute} />}
+        <FailureBanner failure={loadedDispute.failure} onRetry={refreshDispute} />
       </AppShell>
     )
   }
-  const dispute = disputeOutcome.value
+  const dispute = loadedDispute.value
   const canRefund = dispute.allowedEvents.includes('ISSUE_REFUND')
   const canSettle = dispute.allowedEvents.includes('CLOSE') && Number(dispute.balances.suspense) > 0
 

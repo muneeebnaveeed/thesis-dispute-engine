@@ -7,7 +7,9 @@ export type Dispute = Omit<ApiDispute, 'events'> & {
   events: (Omit<ApiDispute['events'][number], 'payload'> & { payload: Json })[]
 }
 export type DisputeState = components['schemas']['DisputeState']
-export type Outcome<T> = { value: T | null; problem: Problem | null }
+// the wire shape of every server function: a Response cannot cross the RPC boundary, a problem+json body can
+export type Outcome<T> = { value: T; problem: null } | { value: null; problem: Problem }
+export type ApiResult<T> = { data: T; error?: undefined } | { data?: undefined; error: Problem }
 
 // earn the Json type by walking the value instead of asserting it
 const toJson = (value: unknown): Json => {
@@ -31,17 +33,12 @@ const disputeView = (apiDispute: ApiDispute): Dispute => ({
   events: apiDispute.events.map((event) => ({ ...event, payload: toJson(event.payload) })),
 })
 
-type ApiResult<T> = { data?: T; error?: Problem }
-
 export const withDisputeView = async (
   result: Promise<ApiResult<ApiDispute>>,
 ): Promise<ApiResult<Dispute>> => {
-  const { data, error } = await result
-  if (data !== undefined) return { data: disputeView(data) }
-  return error ? { error } : {}
+  const settled = await result
+  return settled.error ? { error: settled.error } : { data: disputeView(settled.data) }
 }
 
 export const toOutcome = <T>(result: ApiResult<T>): Outcome<T> =>
-  result.error || result.data === undefined
-    ? { value: null, problem: result.error ?? null }
-    : { value: result.data, problem: null }
+  result.error ? { value: null, problem: result.error } : { value: result.data, problem: null }

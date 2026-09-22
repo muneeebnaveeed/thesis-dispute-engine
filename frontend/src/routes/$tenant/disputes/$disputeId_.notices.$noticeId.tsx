@@ -1,7 +1,6 @@
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 
-import { classify } from '#/api/failure'
 import { FailureBanner } from '#/components/layout/failure-banner'
 import { Button } from '#/components/ui/button'
 import { noticeQuery } from '#/queries/notices'
@@ -9,24 +8,21 @@ import { noticeQuery } from '#/queries/notices'
 const NoticePage = () => {
   const { tenant, disputeId, noticeId } = Route.useParams()
   const noticeNumber = Number(noticeId)
-  const { data: noticeOutcome } = useSuspenseQuery(noticeQuery(disputeId, noticeNumber))
+  const { data: loadedNotice } = useSuspenseQuery(noticeQuery(disputeId, noticeNumber))
   const queryClient = useQueryClient()
-  if (noticeOutcome.problem || !noticeOutcome.value) {
-    const loadFailure = noticeOutcome.problem ? classify({ error: noticeOutcome.problem }) : null
+  if (loadedNotice.failure) {
     return (
       <main className="mx-auto max-w-2xl p-8">
-        {loadFailure && (
-          <FailureBanner
-            failure={loadFailure}
-            onRetry={() =>
-              void queryClient.invalidateQueries({ queryKey: noticeQuery(disputeId, noticeNumber).queryKey })
-            }
-          />
-        )}
+        <FailureBanner
+          failure={loadedNotice.failure}
+          onRetry={() =>
+            void queryClient.invalidateQueries({ queryKey: noticeQuery(disputeId, noticeNumber).queryKey })
+          }
+        />
       </main>
     )
   }
-  const letter = noticeOutcome.value
+  const letter = loadedNotice.value
   return (
     <main className="mx-auto max-w-2xl p-8 font-serif text-[12pt] leading-relaxed text-neutral-900 print:p-0">
       <nav className="mb-8 flex gap-4 font-sans text-sm print:hidden">

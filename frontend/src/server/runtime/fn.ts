@@ -3,8 +3,7 @@ import { Value } from '@sinclair/typebox/value'
 import { createServerFn } from '@tanstack/react-start'
 
 import type { Api } from '#/api/client'
-import type { Problem } from '#/api/failure'
-import { toOutcome, type Outcome } from '#/api/views'
+import { toOutcome, type ApiResult, type Outcome } from '#/api/views'
 import { authed } from './middleware'
 
 export const uuid = Type.String({ format: 'uuid' })
@@ -21,17 +20,17 @@ export const parse =
     return value
   }
 
-type ApiResult<T> = { data?: T; error?: Problem }
-type AnalystCall<Input, T> = (api: Api, input: Input) => Promise<ApiResult<T>>
+type ApiCall<Input, T> = (api: Api, input: Input) => Promise<ApiResult<T>>
 type HandlerContext<Input> = { data: Input; context: { api: Api } }
 
-export const analystGet = createServerFn({ method: 'GET' }).middleware([authed])
-export const analystPost = createServerFn({ method: 'POST' }).middleware([authed])
+export const authenticatedGet = createServerFn({ method: 'GET' }).middleware([authed])
+export const authenticatedPost = createServerFn({ method: 'POST' }).middleware([authed])
 
-// the handler of every analyst server function. Start's builder types cannot be wrapped generically, which is why
-// this is a handler and not part of the builders above. Nothing server-only may be imported here: route files
-// import this module and only middleware .server() bodies are stripped from the client bundle.
-export const asAnalyst =
-  <Input, T>(call: AnalystCall<Input, T>) =>
+// the handler of every authenticated server function: drops the Response (not serialisable) and keeps data or
+// problem. Start's builder types cannot be wrapped generically, which is why this is a handler and not part of the
+// builders above. Nothing server-only may be imported here: route files import this module and only middleware
+// .server() bodies are stripped from the client bundle.
+export const asOutcome =
+  <Input, T>(call: ApiCall<Input, T>) =>
   ({ data, context }: HandlerContext<Input>): Promise<Outcome<T>> =>
     call(context.api, data).then(toOutcome)

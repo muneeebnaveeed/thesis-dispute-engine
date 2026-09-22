@@ -24,11 +24,14 @@ RPC); at that point the second transport bought nothing.
 - One middleware (`authed`, `createMiddleware({ type: 'function' })`) resolves the session once
   and puts an API client into `context.api`; with no session it throws a redirect through the
   tenant's front door and back to the page, so a stale tab signs in again instead of seeing an error. Two shared builders
-  wrap it, `analystGet` and `analystPost`; a server function is `analystGet.validator(parse(schema))
-  .handler(({ data, context }) => read(context.api, api => api.GET(...)))` and nothing more.
+  wrap it, `authenticatedGet` and `authenticatedPost`; a server function is
+  `authenticatedGet.validator(parse(schema)).handler(asOutcome((api, input) => api.GET(...)))` and
+  nothing more.
   `parse` validates every input against a TypeBox schema, the contract's generated schema where
-  one exists, before any handler runs. Handlers return `Outcome<T>` (`{ value }` or `{ problem }`)
-  and never throw for a problem+json answer.
+  one exists, before any handler runs. Handlers return `Outcome<T>` (`{ value }` or `{ problem }`),
+  the serialisable part of the API's answer, and never throw for a problem+json response; each
+  query's `select` turns a problem into the ADR 0012 `Failure` once, so pages branch on
+  `failure`, never on a problem body.
 - Reads are TanStack Query `queryOptions` in `src/queries/`, one per server function, and the
   options are the only source of key truth: `disputeQuery(id)` owns `['disputes', id]`, and the
   identifying argument accepts null to name the prefix, so `disputeQuery(null).queryKey` is
