@@ -10,6 +10,6 @@ Use the operator scripts; never edit tenants, realms, keys or users by hand.
 - Analyst: `scripts/tenant user add|remove|list --slug <slug> ...`. Add prints a temporary password once.
 - Keys alone: `cd backend && go run ./cmd/tenantkey create|list|find|revoke|audit`.
 - Row alone: `cd backend && go run ./cmd/tenant upsert|disable|enable|list`.
-- Everything needs Postgres and Keycloak up (`make auth-up`) and the owner database URL; secrets printed by
+- Everything needs Postgres and Keycloak up (`make auth:up`) and the owner database URL; secrets printed by
   these commands are shown once and must not be pasted into commits, PRs or notes.
 - Runbooks with the reasoning: `docs/operations.md`, `docs/authentication.md`.

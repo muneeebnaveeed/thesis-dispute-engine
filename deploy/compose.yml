@@ -7,10 +7,10 @@
 # service straight to localhost and sidesteps the bridge. Do not "fix" this back
 # to port mappings. Consequence: services talk to each other via localhost.
 #
-#   make db-up      postgres only (the usual `make run` loop)
-#   make up         postgres + the API built from backend/Dockerfile
-#   make docker-dev postgres + the API in a Go toolchain container with live reload
-#   make otel-up    the above plus otel-lgtm; the API exports traces, metrics and logs to it
+#   make db:up     postgres only (the usual `make api:run` loop)
+#   make stack:up  postgres + the API built from backend/Dockerfile
+#   make stack:dev postgres + the API in a Go toolchain container with live reload
+#   make otel:up   the above plus otel-lgtm; the API exports traces, metrics and logs to it
 services:
   postgres:
     image: postgres:17-alpine
@@ -21,7 +21,7 @@ services:
       POSTGRES_DB: dispute
     volumes:
       - pgdata:/var/lib/postgresql/data
-      # Fresh volumes get the API login at init; `make db-up` also applies it to existing ones.
+      # Fresh volumes get the API login at init; `make db:up` also applies it to existing ones.
       - ./postgres/roles.sql:/docker-entrypoint-initdb.d/10-roles.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dispute -d dispute"]
@@ -185,7 +185,7 @@ services:
       - ./grafana/provisioning/alerting/dispute-engine.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/dispute-engine.yaml:ro
       - ./grafana/dashboards:/otel-lgtm/dispute-engine-dashboards:ro
 
-  # Synthetic traffic so the dashboards are populated during a demo; needs `make db-seed` (otel-up runs it).
+  # Synthetic traffic so the dashboards are populated during a demo; needs `make db:seed` (otel:up runs it).
   probe:
     image: curlimages/curl:8.22.0
     network_mode: host

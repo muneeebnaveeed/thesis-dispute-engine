@@ -1,4 +1,4 @@
-# Live reload for `make dev`. Everything air writes stays under tmp/ (gitignored).
+# Live reload for `make api:dev`. Everything air writes stays under tmp/ (gitignored).
 root = "."
 tmp_dir = "tmp"
 

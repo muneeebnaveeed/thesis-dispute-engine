@@ -18,7 +18,7 @@ standard `OTEL_*` environment variables (`contrib/exporters/autoexport`), never 
 - `internal/telemetry.Setup` installs global tracer and meter providers with a resource
   (`service.name`, `service.version`) and W3C trace-context + baggage propagation.
 - With no `OTEL_*` set, providers are still installed, spans and metrics are created, but
-  nothing is exported and nothing is logged. A plain `make run` stays quiet.
+  nothing is exported and nothing is logged. A plain `make api:run` stays quiet.
 - `otelhttp` wraps the whole HTTP stack; matched routes rename the server span to their
   pattern (`GET /disputes/{id}`) and tag `http.route`, so span cardinality is bounded by the
   routing table.
@@ -26,7 +26,7 @@ standard `OTEL_*` environment variables (`contrib/exporters/autoexport`), never 
   exporter with trace context attached; request logs also carry `trace_id` and `span_id`.
 - `otelpgx` traces every statement as a child span named after the sqlc query; values are never
   recorded. Log records pass through a redaction handler before any sink.
-- Local viewing is Grafana LGTM (Tempo, Mimir, Loki) via `make otel-up`; production points the
+- Local viewing is Grafana LGTM (Tempo, Mimir, Loki) via `make otel:up`; production points the
   same variables at whatever backend is in use. The local stack keeps a week of data, binds OTLP
   to loopback, provisions the dashboard and two alert rules from the repo, and runs a synthetic
   probe so panels are never empty. `docs/observability.md` is the operator cheat sheet.

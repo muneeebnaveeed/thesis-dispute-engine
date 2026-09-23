@@ -1,7 +1,7 @@
 # Observability cheat sheet
 
-Everything below assumes `make otel-up` (Postgres, API, workbench, Grafana LGTM, synthetic probe; all on
-host networking). Stop with `make otel-down`; `make otel-reset` also drops the LGTM volume. Two services
+Everything below assumes `make otel:up` (Postgres, API, workbench, Grafana LGTM, synthetic probe; all on
+host networking). Stop with `make otel:down`; `make otel:reset` also drops the LGTM volume. Two services
 report: `dispute-engine` (the Go API) and `dispute-workbench` (the frontend server); one trace spans both
 and continues into the outbox (ADR 0022).
 
@@ -187,7 +187,7 @@ Keep labels and span names bounded; unbounded cardinality is the one mistake tha
 
 ## Load
 
-`make eval` (docs/thesis/evaluation.md) is the load generator: paced dispute lifecycles through the API with a
+`make thesis:eval` (docs/thesis/evaluation.md) is the load generator: paced dispute lifecycles through the API with a
 tenant key and, with `EVAL_WORKBENCH`, server-rendered pages through the workbench as a signed-in analyst,
 then the run's numbers read back from Prometheus into `docs/thesis/data/<date>/load.json`. It is the quickest
 way to see every panel on both dashboards move at once.
@@ -197,7 +197,7 @@ way to see every panel on both dashboards move at once.
 `deploy/probe.sh` runs in the `probe` container and, every `PROBE_INTERVAL` seconds, walks four
 seeded transactions through a full lifecycle plus one deliberate 409 and one deliberate 400, so the
 dashboard is populated during a demo. Its requests carry `actor: probe`; it needs the seed data
-from `make db-seed` (run by `make otel-up`).
+from `make db:seed` (run by `make otel:up`).
 
 ## Changing things
 

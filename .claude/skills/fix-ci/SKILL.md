@@ -12,7 +12,7 @@ Investigate first, then confirm the plan with the user before editing source.
    `run-<id>-logs.txt` (failed steps only).
 3. Read the index, then the log. Each CI job is one check (`backend lint`, `backend test`,
    `backend image`, ...), so the job name already says which `make` target reproduces it.
-4. Reproduce locally with that target (`make lint`, `make test`, `make image`, ...) before
+4. Reproduce locally with that target (`make api:lint`, `make api:test`, `make api:image`, ...) before
    proposing anything; the race detector is the one check that cannot run here.
 5. Present: failing job, root cause, the minimal fix, and what else it touches. Wait for a go.
 6. After fixing: `make ci`, commit with the `commit` skill, push, `scripts/fetch-ci-logs --wait`.
