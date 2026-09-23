@@ -18,7 +18,7 @@ GENERATED       := $(BACKEND)/internal/dispute/infrastructure/postgres/sqlcgen $
 	db\:up db\:down db\:logs db\:seed db\:migrate \
 	api\:run api\:dev api\:build api\:test api\:test-race api\:test-integration api\:cover \
 	api\:generate api\:generate-check api\:lint api\:vet api\:fmt api\:fmt-fix api\:tidy api\:vuln api\:image \
-	workbench\:install workbench\:dev workbench\:check workbench\:fix workbench\:generate \
+	workbench\:install workbench\:dev workbench\:check workbench\:fix workbench\:generate workbench\:cover \
 	workbench\:build workbench\:image workbench\:e2e \
 	stack\:up stack\:dev stack\:down auth\:up auth\:down otel\:up otel\:down otel\:reset \
 	thesis\:build thesis\:eval pr\:open pr\:ci-logs pr\:comments pr\:stack
@@ -141,6 +141,9 @@ workbench\:fix: ## Apply frontend lint and format fixes
 
 workbench\:generate: ## Regenerate the frontend API types and schemas from docs/api/openapi.yaml; commit the output
 	$(PNPM) generate
+
+workbench\:cover: ## Coverage for the layers that hold logic (src/server, src/lib); reported, never gated
+	$(PNPM) test:cover
 
 workbench\:build: ## Production build into frontend/.output
 	$(PNPM) generate-routes && $(PNPM) build

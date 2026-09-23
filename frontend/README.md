@@ -16,6 +16,7 @@ make workbench:install  # pnpm install --frozen-lockfile
 make workbench:dev      # http://localhost:3002, expects the API on :8090
 make workbench:check    # typecheck, lint, knip, format check, tests (what CI runs)
 make workbench:fix      # apply lint and format fixes
+make workbench:cover    # coverage for src/server and src/lib (reported, not gated)
 make workbench:build    # production build into .output/, run with pnpm start
 ```
 

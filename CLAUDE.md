@@ -37,6 +37,8 @@ Targets are namespaced by domain: `db:`, `api:`, `workbench:`, `stack:`, `auth:`
 - `make db:migrate`: apply pending migrations as the schema owner; `make api:run` does it first. The
   API only checks the schema and refuses to start behind it.
 - `make db:seed`: fixed dev accounts and transactions (idempotent; migrates first).
+- `make workbench:cover`: coverage for `src/server` and `src/lib`, where the logic is; CI reports it
+  in the job summary and never gates on it. Routes and components are covered by `make workbench:e2e`.
 - `make api:test` / `make api:lint` / `make api:fmt-fix`: the individual steps. `make api:test-race` needs cgo;
   the dev machine has no C compiler, CI has one.
 - `make api:run`: API natively on :8090. `make api:dev`: same with live reload (air).

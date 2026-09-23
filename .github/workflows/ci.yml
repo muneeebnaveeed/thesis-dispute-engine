@@ -279,7 +279,16 @@ jobs:
         run: pnpm fmt
       - name: test
         if: ${{ !cancelled() }}
-        run: pnpm test
+        run: pnpm test:cover
+      # Reported, never gated: the server functions are exercised by the e2e suite, not by unit tests,
+      # so a threshold here would only measure how much of that was duplicated.
+      - name: coverage
+        if: ${{ !cancelled() }}
+        run: |
+          jq -r '"### Workbench coverage (src/server, src/lib)\n",
+                 "| metric | % | covered |", "| --- | --- | --- |",
+                 (.total | to_entries[] | select(.key != "branchesTrue") | "| \(.key) | \(.value.pct) | \(.value.covered)/\(.value.total) |")' \
+            coverage/coverage-summary.json >> "$GITHUB_STEP_SUMMARY"
       - name: build
         if: ${{ !cancelled() }}
         run: pnpm build

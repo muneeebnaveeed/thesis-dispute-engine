@@ -10,7 +10,10 @@ from the root `mise.toml`; never install with npm or yarn (the `preinstall` hook
 
 ## Commands (repo root)
 
-`make workbench:check` before every push (typecheck, lint, dead code via knip, format check, tests). `make workbench:fix` applies
+`make workbench:check` before every push (typecheck, lint, dead code via knip, format check, tests).
+`make workbench:cover` reports coverage for `src/server` and `src/lib` only: routes and components are
+composition and are covered by the browser suite instead, so a percentage over the whole tree would
+measure the architecture rather than the testing. `make workbench:fix` applies
 lint and format fixes. `make workbench:dev` for the dev server on :3002. Inside `frontend/`, the same as
 `pnpm typecheck|lint|fmt|test|dev|build`.
 

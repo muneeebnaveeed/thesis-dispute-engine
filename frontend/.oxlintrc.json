@@ -28,7 +28,8 @@
     "src/routeTree.gen.ts",
     "src/api/*.gen.ts",
     "playwright-report",
-    "test-results"
+    "test-results",
+    "coverage"
   ],
   "settings": {
     "react": {
