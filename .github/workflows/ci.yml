@@ -257,7 +257,7 @@ jobs:
         with:
           version: ${{ needs.changes.outputs.pnpm }}
           run_install: false
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ needs.changes.outputs.node }}
           cache: pnpm
