@@ -195,7 +195,7 @@ test('the questionnaire follows the reason, incomplete answers are refused under
 }) => {
   await page.getByRole('button', { name: 'New dispute' }).click()
   await page.getByLabel('Transaction ID').fill(tenants.otp.transaction)
-  await page.getByLabel('Reason').selectOption('UNAUTHORISED')
+  await page.getByRole('combobox', { name: /^Reason/ }).selectOption('UNAUTHORISED')
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await expect(page).toHaveURL(/\/otp\/disputes\/[0-9a-f-]{36}$/)
   await expect(page.getByRole('definition').filter({ hasText: 'UNAUTHORISED' })).toBeVisible()
