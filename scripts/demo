@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# One command to bring the whole system up for a demonstration, verify it, and print what to open.
+#
+#   scripts/demo              identity, API, workbench, mail
+#   scripts/demo --otel       the above plus Grafana and the synthetic probe
+#   scripts/demo --check      verify a stack that is already up, change nothing
+#   scripts/demo --down       stop everything, keep the data
+#
+# Idempotent: safe to re-run at any point. Every step says what it is doing and fails loudly, because
+# the one time this matters there is an audience.
+set -euo pipefail
+source "$(dirname "$0")/lib/common.sh"
+root=$(repo_root)
+compose=("docker" "compose" "-f" "$root/deploy/compose.yml")
+
+otel=0 check_only=0 down=0
+while (($#)); do
+  case "$1" in
+    --otel) otel=1; shift ;;
+    --check) check_only=1; shift ;;
+    --down) down=1; shift ;;
+    -h|--help) sed -n '2,9p' "$0"; exit 0 ;;
+    *) die "unknown flag $1" ;;
+  esac
+done
+
+api=${DISPUTE_API_URL:-http://localhost:8090}
+workbench=${DISPUTE_WORKBENCH_URL:-http://localhost:3002}
+
+# Waits for a URL to answer, because compose reports a container started before the process inside it
+# is listening, and Keycloak in particular takes the best part of a minute.
+wait_for() {
+  local name=$1 url=$2 tries=${3:-60}
+  for ((i = 1; i <= tries; i++)); do
+    if curl -fsS -o /dev/null --max-time 3 "$url"; then
+      info "  $name ready"
+      return 0
+    fi
+    sleep 2
+  done
+  die "$name did not answer at $url after $((tries * 2))s (try: $compose logs)"
+}
+
+if ((down)); then
+  info "stopping every profile, keeping the database volume"
+  "${compose[@]}" --profile app --profile otel --profile auth down
+  info "done. Data is kept in the deploy_pgdata volume; scripts/demo brings it all back."
+  exit 0
+fi
+
+if ((check_only == 0)); then
+  command -v docker >/dev/null || die "docker is not on PATH"
+  docker info >/dev/null 2>&1 || die "the docker daemon is not running"
+
+  # The realms are committed, but rendering first means a changed template or tenant list cannot be
+  # left behind in the import directory.
+  info "rendering Keycloak realms"
+  "$root/deploy/keycloak/render-realms.sh" >/dev/null
+
+  profiles=(--profile auth --profile app)
+  ((otel)) && profiles+=(--profile otel)
+
+  # The model key is optional by design (ADR 0024): without it every proposed field is simply empty.
+  if [[ -n ${DISPUTE_DECISIONS_KEY:-} ]]; then
+    info "typed decisions: enabled"
+  else
+    info "typed decisions: disabled (set DISPUTE_DECISIONS_KEY to demonstrate the suggestions)"
+  fi
+
+  info "starting containers (first run builds images and takes a few minutes)"
+  "${compose[@]}" "${profiles[@]}" up -d --build --wait
+
+  info "seeding tenants, accounts and transactions"
+  (cd "$root/backend" && go run ./cmd/seed >/dev/null) || die "seeding failed"
+fi
+
+info "verifying"
+wait_for "API" "$api/readyz"
+wait_for "workbench" "$workbench"
+wait_for "Keycloak" "http://localhost:8180/realms/otp/.well-known/openid-configuration"
+wait_for "Mailpit" "http://localhost:8025"
+((otel)) && wait_for "Grafana" "http://localhost:3001/api/health"
+
+# A read through the API proves the tenant key, row-level security and the seed data all work together,
+# which is the part most likely to be quietly broken after a teardown.
+disputes=$(curl -fsS "$api/disputes?limit=1" -H "Authorization: Bearer ${DISPUTE_DEMO_KEY:-tk_dev_tenant_a}" |
+  python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("items", [])))') ||
+  die "the API refused a seeded tenant key; is the seed complete?"
+info "  API returned $disputes dispute(s) for the seeded tenant"
+
+printf '\n  ready.\n\n'
+row() { printf '  %-11s %-34s %s\n' "$1" "$2" "$3"; }
+row "workbench" "$workbench/otp" "analyst / analyst"
+row "Keycloak" "http://localhost:8180" "admin / admin"
+row "Mailpit" "http://localhost:8025" "no login"
+((otel)) && row "Grafana" "http://localhost:3001" "admin / admin"
+row "API" "$api" "Bearer tk_dev_tenant_a"
+printf '\n  a seeded transaction to open a dispute against:\n    00000000-0000-8000-8000-000000000101\n'
+printf '\n  stop with: scripts/demo --down\n\n'
