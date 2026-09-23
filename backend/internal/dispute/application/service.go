@@ -32,7 +32,8 @@ type Service struct {
 	tracer      trace.Tracer
 	core        BankingCore
 	coreTimeout time.Duration
-	afterCommit func() // nudges the notice dispatcher once a transition is durable
+	decisions   Decisions // proposes values an analyst confirms; nil is supported and means no proposals
+	afterCommit func()    // nudges the notice dispatcher once a transition is durable
 
 	transitions   metric.Int64Counter
 	replays       metric.Int64Counter
@@ -53,6 +54,10 @@ func WithCore(core BankingCore) Option { return func(s *Service) { s.core = core
 
 // WithCoreTimeout bounds one core call; the transition is rolled back and reported unavailable when it passes.
 func WithCoreTimeout(d time.Duration) Option { return func(s *Service) { s.coreTimeout = d } }
+
+// WithDecisions sets the typed-decision model that proposes values (ADR 0024); without it every field it
+// would have filled is left empty.
+func WithDecisions(d Decisions) Option { return func(s *Service) { s.decisions = d } }
 
 // WithAfterCommit runs fn after each successful write, typically Dispatcher.Kick; it must not block.
 func WithAfterCommit(fn func()) Option { return func(s *Service) { s.afterCommit = fn } }
@@ -290,6 +295,9 @@ type CreateDisputeInput struct {
 	Reason        string
 	Actor         string
 	Idempotency   Idempotency
+	// Suggestion is what a model proposed for the reason, when the analyst was shown one. It is recorded
+	// beside the reason they chose and changes nothing about the dispute (ADR 0024).
+	Suggestion *ReasonProposal
 }
 
 // ApplyEventInput moves a dispute along its lifecycle.
@@ -341,8 +349,11 @@ func (s *Service) CreateDispute(ctx context.Context, in CreateDisputeInput) (Res
 		}
 		ev := EventRecord{
 			Seq: 1, Event: "OPENED", FromState: "", ToState: domain.StateInitiated,
-			Actor: in.Actor, Payload: []byte("{}"), IdempotencyKey: keyPtr(in.Idempotency),
+			Actor: in.Actor, Payload: openedPayload(in.Suggestion, reason), IdempotencyKey: keyPtr(in.Idempotency),
 			TraceID: traceIDPtr(ctx), OccurredAt: now,
+		}
+		if in.Suggestion != nil && in.Suggestion.Confident {
+			recordAcceptance(ctx, "reason", string(in.Suggestion.Reason), string(reason))
 		}
 		if err := tx.AppendEvent(ctx, id, ev); err != nil {
 			return DisputeView{}, err
@@ -487,6 +498,12 @@ type eventFacts struct {
 	Settlement   string            `json:"settlement"`
 	Answers      map[string]string `json:"answers"`
 	RiskOverride string            `json:"riskOverride"`
+	// Suggestions is what a model proposed for the answers, when the analyst was shown proposals. It is
+	// stored with the rest of the payload and read only as a rate (ADR 0024).
+	Suggestions map[string]struct {
+		Value       string  `json:"value"`
+		Probability float64 `json:"probability"`
+	} `json:"suggestions"`
 }
 
 // assess scores the dispute from the account's history, the transaction and the questionnaire, and records it.
@@ -552,6 +569,9 @@ func (s *Service) questionnaire(ctx context.Context, tx Tx, rec DisputeRecord, e
 		}
 		if err := domain.ValidateAnswers(q.Questions, facts.Answers); err != nil {
 			return err
+		}
+		for id, proposal := range facts.Suggestions {
+			recordAcceptance(ctx, "questionnaire."+id, proposal.Value, facts.Answers[id])
 		}
 		return tx.AnswerQuestionnaire(ctx, rec.ID, facts.Answers, now)
 	}

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Thesis evaluation run: correctness suites, a paced load run, Prometheus read-back; all into docs/thesis/data/<date>/.
-# Needs the otel profile up (make otel-up) so Prometheus has the API's metrics.
+# Needs the otel profile up (make otel:up) so Prometheus has the API's metrics.
 set -euo pipefail
 source "$(dirname "$0")/lib/common.sh"
 root=$(repo_root)
@@ -20,8 +20,8 @@ fi
 out="$root/docs/thesis/data/$(date +%Y-%m-%d_%H%M)"
 mkdir -p "$out"
 
-curl -fsS "$api/readyz" >/dev/null || die "API not ready at $api (make otel-up)"
-curl -fsS "$prom/-/ready" >/dev/null || die "Prometheus not ready at $prom (make otel-up)"
+curl -fsS "$api/readyz" >/dev/null || die "API not ready at $api (make otel:up)"
+curl -fsS "$prom/-/ready" >/dev/null || die "Prometheus not ready at $prom (make otel:up)"
 
 info "correctness suites"
 (cd "$root/backend" && go test -count=1 -json ./internal/dispute/... ./internal/platform/... 2>/dev/null) \

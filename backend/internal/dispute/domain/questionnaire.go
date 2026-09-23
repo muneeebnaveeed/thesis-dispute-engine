@@ -133,6 +133,22 @@ func checkQuestionSet(f questionnaireFile) error {
 	return nil
 }
 
+// ReasonMeaning says what a reason covers, in a customer's words rather than the code's. It is the option
+// list a typed-decision model is given, so it belongs beside the reasons themselves.
+func ReasonMeaning(r Reason) string {
+	switch r {
+	case ReasonUnauthorised:
+		return "the customer says they did not make or authorise the payment at all"
+	case ReasonNotReceived:
+		return "the customer paid but the goods or services never arrived, or arrived only in part"
+	case ReasonDuplicate:
+		return "the same purchase was charged more than once"
+	case ReasonAmountDiffers:
+		return "the customer made the purchase but was charged a different amount than agreed"
+	}
+	return ""
+}
+
 // ParseReason accepts a reason string, defaulting to UNAUTHORISED when empty.
 func ParseReason(raw string) (Reason, error) {
 	if raw == "" {

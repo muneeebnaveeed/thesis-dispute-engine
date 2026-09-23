@@ -10,14 +10,17 @@ from the root `mise.toml`; never install with npm or yarn (the `preinstall` hook
 
 ## Commands (repo root)
 
-`make fe-check` before every push (typecheck, lint, dead code via knip, format check, tests). `make fe-fix` applies
-lint and format fixes. `make fe-dev` for the dev server on :3002. Inside `frontend/`, the same as
+`make workbench:check` before every push (typecheck, lint, dead code via knip, format check, tests).
+`make workbench:cover` reports coverage for `src/server` and `src/lib` only: routes and components are
+composition and are covered by the browser suite instead, so a percentage over the whole tree would
+measure the architecture rather than the testing. `make workbench:fix` applies
+lint and format fixes. `make workbench:dev` for the dev server on :3002. Inside `frontend/`, the same as
 `pnpm typecheck|lint|fmt|test|dev|build`.
 
 ## Conventions
 
 - Routes are files; `src/routeTree.gen.ts` is generated and ignored. Run `pnpm generate-routes`
-  after adding a route (typecheck and lint depend on it; `make fe-check` does it).
+  after adding a route (typecheck and lint depend on it; `make workbench:check` does it).
 - Import app code through the `#/` alias, never relative paths across directories.
 - Layout by role, then by domain: `src/api/` (generated contract, failures, views), `src/queries/`
   and `src/server/functions/` (one file per domain: `disputes`, `notices`, `tenant-keys`,
@@ -110,7 +113,7 @@ mutation.mutateAsync(...))`, which puts an API validation refusal on the fields 
 - `pnpm screenshot [name]` captures the workbench figures the thesis register lists, signed in against
   the local stack, into `docs/thesis/figures/*.webp`. Retake them when a UI change makes one wrong, and
   pass them to `scripts/create-pr --screenshot <path>` so the pull request shows what changed.
-- Browser tests live in `e2e/` (Playwright) and run against the real stack (`make e2e`). Write
+- Browser tests live in `e2e/` (Playwright) and run against the real stack (`make workbench:e2e`). Write
   them for behaviour a user sees (sign-in, redirects, a dispute advancing), use role and label
   locators, and keep fixtures pointing at the seeded tenants in `e2e/fixtures.ts`. Unit tests
   stay in `src/**/*.test.tsx`. Emails, letters, templates and the communications panel are

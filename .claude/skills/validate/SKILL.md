@@ -15,7 +15,7 @@ From `backend/`:
 ## Before commit or PR
 
 From the repo root: `make ci` (versions, fmt, vet, lint, test, tidy). Fix formatting with
-`make fmt-fix`. `make test-race` only works where cgo is available (CI does this).
+`make api:fmt-fix`. `make api:test-race` only works where cgo is available (CI does this).
 
 ## Interpreting failures
 

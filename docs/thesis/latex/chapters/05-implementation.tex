@@ -81,6 +81,46 @@ current state.}
 \label{fig:dispute}
 \end{figure}
 
+\section{Proposals from a typed-decision model}
+\label{sec:impl-decisions}
+
+Three places in the workbench turn a person's prose into a value the domain already has a type for.
+An intake describes a problem and someone picks one of four reasons. A customer answers a
+questionnaire in a paragraph and an analyst records typed answers. An analyst wants a list and
+types a sentence rather than setting three filters. A \emph{typed decision model} answers exactly
+that shape: it takes a state and questions whose answers are constrained to a closed set, and
+returns the value with a probability in one pass, generating no text, so there is nothing to parse
+and no free-form output to police.
+
+The model sits behind a port in the application layer beside the banking core of
+section~\ref{sec:design-core}, and for the same reasons: it is someone else's system, it can be
+slow, it can be down, and the domain must not know which one it is. The rule that governs its use
+is that it proposes and a person disposes. No transition, no clock, no posting and no letter may
+depend on it; every use is a field that arrives filled in and can be changed before anything is
+recorded; and what is stored is always the value the person left. The port is optional, so with no
+model configured each of these fields is simply empty and the engine behaves as it did before,
+which is also what keeps the claim of section~\ref{sec:impl-service} about a single stateful
+dependency honest. A proposal below three quarters probability is dropped rather than shown,
+because a wrong pre-filled answer costs an analyst more attention than an empty one.
+
+Two failures found by driving the real model, rather than by testing against a fake, shaped the
+design more than the benchmark did. A question offering only the four reasons must answer with one
+of them: a message reading ``hello I have a question about my account'' came back as an
+unauthorised payment at 0.81, comfortably above the gate. The question now offers an explicit
+option for text that describes no dispute at all, and that message yields nothing. The same problem
+has a different shape for yes and no questions, which cannot abstain: asked about a message that
+answers nothing, the model returned a confident negative to every question on the questionnaire.
+The batch now carries a gate question asking whether the message is a customer answering about a
+disputed payment, and without it nothing is proposed. A forced choice, in other words, is a
+proposal generator whether or not there is anything to propose, and the remedy is to give the model
+somewhere to put its uncertainty rather than to raise the threshold.
+
+Whether any of this helps is one number, and the system records it. When an analyst opens a dispute
+from a proposed reason, the opened event carries what was proposed, how sure the model was, and
+whether they kept it, beside the reason they actually chose. The audit trail therefore stays a
+record of what a person did, with the machine's contribution visible next to it, and the acceptance
+rate becomes something the running system reports rather than something the author asserts.
+
 \section{Observability from day one}
 \label{sec:impl-observability}
 % To write: ADR 0003, 0022, docs/observability.md.

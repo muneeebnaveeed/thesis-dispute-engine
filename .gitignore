@@ -5,6 +5,7 @@ build-errors.log
 *.test
 *.out
 coverage.*
+coverage/
 
 # Node (frontend/, Phase 4)
 node_modules/

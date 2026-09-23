@@ -244,6 +244,66 @@ export type paths = {
     patch?: never
     trace?: never
   }
+  '/suggestions/search-filters': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Read an analyst's sentence as search filters
+     * @description A convenience, never a decision. The filters come back only when the model is sure enough, so an empty answer is the normal case and never an error; the analyst sees the filters and can change them before searching. Nothing is stored.
+     */
+    post: operations['suggestSearchFilters']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/disputes/{disputeId}/suggestions/questionnaire': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Read a customer's reply as questionnaire answers
+     * @description A convenience, never a decision. Only the yes and no questions of this dispute's questionnaire are answered, and only those the model was sure about; dates and free text are left to the analyst, who confirms everything before any answer is recorded. The reply is read and not stored.
+     */
+    post: operations['suggestQuestionnaireAnswers']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/suggestions/dispute-reason': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Read what a customer wrote as a dispute reason
+     * @description A convenience, never a decision. The reason comes back only when the model is sure enough, and the analyst confirms it before a dispute is opened; the description is read and not stored, so the record still holds only what a person chose.
+     */
+    post: operations['suggestDisputeReason']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/tenant': {
     parameters: {
       query?: never
@@ -532,6 +592,51 @@ export type components = {
     }
     /** @enum {string} */
     Regime: 'EU_SEPA_DIRECT_DEBIT' | 'EU_PSD2_CARD' | 'US_REG_E' | 'US_REG_Z'
+    QuestionnaireSuggestionRequest: {
+      /** @description What the customer wrote back, in any language. */
+      reply: string
+    }
+    QuestionnaireSuggestion: {
+      /** @description Question id to the answer proposed for it. A question the model was unsure about is absent, as is every question that is not a yes or no. */
+      answers: {
+        [key: string]: {
+          /** @enum {string} */
+          value: 'yes' | 'no'
+          /** Format: double */
+          probability: number
+        }
+      }
+    }
+    /** @description What a model proposed for a field, sent back when the dispute is opened so the record can say the analyst was shown a suggestion and what they did with it. It changes nothing about the dispute. */
+    AcceptedSuggestion: {
+      reason: components['schemas']['DisputeReason']
+      /** Format: double */
+      probability: number
+    }
+    DisputeReasonSuggestionRequest: {
+      /** @description What the customer said, in any language. */
+      description: string
+    }
+    /** @description An absent reason means the model was not sure enough to offer one. */
+    DisputeReasonSuggestion: {
+      reason?: components['schemas']['DisputeReason']
+      /**
+       * Format: double
+       * @description How sure the model was, recorded with the dispute when the analyst accepts it.
+       */
+      probability?: number
+    }
+    SearchFilterSuggestionRequest: {
+      /** @description What the analyst typed, in any language. */
+      query: string
+    }
+    /** @description Every field is optional; an absent field is one the model was not sure enough about. */
+    SearchFilterSuggestion: {
+      state?: components['schemas']['DisputeState']
+      reason?: components['schemas']['DisputeReason']
+      /** @description Present only when the sentence asks for disputes past a deadline. */
+      overdue?: boolean
+    }
     /** @enum {string} */
     DisputeState:
       | 'INITIATED'
@@ -574,6 +679,8 @@ export type components = {
        * @default customer
        */
       actor?: string
+      /** @description What a model proposed for the reason, if the analyst was shown one. Recorded beside the reason they chose so acceptance can be measured; it never changes what is opened. */
+      suggestion?: components['schemas']['AcceptedSuggestion']
     }
     /** @enum {string} */
     DisputeReason: 'UNAUTHORISED' | 'NOT_RECEIVED' | 'DUPLICATE' | 'AMOUNT_DIFFERS'
@@ -581,7 +688,7 @@ export type components = {
       event: components['schemas']['DisputeEvent']
       /** @default system */
       actor?: string
-      /** @description Event-specific facts, stored verbatim on the log entry. Two are read by the ledger: on ISSUE_REFUND, `liability` is the amount the customer bears (a decimal string, capped by the regime, refused with invalid-liability); on CLOSE, `settlement` says how an outstanding advance clears (RECOVERED or WRITTEN_OFF; the regime's default when absent; refused with invalid-settlement); on RECEIVE_QUESTIONNAIRE, `answers` maps question ids to answers and is validated against the questions that were sent (refused with invalid-answers, one error per question). On ISSUE_REFUND for a dispute whose latest risk tier is HIGH, `riskOverride` must carry the analyst's justification or the credit is refused with risk-hold. */
+      /** @description Event-specific facts, stored verbatim on the log entry. Two are read by the ledger: on ISSUE_REFUND, `liability` is the amount the customer bears (a decimal string, capped by the regime, refused with invalid-liability); on CLOSE, `settlement` says how an outstanding advance clears (RECOVERED or WRITTEN_OFF; the regime's default when absent; refused with invalid-settlement); on RECEIVE_QUESTIONNAIRE, `answers` maps question ids to answers and is validated against the questions that were sent (refused with invalid-answers, one error per question), and `suggestions` may carry what a model proposed for those answers, stored beside them and read only as an acceptance rate. On ISSUE_REFUND for a dispute whose latest risk tier is HIGH, `riskOverride` must carry the analyst's justification or the credit is refused with risk-hold. */
       payload?: {
         /** @example 50.00 */
         liability?: string
@@ -1457,6 +1564,90 @@ export interface operations {
       401: components['responses']['Unauthorized']
       403: components['responses']['Forbidden']
       404: components['responses']['NotFound']
+      429: components['responses']['TooManyRequests']
+    }
+  }
+  suggestSearchFilters: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SearchFilterSuggestionRequest']
+      }
+    }
+    responses: {
+      /** @description What the sentence appears to ask for, with any field the model was unsure of left out */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SearchFilterSuggestion']
+        }
+      }
+      400: components['responses']['BadRequest']
+      401: components['responses']['Unauthorized']
+      429: components['responses']['TooManyRequests']
+    }
+  }
+  suggestQuestionnaireAnswers: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        disputeId: components['parameters']['DisputeId']
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['QuestionnaireSuggestionRequest']
+      }
+    }
+    responses: {
+      /** @description The answers the reply appears to give, keyed by question id */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['QuestionnaireSuggestion']
+        }
+      }
+      400: components['responses']['BadRequest']
+      401: components['responses']['Unauthorized']
+      404: components['responses']['NotFound']
+      429: components['responses']['TooManyRequests']
+    }
+  }
+  suggestDisputeReason: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DisputeReasonSuggestionRequest']
+      }
+    }
+    responses: {
+      /** @description The reason the description appears to describe, absent when the model was unsure */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DisputeReasonSuggestion']
+        }
+      }
+      400: components['responses']['BadRequest']
+      401: components['responses']['Unauthorized']
       429: components['responses']['TooManyRequests']
     }
   }

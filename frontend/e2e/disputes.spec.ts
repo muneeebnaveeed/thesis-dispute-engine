@@ -195,7 +195,7 @@ test('the questionnaire follows the reason, incomplete answers are refused under
 }) => {
   await page.getByRole('button', { name: 'New dispute' }).click()
   await page.getByLabel('Transaction ID').fill(tenants.otp.transaction)
-  await page.getByLabel('Reason').selectOption('UNAUTHORISED')
+  await page.getByRole('combobox', { name: /^Reason/ }).selectOption('UNAUTHORISED')
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await expect(page).toHaveURL(/\/otp\/disputes\/[0-9a-f-]{36}$/)
   await expect(page.getByRole('definition').filter({ hasText: 'UNAUTHORISED' })).toBeVisible()
@@ -218,7 +218,7 @@ test('the questionnaire follows the reason, incomplete answers are refused under
       .first(),
   ).toHaveText('QUESTIONNAIRE_SENT')
 
-  await page.getByLabel(/card in your possession/).selectOption('yes')
+  await page.getByLabel(/still have the card/).selectOption('yes')
   await page.getByLabel(/anyone else had access/).selectOption('no')
   await page.getByLabel(/disputed a transaction with this merchant before/).selectOption('no')
   await noticed.fill('2026-09-20')

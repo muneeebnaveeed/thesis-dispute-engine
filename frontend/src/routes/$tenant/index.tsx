@@ -21,6 +21,7 @@ import { TenantMismatch } from '#/components/layout/tenant-mismatch'
 import { submitTo, submitting, useAppForm } from '#/forms/app-form'
 import { parsed, schemaValidator } from '#/forms/schema'
 import { disputeQuery, disputesQuery, type DisputeListSearch } from '#/queries/disputes'
+import { useDisputeReasonSuggestion } from '#/queries/suggestions'
 import { useServerMutation } from '#/queries/use-server-mutation'
 import { openDispute } from '#/server/functions/disputes'
 
@@ -76,12 +77,33 @@ const Workbench = () => {
       },
     },
   )
+  // the reason the model offered, cleared the moment the analyst touches the dropdown: what is opened is
+  // always what the dropdown says, and this only records whether a machine put it there
+  const [proposed, setProposed] = useState<{ reason: string; probability: number } | null>(null)
+  const reasonSuggestion = useDisputeReasonSuggestion()
   const openForm = useAppForm({
-    defaultValues: { transactionId: '', reason: 'UNAUTHORISED' },
+    defaultValues: { transactionId: '', reason: 'UNAUTHORISED', description: '' },
     validators: { onSubmit: schemaValidator(CreateDisputeRequest) },
     onSubmit: ({ value, formApi }) =>
-      submitTo(formApi, () => openDisputeMutation.mutateAsync(parsed(CreateDisputeRequest, value))),
+      submitTo(formApi, () =>
+        openDisputeMutation.mutateAsync(
+          parsed(CreateDisputeRequest, {
+            transactionId: value.transactionId,
+            reason: value.reason,
+            // what the analyst was shown travels with what they chose, so acceptance can be counted
+            ...(proposed ? { suggestion: proposed } : {}),
+          }),
+        ),
+      ),
   })
+  const readDescription = async (description: string) => {
+    const trimmed = description.trim()
+    if (!trimmed) return
+    const proposal = await reasonSuggestion.mutateAsync(trimmed).catch(() => null)
+    if (!proposal?.reason || proposal.probability === undefined) return
+    openForm.setFieldValue('reason', proposal.reason)
+    setProposed({ reason: proposal.reason, probability: proposal.probability })
+  }
   const filterForm = useAppForm({
     defaultValues: { state: state ?? '', overdue: overdue ?? false },
     onSubmit: ({ value }) => {
@@ -186,6 +208,16 @@ const Workbench = () => {
         }
       >
         <form id="open-dispute" className="form-rows" onSubmit={submitting(openForm)}>
+          <openForm.AppField name="description">
+            {(field) => (
+              <field.TextareaField
+                label="What the customer said"
+                hint="(optional, read to fill in the reason)"
+                rows={3}
+                onBlur={(event) => void readDescription(event.target.value)}
+              />
+            )}
+          </openForm.AppField>
           <openForm.AppField name="transactionId">
             {(field) => (
               <field.TextField
@@ -196,8 +228,21 @@ const Workbench = () => {
             )}
           </openForm.AppField>
           <openForm.AppField name="reason">
-            {(field) => <field.SelectField label="Reason" options={DISPUTE_REASONS} mono />}
+            {(field) => (
+              <field.SelectField
+                label="Reason"
+                options={DISPUTE_REASONS}
+                mono
+                onChange={() => setProposed(null)}
+              />
+            )}
           </openForm.AppField>
+          {proposed && (
+            <p className="text-[11px] text-muted-foreground">
+              Reason suggested from the description ({Math.round(proposed.probability * 100)}% sure). Change
+              it if it is wrong.
+            </p>
+          )}
         </form>
         {openFailure && openFailure.kind !== 'validation' && (
           <div className="mt-2">

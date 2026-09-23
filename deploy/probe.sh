@@ -1,6 +1,6 @@
 #!/bin/sh
 # Synthetic traffic for the local stack: walks one seeded transaction through a lifecycle every INTERVAL seconds,
-# so dashboards are never empty during a demo. Needs `make db-seed`; exits quietly if the API is down.
+# so dashboards are never empty during a demo. Needs `make db:seed`; exits quietly if the API is down.
 API=${API:-http://localhost:8090}
 TENANT_KEY=${TENANT_KEY:-tk_dev_tenant_a}
 INTERVAL=${INTERVAL:-60}

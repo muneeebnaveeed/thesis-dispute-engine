@@ -4,6 +4,7 @@ package postgres_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -21,7 +22,13 @@ func TestDeadlinesThroughPostgres(t *testing.T) {
 	owner, schema := pgtest.PoolWithSchema(t)
 	app := pgtest.AppPool(t, schema)
 	store := disputepg.NewStore(app)
-	now := time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC) // a Monday
+	// CountOverdue compares against the database clock, not this one, so the calendar has to stay ahead
+	// of real time; a fixed date passes it and the test then fails on every branch at once.
+	monday := nextMonday(time.Now().UTC())
+	now := time.Date(monday.Year(), monday.Month(), monday.Day(), 12, 0, 0, 0, time.UTC)
+	holiday := now.AddDate(0, 0, 1)    // Tuesday, for tenant A only
+	refundDueA := now.AddDate(0, 0, 2) // the holiday pushes one business day to Wednesday
+	refundDueB := now.AddDate(0, 0, 1) // tenant B has no calendar: Tuesday
 	svc, err := application.NewService(store, func() time.Time { return now })
 	if err != nil {
 		t.Fatal(err)
@@ -30,8 +37,9 @@ func TestDeadlinesThroughPostgres(t *testing.T) {
 	ctxB := tenant.WithID(context.Background(), apptest.TenantB)
 	txnA := seedFor(t, owner, apptest.TenantA, domain.RailCard, "EUR")
 	txnB := seedFor(t, owner, apptest.TenantB, domain.RailCard, "EUR")
+	settings := fmt.Sprintf(`{"timezone":"Europe/Budapest","holidays":[%q]}`, holiday.Format(time.DateOnly))
 	if _, err := owner.Exec(context.Background(),
-		`UPDATE tenants SET settings = '{"timezone":"Europe/Budapest","holidays":["2026-09-22"]}' WHERE id = $1`, apptest.TenantA); err != nil {
+		`UPDATE tenants SET settings = $2 WHERE id = $1`, apptest.TenantA, settings); err != nil {
 		t.Fatal(err)
 	}
 
@@ -46,8 +54,9 @@ func TestDeadlinesThroughPostgres(t *testing.T) {
 	for _, d := range created.View.Deadlines {
 		if d.Kind == domain.DeadlineRefund {
 			// Tuesday is a holiday for this tenant, so one business day ends Wednesday, Budapest time.
-			if got := d.DueAt.In(budapest).Format("2006-01-02 15:04"); got != "2026-09-23 23:59" {
-				t.Errorf("refund due %s", got)
+			want := refundDueA.Format(time.DateOnly) + " 23:59"
+			if got := d.DueAt.In(budapest).Format("2006-01-02 15:04"); got != want {
+				t.Errorf("refund due %s, want %s", got, want)
 			}
 		}
 	}
@@ -57,8 +66,8 @@ func TestDeadlinesThroughPostgres(t *testing.T) {
 	}
 	// Tenant B has no calendar: UTC and weekends only, so the refund is due Tuesday.
 	for _, d := range other.View.Deadlines {
-		if d.Kind == domain.DeadlineRefund && d.DueAt.UTC().Format("2006-01-02") != "2026-09-22" {
-			t.Errorf("tenant B refund due %s", d.DueAt.UTC())
+		if d.Kind == domain.DeadlineRefund && d.DueAt.UTC().Format(time.DateOnly) != refundDueB.Format(time.DateOnly) {
+			t.Errorf("tenant B refund due %s, want %s", d.DueAt.UTC(), refundDueB.Format(time.DateOnly))
 		}
 	}
 
@@ -122,4 +131,13 @@ func TestDeadlinesThroughPostgres(t *testing.T) {
 	if len(after.Items) != 0 {
 		t.Errorf("still overdue after settling: %+v", after.Items)
 	}
+}
+
+// The Monday after t, so the fixed weekday arithmetic above always lands in the future.
+func nextMonday(t time.Time) time.Time {
+	days := (8 - int(t.Weekday())) % 7
+	if days == 0 {
+		days = 7
+	}
+	return t.AddDate(0, 0, days)
 }

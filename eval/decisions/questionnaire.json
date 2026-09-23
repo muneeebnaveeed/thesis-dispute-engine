@@ -1,0 +1,395 @@
+[
+ {
+  "reply": "I do not know this shop. My card was in my wallet all along. Nobody else has my details. I have never disputed them before. I reported it to the police on Monday.",
+  "want": {
+   "recognise_merchant": "no",
+   "card_in_possession": "yes",
+   "shared_credentials": "no",
+   "prior_disputes_merchant": "no",
+   "police_report": "yes"
+  },
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "reply": "I recognise the merchant, I shop there often. The card was with me. My husband also uses it. I disputed a charge from them in April. No police report.",
+  "want": {
+   "recognise_merchant": "yes",
+   "card_in_possession": "yes",
+   "shared_credentials": "yes",
+   "prior_disputes_merchant": "yes",
+   "police_report": "no"
+  },
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "reply": "Never heard of them. I lost the card two weeks ago and reported it stolen. Nobody had my PIN. First complaint about this merchant.",
+  "want": {
+   "recognise_merchant": "no",
+   "card_in_possession": "no",
+   "shared_credentials": "no",
+   "prior_disputes_merchant": "no",
+   "police_report": "yes"
+  },
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "reply": "Yes I know the company. The card never left me. Only I use it. I have complained about them twice before. I have not been to the police.",
+  "want": {
+   "recognise_merchant": "yes",
+   "card_in_possession": "yes",
+   "shared_credentials": "no",
+   "prior_disputes_merchant": "yes",
+   "police_report": "no"
+  },
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "reply": "The name means nothing to me. Card is in my possession. My son borrows it sometimes. No previous disputes. I filed a report at the station.",
+  "want": {
+   "recognise_merchant": "no",
+   "card_in_possession": "yes",
+   "shared_credentials": "yes",
+   "prior_disputes_merchant": "no",
+   "police_report": "yes"
+  },
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "reply": "The card has been in my office safe since the summer, I have not carried it.",
+  "want": {
+   "card_in_possession": "yes"
+  },
+  "lang": "en",
+  "band": "indirect"
+ },
+ {
+  "reply": "I handed the card to my daughter for her studies abroad in September.",
+  "want": {
+   "card_in_possession": "no",
+   "shared_credentials": "yes"
+  },
+  "lang": "en",
+  "band": "indirect"
+ },
+ {
+  "reply": "I buy my groceries there every week, so the name is familiar enough.",
+  "want": {
+   "recognise_merchant": "yes"
+  },
+  "lang": "en",
+  "band": "indirect"
+ },
+ {
+  "reply": "I had to cancel the card and the bank sent a new one after I called the police.",
+  "want": {
+   "card_in_possession": "no",
+   "police_report": "yes"
+  },
+  "lang": "en",
+  "band": "indirect"
+ },
+ {
+  "reply": "This is the third time I am writing to you about this same company.",
+  "want": {
+   "prior_disputes_merchant": "yes"
+  },
+  "lang": "en",
+  "band": "indirect"
+ },
+ {
+  "reply": "Only I know the PIN and the card has never been out of my sight.",
+  "want": {
+   "card_in_possession": "yes",
+   "shared_credentials": "no"
+  },
+  "lang": "en",
+  "band": "indirect"
+ },
+ {
+  "reply": "I gave the details over the phone to someone claiming to be from the bank.",
+  "want": {
+   "shared_credentials": "yes"
+  },
+  "lang": "en",
+  "band": "indirect"
+ },
+ {
+  "reply": "It is not true that anyone else had access to my card.",
+  "want": {
+   "shared_credentials": "no"
+  },
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "reply": "I would not say I recognise them, no.",
+  "want": {
+   "recognise_merchant": "no"
+  },
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "reply": "I did not fail to report it, I went to the police the same evening.",
+  "want": {
+   "police_report": "yes"
+  },
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "reply": "I cannot say the card was with me, it was not.",
+  "want": {
+   "card_in_possession": "no"
+  },
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "reply": "Nobody, and I mean nobody, has ever used my card except me.",
+  "want": {
+   "shared_credentials": "no"
+  },
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "reply": "I have never once had to dispute anything with this merchant.",
+  "want": {
+   "prior_disputes_merchant": "no"
+  },
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "reply": "No police involvement so far, I wanted to ask you first.",
+  "want": {
+   "police_report": "no"
+  },
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "reply": "I am not unfamiliar with the merchant, I have bought from them.",
+  "want": {
+   "recognise_merchant": "yes"
+  },
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "reply": "card was with me the whole time nobody else uses it never disputed them before no police report yet and I do not recognise the name",
+  "want": {
+   "recognise_merchant": "no",
+   "card_in_possession": "yes",
+   "shared_credentials": "no",
+   "prior_disputes_merchant": "no",
+   "police_report": "no"
+  },
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "reply": "yes I know them yes my partner has the card too no I have not reported anything to anyone",
+  "want": {
+   "recognise_merchant": "yes",
+   "shared_credentials": "yes",
+   "police_report": "no"
+  },
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "reply": "Nem ismerem ezt a kereskedőt. A kártyám végig nálam volt. Senki másnak nem adtam oda. Korábban nem volt vitám velük. Rendőrségi feljelentést nem tettem.",
+  "want": {
+   "recognise_merchant": "no",
+   "card_in_possession": "yes",
+   "shared_credentials": "no",
+   "prior_disputes_merchant": "no",
+   "police_report": "no"
+  },
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "reply": "Ismerem a boltot, gyakran vásárolok ott. A kártya nálam volt. A feleségem is használja. Tavaly már reklamáltam náluk. Feljelentést tettem.",
+  "want": {
+   "recognise_merchant": "yes",
+   "card_in_possession": "yes",
+   "shared_credentials": "yes",
+   "prior_disputes_merchant": "yes",
+   "police_report": "yes"
+  },
+  "lang": "hu",
+  "band": "plain"
+ },
+ {
+  "reply": "Elvesztettem a kártyámat és bejelentettem a rendőrségen.",
+  "want": {
+   "card_in_possession": "no",
+   "police_report": "yes"
+  },
+  "lang": "hu",
+  "band": "indirect"
+ },
+ {
+  "reply": "Senki más nem fért hozzá a kártyámhoz.",
+  "want": {
+   "shared_credentials": "no"
+  },
+  "lang": "hu",
+  "band": "hard"
+ },
+ {
+  "reply": "Nem mondanám, hogy ismerem őket.",
+  "want": {
+   "recognise_merchant": "no"
+  },
+  "lang": "hu",
+  "band": "hard"
+ },
+ {
+  "reply": "A kártya mindig nálam van, soha nem adom oda senkinek.",
+  "want": {
+   "card_in_possession": "yes",
+   "shared_credentials": "no"
+  },
+  "lang": "hu",
+  "band": "indirect"
+ },
+ {
+  "reply": "Már harmadszor írok ugyanerről a cégről.",
+  "want": {
+   "prior_disputes_merchant": "yes"
+  },
+  "lang": "hu",
+  "band": "indirect"
+ },
+ {
+  "reply": "A fiamnak odaadtam a kártyát a nyáron.",
+  "want": {
+   "card_in_possession": "no",
+   "shared_credentials": "yes"
+  },
+  "lang": "hu",
+  "band": "indirect"
+ },
+ {
+  "reply": "nem ismerem the merchant, card volt nalam, nobody else used it",
+  "want": {
+   "recognise_merchant": "no",
+   "card_in_possession": "yes",
+   "shared_credentials": "no"
+  },
+  "lang": "mixed",
+  "band": "hard"
+ },
+ {
+  "reply": "police report igen, kartya elveszett",
+  "want": {
+   "card_in_possession": "no",
+   "police_report": "yes"
+  },
+  "lang": "mixed",
+  "band": "hard"
+ },
+ {
+  "reply": "dont recognise them, card w me, no one else, no prior, no police",
+  "want": {
+   "recognise_merchant": "no",
+   "card_in_possession": "yes",
+   "shared_credentials": "no",
+   "prior_disputes_merchant": "no",
+   "police_report": "no"
+  },
+  "lang": "en",
+  "band": "hard"
+ },
+ {
+  "reply": "recognise yes. possession yes. shared no. prior yes. police no.",
+  "want": {
+   "recognise_merchant": "yes",
+   "card_in_possession": "yes",
+   "shared_credentials": "no",
+   "prior_disputes_merchant": "yes",
+   "police_report": "no"
+  },
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "reply": "I know the shop well. Card stolen last Tuesday, reported immediately. Nobody had the details before that. No earlier disputes.",
+  "want": {
+   "recognise_merchant": "yes",
+   "card_in_possession": "no",
+   "shared_credentials": "no",
+   "prior_disputes_merchant": "no",
+   "police_report": "yes"
+  },
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "reply": "Do not know them at all. Card is right here in front of me. My flatmate knows the PIN. Never disputed anything. Police were informed.",
+  "want": {
+   "recognise_merchant": "no",
+   "card_in_possession": "yes",
+   "shared_credentials": "yes",
+   "prior_disputes_merchant": "no",
+   "police_report": "yes"
+  },
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "reply": "Familiar merchant, card with me, shared with nobody, disputed once before, no police.",
+  "want": {
+   "recognise_merchant": "yes",
+   "card_in_possession": "yes",
+   "shared_credentials": "no",
+   "prior_disputes_merchant": "yes",
+   "police_report": "no"
+  },
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "reply": "I have shopped there twice. The card was in my bag which was stolen at the station and I reported that theft.",
+  "want": {
+   "recognise_merchant": "yes",
+   "card_in_possession": "no",
+   "police_report": "yes"
+  },
+  "lang": "en",
+  "band": "indirect"
+ },
+ {
+  "reply": "Unknown company. I still hold the card. I have shared the number with my accountant. No previous complaints. I did not call the police.",
+  "want": {
+   "recognise_merchant": "no",
+   "card_in_possession": "yes",
+   "shared_credentials": "yes",
+   "prior_disputes_merchant": "no",
+   "police_report": "no"
+  },
+  "lang": "en",
+  "band": "plain"
+ },
+ {
+  "reply": "Ismeretlen cég. A kártya nálam van. Senkinek nem adtam meg az adatokat. Nem volt korábbi panasz. Nem mentem a rendőrségre.",
+  "want": {
+   "recognise_merchant": "no",
+   "card_in_possession": "yes",
+   "shared_credentials": "no",
+   "prior_disputes_merchant": "no",
+   "police_report": "no"
+  },
+  "lang": "hu",
+  "band": "plain"
+ }
+]

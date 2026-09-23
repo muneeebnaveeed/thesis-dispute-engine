@@ -1,0 +1,60 @@
+[
+  {
+    "checkpoint": "jev (typesafe/jev-1.13)",
+    "latency_ms": {
+      "one_question_median": 573.6,
+      "one_question_p90": 620.2
+    },
+    "reason": {
+      "accuracy": 0.986,
+      "n": 72,
+      "by_band": {
+        "plain": "51/52",
+        "hard": "20/20"
+      },
+      "by_lang": {
+        "en": "45/46",
+        "hu": "24/24",
+        "mixed": "2/2"
+      },
+      "ece": 0.011,
+      "confusion": {
+        "AMOUNT_DIFFERS->UNAUTHORISED": 1
+      }
+    },
+    "questionnaire": {
+      "accuracy": 0.973,
+      "n": 113,
+      "per_question": {
+        "recognise_merchant": "22/22",
+        "card_in_possession": "23/26",
+        "shared_credentials": "25/25",
+        "prior_disputes_merchant": "18/18",
+        "police_report": "22/22"
+      },
+      "by_band": {
+        "plain": "64/65",
+        "indirect": "18/20",
+        "hard": "28/28"
+      },
+      "ece": 0.108
+    },
+    "search": {
+      "field_accuracy": 0.928,
+      "n_fields": 69,
+      "query_exact": "45/50",
+      "per_field": {
+        "overdue": "14/16",
+        "state": "25/28",
+        "reason": "25/25"
+      },
+      "by_band": {
+        "plain": "36/37",
+        "hard": "19/23",
+        "hu": "9/9"
+      }
+    },
+    "calls": 173,
+    "cost_usd": 0.00374
+  }
+]

@@ -900,3 +900,17 @@ func TestTenantLogoAndAnalystAvatar(t *testing.T) {
 		t.Errorf("another analyst reading the avatar: %d", rec.Code)
 	}
 }
+
+// The suggestion endpoint is a convenience: with no model configured it answers with nothing at all, which
+// is what the workbench renders as "the analyst sets the filters themselves".
+func TestSearchFilterSuggestionWithoutAModel(t *testing.T) {
+	a := newAPI(t, nil)
+	rec, body := a.do(http.MethodPost, "/suggestions/search-filters", map[string]any{"query": "anything overdue"},
+		map[string]string{"X-Test-Analyst": "a:analyst"})
+	if rec.Code != 200 {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+	}
+	if len(body) != 0 {
+		t.Errorf("suggestion without a model = %v, want nothing", body)
+	}
+}

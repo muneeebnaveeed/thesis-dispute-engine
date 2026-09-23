@@ -1,4 +1,4 @@
-// Package oapi holds code generated from docs/api/openapi.yaml; regenerate with make generate.
+// Package oapi holds code generated from docs/api/openapi.yaml; regenerate with make api:generate.
 package oapi
 
 //go:generate go tool oapi-codegen -config config.yaml ../../../../../../docs/api/openapi.yaml

@@ -7,10 +7,10 @@
 # service straight to localhost and sidesteps the bridge. Do not "fix" this back
 # to port mappings. Consequence: services talk to each other via localhost.
 #
-#   make db-up      postgres only (the usual `make run` loop)
-#   make up         postgres + the API built from backend/Dockerfile
-#   make docker-dev postgres + the API in a Go toolchain container with live reload
-#   make otel-up    the above plus otel-lgtm; the API exports traces, metrics and logs to it
+#   make db:up     postgres only (the usual `make api:run` loop)
+#   make stack:up  postgres + the API built from backend/Dockerfile
+#   make stack:dev postgres + the API in a Go toolchain container with live reload
+#   make otel:up   the above plus otel-lgtm; the API exports traces, metrics and logs to it
 services:
   postgres:
     image: postgres:17-alpine
@@ -21,7 +21,7 @@ services:
       POSTGRES_DB: dispute
     volumes:
       - pgdata:/var/lib/postgresql/data
-      # Fresh volumes get the API login at init; `make db-up` also applies it to existing ones.
+      # Fresh volumes get the API login at init; `make db:up` also applies it to existing ones.
       - ./postgres/roles.sql:/docker-entrypoint-initdb.d/10-roles.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dispute -d dispute"]
@@ -65,6 +65,9 @@ services:
       DISPUTE_RATE_PER_MINUTE: ${DISPUTE_RATE_PER_MINUTE:-600}
       DISPUTE_INTERNAL_CIDRS: ${DISPUTE_INTERNAL_CIDRS:-127.0.0.0/8,::1/128}
       # Customer notices go to Mailpit (SMTP 1025, inbox on http://localhost:8025); empty logs instead of sending.
+      # empty by default: with no key every proposed field is simply left empty (ADR 0024)
+      DISPUTE_DECISIONS_KEY: ${DISPUTE_DECISIONS_KEY:-}
+      DISPUTE_DECISIONS_MODEL: ${DISPUTE_DECISIONS_MODEL:-}
       DISPUTE_SMTP_ADDR: ${DISPUTE_SMTP_ADDR:-localhost:1025}
       DISPUTE_MAIL_FROM: ${DISPUTE_MAIL_FROM:-disputes@dispute-engine.local}
       # deploy/otel.env fills these under the otel profile; empty means instrumented, nothing exported.
@@ -175,6 +178,18 @@ services:
       LOKI_EXTRA_ARGS: "-compactor.retention-enabled=true -compactor.delete-request-store=filesystem -compactor.working-directory=/data/loki/compactor -store.retention=${LGTM_RETENTION:-168h}"
       # With host networking the collector would otherwise listen on every interface; keep OTLP on loopback.
       OTELCOL_EXTRA_ARGS: "--set=receivers.otlp.protocols.grpc.endpoint=127.0.0.1:4317 --set=receivers.otlp.protocols.http.endpoint=127.0.0.1:4318"
+    # The image's own check waits for Grafana on 3000, which GF_SERVER_HTTP_PORT moves to 3001, so it
+    # never marks itself ready and anything using --wait or depends_on blocks on it forever.
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:3001/api/health >/dev/null && curl -fsS http://localhost:13133/ready >/dev/null",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
     volumes:
       - lgtm:/data
       - ./lgtm/tempo-config.yaml:/otel-lgtm/tempo-config.yaml:ro
@@ -182,7 +197,7 @@ services:
       - ./grafana/provisioning/alerting/dispute-engine.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/dispute-engine.yaml:ro
       - ./grafana/dashboards:/otel-lgtm/dispute-engine-dashboards:ro
 
-  # Synthetic traffic so the dashboards are populated during a demo; needs `make db-seed` (otel-up runs it).
+  # Synthetic traffic so the dashboards are populated during a demo; needs `make db:seed` (otel:up runs it).
   probe:
     image: curlimages/curl:8.22.0
     network_mode: host

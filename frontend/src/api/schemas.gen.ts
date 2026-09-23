@@ -6,6 +6,27 @@ import type { components } from './schema.gen'
 // Each schema is checked both ways against the openapi-typescript type, so the two generated files cannot drift.
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never
 
+export const DisputeReason = Type.Union([
+  Type.Literal('UNAUTHORISED'),
+  Type.Literal('NOT_RECEIVED'),
+  Type.Literal('DUPLICATE'),
+  Type.Literal('AMOUNT_DIFFERS'),
+])
+export type DisputeReason = Static<typeof DisputeReason>
+const _DisputeReason: Same<DisputeReason, components['schemas']['DisputeReason']> = true
+void _DisputeReason
+
+export const AcceptedSuggestion = Type.Object(
+  {
+    reason: DisputeReason,
+    probability: Type.Number({ format: 'double', minimum: 0, maximum: 1 }),
+  },
+  { additionalProperties: false },
+)
+export type AcceptedSuggestion = Static<typeof AcceptedSuggestion>
+const _AcceptedSuggestion: Same<AcceptedSuggestion, components['schemas']['AcceptedSuggestion']> = true
+void _AcceptedSuggestion
+
 export const AnswerType = Type.Union(
   [Type.Literal('YES_NO'), Type.Literal('DATE'), Type.Literal('TEXT'), Type.Literal('AMOUNT')],
   {
@@ -58,7 +79,7 @@ export const ApplyEventRequest = Type.Object({
       },
       {
         description:
-          "Event-specific facts, stored verbatim on the log entry. Two are read by the ledger: on ISSUE_REFUND, `liability` is the amount the customer bears (a decimal string, capped by the regime, refused with invalid-liability); on CLOSE, `settlement` says how an outstanding advance clears (RECOVERED or WRITTEN_OFF; the regime's default when absent; refused with invalid-settlement); on RECEIVE_QUESTIONNAIRE, `answers` maps question ids to answers and is validated against the questions that were sent (refused with invalid-answers, one error per question). On ISSUE_REFUND for a dispute whose latest risk tier is HIGH, `riskOverride` must carry the analyst's justification or the credit is refused with risk-hold.",
+          "Event-specific facts, stored verbatim on the log entry. Two are read by the ledger: on ISSUE_REFUND, `liability` is the amount the customer bears (a decimal string, capped by the regime, refused with invalid-liability); on CLOSE, `settlement` says how an outstanding advance clears (RECOVERED or WRITTEN_OFF; the regime's default when absent; refused with invalid-settlement); on RECEIVE_QUESTIONNAIRE, `answers` maps question ids to answers and is validated against the questions that were sent (refused with invalid-answers, one error per question), and `suggestions` may carry what a model proposed for those answers, stored beside them and read only as an acceptance rate. On ISSUE_REFUND for a dispute whose latest risk tier is HIGH, `riskOverride` must carry the analyst's justification or the credit is refused with risk-hold.",
       },
     ),
   ),
@@ -147,22 +168,13 @@ export type CoreReceipt = Static<typeof CoreReceipt>
 const _CoreReceipt: Same<CoreReceipt, components['schemas']['CoreReceipt']> = true
 void _CoreReceipt
 
-export const DisputeReason = Type.Union([
-  Type.Literal('UNAUTHORISED'),
-  Type.Literal('NOT_RECEIVED'),
-  Type.Literal('DUPLICATE'),
-  Type.Literal('AMOUNT_DIFFERS'),
-])
-export type DisputeReason = Static<typeof DisputeReason>
-const _DisputeReason: Same<DisputeReason, components['schemas']['DisputeReason']> = true
-void _DisputeReason
-
 export const CreateDisputeRequest = Type.Object({
   transactionId: Type.String({ format: 'uuid' }),
   reason: Type.Optional(DisputeReason),
   actor: Type.Optional(
     Type.String({ description: 'Who opened it; defaults to customer.', default: 'customer' }),
   ),
+  suggestion: Type.Optional(AcceptedSuggestion),
 })
 export type CreateDisputeRequest = Static<typeof CreateDisputeRequest>
 const _CreateDisputeRequest: Same<CreateDisputeRequest, components['schemas']['CreateDisputeRequest']> = true
@@ -462,6 +474,44 @@ export type DisputePage = Static<typeof DisputePage>
 const _DisputePage: Same<DisputePage, components['schemas']['DisputePage']> = true
 void _DisputePage
 
+export const DisputeReasonSuggestion = Type.Object(
+  {
+    reason: Type.Optional(DisputeReason),
+    probability: Type.Optional(
+      Type.Number({
+        description: 'How sure the model was, recorded with the dispute when the analyst accepts it.',
+        format: 'double',
+        minimum: 0,
+        maximum: 1,
+      }),
+    ),
+  },
+  { additionalProperties: false },
+)
+export type DisputeReasonSuggestion = Static<typeof DisputeReasonSuggestion>
+const _DisputeReasonSuggestion: Same<
+  DisputeReasonSuggestion,
+  components['schemas']['DisputeReasonSuggestion']
+> = true
+void _DisputeReasonSuggestion
+
+export const DisputeReasonSuggestionRequest = Type.Object(
+  {
+    description: Type.String({
+      description: 'What the customer said, in any language.',
+      minLength: 1,
+      maxLength: 2000,
+    }),
+  },
+  { additionalProperties: false },
+)
+export type DisputeReasonSuggestionRequest = Static<typeof DisputeReasonSuggestionRequest>
+const _DisputeReasonSuggestionRequest: Same<
+  DisputeReasonSuggestionRequest,
+  components['schemas']['DisputeReasonSuggestionRequest']
+> = true
+void _DisputeReasonSuggestionRequest
+
 export const FieldType = Type.Union(
   [
     Type.Literal('TEXT'),
@@ -668,6 +718,81 @@ export const Problem = Type.Object(
 export type Problem = Static<typeof Problem>
 const _Problem: Same<Problem, components['schemas']['Problem']> = true
 void _Problem
+
+export const QuestionnaireSuggestion = Type.Object(
+  {
+    answers: Type.Record(
+      Type.String(),
+      Type.Object(
+        {
+          value: Type.Union([Type.Literal('yes'), Type.Literal('no')]),
+          probability: Type.Number({ format: 'double', minimum: 0, maximum: 1 }),
+        },
+        { additionalProperties: false },
+      ),
+      {
+        description:
+          'Question id to the answer proposed for it. A question the model was unsure about is absent, as is every question that is not a yes or no.\n',
+      },
+    ),
+  },
+  { additionalProperties: false },
+)
+export type QuestionnaireSuggestion = Static<typeof QuestionnaireSuggestion>
+const _QuestionnaireSuggestion: Same<
+  QuestionnaireSuggestion,
+  components['schemas']['QuestionnaireSuggestion']
+> = true
+void _QuestionnaireSuggestion
+
+export const QuestionnaireSuggestionRequest = Type.Object(
+  {
+    reply: Type.String({
+      description: 'What the customer wrote back, in any language.',
+      minLength: 1,
+      maxLength: 4000,
+    }),
+  },
+  { additionalProperties: false },
+)
+export type QuestionnaireSuggestionRequest = Static<typeof QuestionnaireSuggestionRequest>
+const _QuestionnaireSuggestionRequest: Same<
+  QuestionnaireSuggestionRequest,
+  components['schemas']['QuestionnaireSuggestionRequest']
+> = true
+void _QuestionnaireSuggestionRequest
+
+export const SearchFilterSuggestion = Type.Object(
+  {
+    state: Type.Optional(DisputeState),
+    reason: Type.Optional(DisputeReason),
+    overdue: Type.Optional(
+      Type.Boolean({ description: 'Present only when the sentence asks for disputes past a deadline.' }),
+    ),
+  },
+  { additionalProperties: false },
+)
+export type SearchFilterSuggestion = Static<typeof SearchFilterSuggestion>
+const _SearchFilterSuggestion: Same<SearchFilterSuggestion, components['schemas']['SearchFilterSuggestion']> =
+  true
+void _SearchFilterSuggestion
+
+export const SearchFilterSuggestionRequest = Type.Object(
+  {
+    query: Type.String({
+      description: 'What the analyst typed, in any language.',
+      minLength: 1,
+      maxLength: 300,
+    }),
+  },
+  { additionalProperties: false },
+)
+export type SearchFilterSuggestionRequest = Static<typeof SearchFilterSuggestionRequest>
+const _SearchFilterSuggestionRequest: Same<
+  SearchFilterSuggestionRequest,
+  components['schemas']['SearchFilterSuggestionRequest']
+> = true
+void _SearchFilterSuggestionRequest
 
 export const SessionBlob = Type.Object(
   {

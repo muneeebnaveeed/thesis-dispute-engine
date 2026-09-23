@@ -12,14 +12,15 @@ but pnpm. `scripts/check-runtime-versions.sh` fails CI when `Dockerfile` or `pac
 
 ```sh
 mise install            # from the repo root
-make fe-install         # pnpm install --frozen-lockfile
-make fe-dev             # http://localhost:3002, expects the API on :8090
-make fe-check           # typecheck, lint, knip, format check, tests (what CI runs)
-make fe-fix             # apply lint and format fixes
-make fe-build           # production build into .output/, run with pnpm start
+make workbench:install  # pnpm install --frozen-lockfile
+make workbench:dev      # http://localhost:3002, expects the API on :8090
+make workbench:check    # typecheck, lint, knip, format check, tests (what CI runs)
+make workbench:fix      # apply lint and format fixes
+make workbench:cover    # coverage for src/server and src/lib (reported, not gated)
+make workbench:build    # production build into .output/, run with pnpm start
 ```
 
-`make e2e` (repo root) runs the Playwright suite in `e2e/` against the real stack: it starts
+`make workbench:e2e` (repo root) runs the Playwright suite in `e2e/` against the real stack: it starts
 Postgres, the API and Keycloak, seeds, builds this app and drives Chromium through sign-in at the
 tenant's realm, the `next` redirect, sign-out, opening and advancing a dispute (asserting that no
 request from the page reaches the API), validation problems and tenant isolation. `pnpm e2e:ui` for the inspector.
@@ -32,7 +33,7 @@ and ignored. Unit tests sit next to the code as `*.test.tsx` and run under a sep
 
 ## Contract-driven generation
 
-`docs/api/openapi.yaml` is the single source. `pnpm generate` (or `make fe-generate`) writes two
+`docs/api/openapi.yaml` is the single source. `pnpm generate` (or `make workbench:generate`) writes two
 files into `src/api/`, both committed and diffed in CI (`pnpm generate:check`):
 
 - `schema.gen.ts`: request, response and path types from `openapi-typescript`, consumed by the
@@ -90,7 +91,7 @@ The server side is a traced service, `dispute-workbench` (docs/adr/0022): a span
 per server function with its outcome, `traceparent` propagated to the API, request and server-function
 duration metrics, and logs with trace ids. It reads the same `OTEL_*` variables as the API and stays
 silent without `OTEL_EXPORTER_OTLP_ENDPOINT`; to export from a local build, `set -a; . deploy/otel.env;
-set +a; OTEL_SERVICE_NAME=dispute-workbench pnpm start` with `make otel-up` running.
+set +a; OTEL_SERVICE_NAME=dispute-workbench pnpm start` with `make otel:up` running.
 
 ## Authentication
 
@@ -104,5 +105,5 @@ to the page they asked for; Keycloak's back-channel logout ends sessions at `/au
 its own scripts. Analysts with the `tenant-admin` role get a Keys page (`/<slug>/keys`) to issue and
 revoke their organisation's tenant keys; the secret is shown once and never appears in the list. The
 access token is read only inside server functions (`accessTokenForRequest` in
-`src/server/auth/session-impl.ts`), where refresh also happens. `make auth-up` brings Keycloak with
+`src/server/auth/session-impl.ts`), where refresh also happens. `make auth:up` brings Keycloak with
 the `otp` and `erste` realms; sign in as `analyst` / `analyst`.

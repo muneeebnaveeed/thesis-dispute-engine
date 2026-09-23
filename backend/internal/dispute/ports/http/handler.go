@@ -338,11 +338,18 @@ func (h *Handler) CreateDispute(ctx context.Context, req oapi.CreateDisputeReque
 	if req.Body.Reason != nil {
 		reason = string(*req.Body.Reason)
 	}
+	var suggestion *application.ReasonProposal
+	if s := req.Body.Suggestion; s != nil {
+		suggestion = &application.ReasonProposal{
+			Reason: domain.Reason(s.Reason), Probability: s.Probability, Confident: true,
+		}
+	}
 	res, err := h.svc.CreateDispute(ctx, application.CreateDisputeInput{
 		TransactionID: req.Body.TransactionId,
 		Reason:        reason,
 		Actor:         orDefault(req.Body.Actor, "customer"),
 		Idempotency:   idempotency(req.Params.IdempotencyKey, body),
+		Suggestion:    suggestion,
 	})
 	if err != nil {
 		p := h.problem(ctx, "/disputes", err, uuid.Nil)
@@ -1061,4 +1068,55 @@ func (h *Handler) PutMyAvatar(ctx context.Context, req oapi.PutMyAvatarRequestOb
 		return nil, err
 	}
 	return oapi.PutMyAvatar204Response{}, nil
+}
+
+// SuggestSearchFilters reads an analyst's sentence as filters. A model that is unsure, unreachable or not
+// configured all produce the same empty answer, because a suggestion nobody made is not an error (ADR 0024).
+func (h *Handler) SuggestSearchFilters(ctx context.Context, req oapi.SuggestSearchFiltersRequestObject) (oapi.SuggestSearchFiltersResponseObject, error) {
+	filters := h.svc.SuggestSearchFilters(ctx, req.Body.Query)
+	var out oapi.SearchFilterSuggestion
+	if filters.State != nil {
+		state := oapi.DisputeState(*filters.State)
+		out.State = &state
+	}
+	if filters.Reason != nil {
+		reason := oapi.DisputeReason(*filters.Reason)
+		out.Reason = &reason
+	}
+	out.Overdue = filters.Overdue
+	return oapi.SuggestSearchFilters200JSONResponse(out), nil
+}
+
+// SuggestDisputeReason reads a customer's words as one of the four reasons, for the analyst to confirm.
+func (h *Handler) SuggestDisputeReason(ctx context.Context, req oapi.SuggestDisputeReasonRequestObject) (oapi.SuggestDisputeReasonResponseObject, error) {
+	proposal := h.svc.SuggestDisputeReason(ctx, req.Body.Description)
+	var out oapi.DisputeReasonSuggestion
+	if proposal.Confident {
+		reason := oapi.DisputeReason(proposal.Reason)
+		out.Reason, out.Probability = &reason, &proposal.Probability
+	}
+	return oapi.SuggestDisputeReason200JSONResponse(out), nil
+}
+
+// SuggestQuestionnaireAnswers reads a customer's reply as answers for the analyst to confirm.
+func (h *Handler) SuggestQuestionnaireAnswers(ctx context.Context, req oapi.SuggestQuestionnaireAnswersRequestObject) (oapi.SuggestQuestionnaireAnswersResponseObject, error) {
+	proposals, err := h.svc.SuggestQuestionnaireAnswers(ctx, req.DisputeId, req.Body.Reply)
+	if err != nil {
+		if errors.Is(err, application.ErrNotFound) {
+			p := h.problem(ctx, "/disputes/"+req.DisputeId.String()+"/suggestions/questionnaire", err, req.DisputeId)
+			return oapi.SuggestQuestionnaireAnswers404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: oapi.NotFoundApplicationProblemPlusJSONResponse(p)}, nil
+		}
+		return nil, err
+	}
+	out := oapi.QuestionnaireSuggestion{Answers: map[string]struct {
+		Probability float64                                  `json:"probability"`
+		Value       oapi.QuestionnaireSuggestionAnswersValue `json:"value"`
+	}{}}
+	for id, proposal := range proposals {
+		out.Answers[id] = struct {
+			Probability float64                                  `json:"probability"`
+			Value       oapi.QuestionnaireSuggestionAnswersValue `json:"value"`
+		}{Probability: proposal.Probability, Value: oapi.QuestionnaireSuggestionAnswersValue(proposal.Value)}
+	}
+	return oapi.SuggestQuestionnaireAnswers200JSONResponse(out), nil
 }

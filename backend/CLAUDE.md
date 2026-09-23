@@ -24,7 +24,7 @@ its `domain` or storage.
   validation and `httpserver.NameSpanByRoute`. Never register routes by hand.
 - **Errors:** sentinels are `errs.New(...)` values in the package that owns the rule; wrap with
   `errs.Wrap`; infrastructure maps driver errors onto application sentinels in `mapErr`.
-- **Persistence:** sqlc queries in `infrastructure/postgres/queries/*.sql`, `make generate`,
+- **Persistence:** sqlc queries in `infrastructure/postgres/queries/*.sql`, `make api:generate`,
   never hand-written SQL in Go. Money is `decimal.Decimal`. Every write path goes through
   `application.Store.WithTx`; the event log is append-only (docs/adr/0004). The API connects as
   `dispute_api`, a member of the `dispute_app` group role whose grants live in the migration

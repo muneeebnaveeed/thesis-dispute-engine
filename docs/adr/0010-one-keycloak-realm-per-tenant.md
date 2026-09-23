@@ -14,7 +14,7 @@ claim. Keycloak offers two shapes: one realm with an organisation per tenant, or
 - One realm per tenant. The realm name is the tenant's `slug`; the tenant row records the realm's
   issuer URL. Realms are rendered from `deploy/keycloak/realm.template.json` by
   `deploy/keycloak/render-realms.sh` for the seeded tenants and imported on Keycloak start; the
-  rendered files are committed and `make generate-check` fails on drift. Onboarding a tenant means
+  rendered files are committed and `make api:generate-check` fails on drift. Onboarding a tenant means
   a row plus a rendered realm.
 - Each realm carries a `dispute-api` client scope that puts `dispute-api` in the audience and a
   hardcoded `tenant_id` claim in every token, plus `roles`, `preferred_username` and `email`.

@@ -1,5 +1,5 @@
 // Captures the workbench figures the thesis register asks for, reproducibly, into docs/thesis/latex/figures.
-// Needs the stack up (make auth-up and the workbench on :3002). Usage: pnpm screenshot [name...]
+// Needs the stack up (make auth:up and the workbench on :3002). Usage: pnpm screenshot [name...]
 import { mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'

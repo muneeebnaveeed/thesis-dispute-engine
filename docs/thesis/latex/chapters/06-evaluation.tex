@@ -4,6 +4,57 @@
 % Budget and sources: docs/thesis/outline.md. Every claim about behaviour points at a test, a figure or a number in data/.
 
 
+\section{Are the model's proposals good enough to show?}
+\label{sec:eval-decisions}
+
+The feature of section~\ref{sec:impl-decisions} is only defensible if the proposals are usually
+right, so it was measured before it was built. The labelled set is drawn from this system's own
+vocabulary: the four reasons, the yes and no questions of the unauthorised questionnaire, and the
+fifteen lifecycle states. It holds 72 complaints, 113 questionnaire answers across 40 replies, and
+69 filter fields across 50 queries. Every part carries a deliberately hard band, and roughly a
+third is Hungarian, since both seeded tenants are Hungarian banks and a customer writes in the
+language they complain in. Two models were run against it: an open one on a consumer GPU, and a
+hosted one (table~\ref{fig:decisions}).
+
+\begin{figure}[htbp]
+\centering
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+Model & Reason & Questionnaire & Search & ECE & One question \\
+\midrule
+Open, English checkpoint & 0.597 & 0.469 & 0.812 & 0.401 & 17 ms \\
+Open, multilingual & 0.639 & 0.522 & 0.623 & 0.213 & 8 ms \\
+Open, typed decisions & 0.639 & 0.611 & 0.696 & 0.595 & 16 ms \\
+Hosted & \textbf{0.986} & \textbf{0.973} & \textbf{0.928} & \textbf{0.011} & 574 ms \\
+\midrule
+Chance & 0.25 & 0.50 & & & \\
+\bottomrule
+\end{tabular}
+\caption{Accuracy on the labelled set (\code{eval/decisions}), expected calibration error on the
+reason task, and the latency of one question. The open model runs locally on an RTX~4070; the
+hosted one is a network call costing \$0.0000216. Chance is one in four for the reason task and
+one in two for the questionnaire.}
+\label{fig:decisions}
+\end{figure}
+
+The open model is not accurate enough for any of the three uses, and the reason it fails is not
+only accuracy. Its expected calibration error ranges from 0.21 to 0.60, and it warns on loading
+that its temperatures fall outside the calibrated range, so its confidence cannot be used to decide
+when to stay quiet. The hosted model's error of 0.011 is what makes the confidence gate meaningful:
+the single reason it got wrong, a rental company adding charges the customer never agreed to, came
+back at 0.50 with the probability split 0.63 to 0.37 between two readings a person would also
+argue about. Its three questionnaire mistakes were all the same question, which asked whether the
+card was in the customer's possession and so conflated owning it with carrying it; the question was
+reworded rather than the model replaced.
+
+The honest limit of this measurement is that the set is synthetic. No corpus of real customer
+language exists for this system, so the prose was written rather than collected, and it was
+labelled by its author. It therefore measures how well a model recovers an intent that was
+deliberately encoded, which is an easier task than reading what a real customer writes. The number
+the running system reports, the share of proposals an analyst keeps, is the one that will answer
+the question properly, and it is recorded from the first dispute opened this way.
+
 \section{Limitations}
 \label{sec:limitations}
 % To write: what the evaluation cannot show and what the model leaves out (statutory extensions, MFA, real banking cores).

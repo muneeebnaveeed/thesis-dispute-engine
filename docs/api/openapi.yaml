@@ -374,6 +374,78 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+  /suggestions/search-filters:
+    post:
+      operationId: suggestSearchFilters
+      summary: Read an analyst's sentence as search filters
+      description: >
+        A convenience, never a decision. The filters come back only when the model is sure enough, so an
+        empty answer is the normal case and never an error; the analyst sees the filters and can change
+        them before searching. Nothing is stored.
+      tags: [suggestions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SearchFilterSuggestionRequest" }
+      responses:
+        "200":
+          description: What the sentence appears to ask for, with any field the model was unsure of left out
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SearchFilterSuggestion" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /disputes/{disputeId}/suggestions/questionnaire:
+    post:
+      operationId: suggestQuestionnaireAnswers
+      summary: Read a customer's reply as questionnaire answers
+      description: >
+        A convenience, never a decision. Only the yes and no questions of this dispute's questionnaire are
+        answered, and only those the model was sure about; dates and free text are left to the analyst, who
+        confirms everything before any answer is recorded. The reply is read and not stored.
+      tags: [suggestions]
+      parameters:
+        - $ref: "#/components/parameters/DisputeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QuestionnaireSuggestionRequest" }
+      responses:
+        "200":
+          description: The answers the reply appears to give, keyed by question id
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QuestionnaireSuggestion" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /suggestions/dispute-reason:
+    post:
+      operationId: suggestDisputeReason
+      summary: Read what a customer wrote as a dispute reason
+      description: >
+        A convenience, never a decision. The reason comes back only when the model is sure enough, and the
+        analyst confirms it before a dispute is opened; the description is read and not stored, so the
+        record still holds only what a person chose.
+      tags: [suggestions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DisputeReasonSuggestionRequest" }
+      responses:
+        "200":
+          description: The reason the description appears to describe, absent when the model was unsure
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DisputeReasonSuggestion" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /tenant:
     get:
       operationId: getTenant
@@ -770,6 +842,85 @@ components:
     Regime:
       type: string
       enum: [EU_SEPA_DIRECT_DEBIT, EU_PSD2_CARD, US_REG_E, US_REG_Z]
+    QuestionnaireSuggestionRequest:
+      type: object
+      required: [reply]
+      properties:
+        reply:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          description: What the customer wrote back, in any language.
+      additionalProperties: false
+    QuestionnaireSuggestion:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: object
+          description: >
+            Question id to the answer proposed for it. A question the model was unsure about is absent, as
+            is every question that is not a yes or no.
+          additionalProperties:
+            type: object
+            required: [value, probability]
+            properties:
+              value: { type: string, enum: [yes, no] }
+              probability: { type: number, format: double, minimum: 0, maximum: 1 }
+            additionalProperties: false
+      additionalProperties: false
+    AcceptedSuggestion:
+      type: object
+      description: >
+        What a model proposed for a field, sent back when the dispute is opened so the record can say the
+        analyst was shown a suggestion and what they did with it. It changes nothing about the dispute.
+      required: [reason, probability]
+      properties:
+        reason: { $ref: "#/components/schemas/DisputeReason" }
+        probability: { type: number, format: double, minimum: 0, maximum: 1 }
+      additionalProperties: false
+    DisputeReasonSuggestionRequest:
+      type: object
+      required: [description]
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: What the customer said, in any language.
+      additionalProperties: false
+    DisputeReasonSuggestion:
+      type: object
+      description: An absent reason means the model was not sure enough to offer one.
+      properties:
+        reason: { $ref: "#/components/schemas/DisputeReason" }
+        probability:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          description: How sure the model was, recorded with the dispute when the analyst accepts it.
+      additionalProperties: false
+    SearchFilterSuggestionRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 300
+          description: What the analyst typed, in any language.
+      additionalProperties: false
+    SearchFilterSuggestion:
+      type: object
+      description: Every field is optional; an absent field is one the model was not sure enough about.
+      properties:
+        state: { $ref: "#/components/schemas/DisputeState" }
+        reason: { $ref: "#/components/schemas/DisputeReason" }
+        overdue:
+          type: boolean
+          description: Present only when the sentence asks for disputes past a deadline.
+      additionalProperties: false
     DisputeState:
       type: string
       enum:
@@ -813,6 +964,11 @@ components:
           description: Why the customer disputes it; selects the questionnaire. Defaults to UNAUTHORISED.
           $ref: "#/components/schemas/DisputeReason"
         actor: { type: string, description: "Who opened it; defaults to customer.", default: customer }
+        suggestion:
+          description: >
+            What a model proposed for the reason, if the analyst was shown one. Recorded beside the reason
+            they chose so acceptance can be measured; it never changes what is opened.
+          $ref: "#/components/schemas/AcceptedSuggestion"
     DisputeReason:
       type: string
       enum: [UNAUTHORISED, NOT_RECEIVED, DUPLICATE, AMOUNT_DIFFERS]
@@ -830,7 +986,8 @@ components:
             invalid-liability); on CLOSE, `settlement` says how an outstanding advance clears (RECOVERED or
             WRITTEN_OFF; the regime's default when absent; refused with invalid-settlement); on
             RECEIVE_QUESTIONNAIRE, `answers` maps question ids to answers and is validated against the questions
-            that were sent (refused with invalid-answers, one error per question). On ISSUE_REFUND for a dispute
+            that were sent (refused with invalid-answers, one error per question), and `suggestions` may carry
+            what a model proposed for those answers, stored beside them and read only as an acceptance rate. On ISSUE_REFUND for a dispute
             whose latest risk tier is HIGH, `riskOverride` must carry the analyst's justification or the credit is
             refused with risk-hold.
           additionalProperties: true

@@ -21,16 +21,17 @@ Requires `mise`, Docker with Compose v2, `make`. Optional: a C compiler for `go 
 
 ```sh
 mise install          # Go, golangci-lint, air; versions in mise.toml
-make db-up            # PostgreSQL on localhost:5432 (plus the API's login role)
-make run              # migrate, then the API on http://localhost:8090  ->  curl localhost:8090/healthz
-make db-seed          # two tenants with fixed dev tenant keys, accounts and transactions
-make dev              # same as run, with live reload
+make demo             # the whole system for a demonstration, verified; stop with make demo:down
+make db:up            # PostgreSQL on localhost:5432 (plus the API's login role)
+make api:run          # migrate, then the API on http://localhost:8090  ->  curl localhost:8090/healthz
+make db:seed          # two tenants with fixed dev tenant keys, accounts and transactions
+make api:dev          # same as api:run, with live reload
 make ci               # what CI runs
-make help             # every target, including PR and stack tooling
+make help             # every target, grouped by domain
 ```
 
 Every dispute endpoint needs a credential: a tenant key for a customer's systems, or an analyst's
-access token from that tenant's Keycloak realm (`make auth-up`). The seed prints two dev
+access token from that tenant's Keycloak realm (`make auth:up`). The seed prints two dev
 keys, and `go run ./cmd/tenantkey create --tenant <uuid> --label <text>` (from `backend/`) issues real ones;
 `docs/operations.md` covers rotation, leaks and expiry.
 
@@ -39,8 +40,8 @@ curl -s localhost:8090/disputes -H 'Authorization: Bearer tk_dev_tenant_a' -H 'C
   -d '{"transactionId":"00000000-0000-8000-8000-000000000101","actor":"demo"}'
 ```
 
-`make up` runs the API from its container image alongside Postgres; `make docker-dev` runs
-the API in a Go toolchain container with live reload instead; `make otel-up` adds a Grafana LGTM
+`make stack:up` runs the API from its container image alongside Postgres; `make stack:dev` runs
+the API in a Go toolchain container with live reload instead; `make otel:up` adds a Grafana LGTM
 stack and the API exports traces, metrics and logs to it (http://localhost:3001). All telemetry is configured through
 standard `OTEL_*` variables; see `.env.example`.
 
