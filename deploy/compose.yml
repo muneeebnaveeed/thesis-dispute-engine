@@ -178,6 +178,18 @@ services:
       LOKI_EXTRA_ARGS: "-compactor.retention-enabled=true -compactor.delete-request-store=filesystem -compactor.working-directory=/data/loki/compactor -store.retention=${LGTM_RETENTION:-168h}"
       # With host networking the collector would otherwise listen on every interface; keep OTLP on loopback.
       OTELCOL_EXTRA_ARGS: "--set=receivers.otlp.protocols.grpc.endpoint=127.0.0.1:4317 --set=receivers.otlp.protocols.http.endpoint=127.0.0.1:4318"
+    # The image's own check waits for Grafana on 3000, which GF_SERVER_HTTP_PORT moves to 3001, so it
+    # never marks itself ready and anything using --wait or depends_on blocks on it forever.
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:3001/api/health >/dev/null && curl -fsS http://localhost:13133/ready >/dev/null",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
     volumes:
       - lgtm:/data
       - ./lgtm/tempo-config.yaml:/otel-lgtm/tempo-config.yaml:ro

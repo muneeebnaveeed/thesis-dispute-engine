@@ -1,7 +1,7 @@
 # Observability cheat sheet
 
 Everything below assumes `make otel:up` (Postgres, API, workbench, Grafana LGTM, synthetic probe; all on
-host networking). Stop with `make otel:down`; `make otel:reset` also drops the LGTM volume. Two services
+host networking); `make demo` brings up the same stack plus Keycloak and Mailpit. Stop with `make otel:down`; `make otel:reset` also drops the LGTM volume. Two services
 report: `dispute-engine` (the Go API) and `dispute-workbench` (the frontend server); one trace spans both
 and continues into the outbox (ADR 0022).
 

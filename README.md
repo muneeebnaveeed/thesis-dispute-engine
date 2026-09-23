@@ -21,7 +21,7 @@ Requires `mise`, Docker with Compose v2, `make`. Optional: a C compiler for `go 
 
 ```sh
 mise install          # Go, golangci-lint, air; versions in mise.toml
-make demo             # the whole system for a demonstration, verified; stop with scripts/demo --down
+make demo             # the whole system for a demonstration, verified; stop with make demo:down
 make db:up            # PostgreSQL on localhost:5432 (plus the API's login role)
 make api:run          # migrate, then the API on http://localhost:8090  ->  curl localhost:8090/healthz
 make db:seed          # two tenants with fixed dev tenant keys, accounts and transactions

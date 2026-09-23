@@ -17,9 +17,11 @@ How to work in this repo. What the system does is in `README.md` and `docs/adr/`
 Targets are namespaced by domain: `db:`, `api:`, `workbench:`, `stack:`, `auth:`, `otel:`, `thesis:`,
 `pr:`. `make help` lists them grouped.
 
-- `make demo`: the whole system for a demonstration (Keycloak, API, workbench, Mailpit), seeded and
-  verified, printing what to open and the credentials. `ARGS='--otel'` adds Grafana, `ARGS='--check'`
-  verifies a stack already up, `ARGS='--down'` stops it. Implementation: `scripts/demo`.
+- `make demo`: the whole system for a demonstration (Keycloak, API, workbench, Mailpit, Grafana and
+  the synthetic probe), seeded and verified, printing what to open and the credentials.
+  `make demo:check` verifies a stack already up, `make demo:down` stops it. Observability is on by
+  default; `scripts/demo --no-otel` is the lean variant. Flags go to the script, not through make,
+  which would read `--otel` as its own option.
 - `make thesis:eval`: the thesis evaluation run (correctness suites, paced load, Prometheus read-back) into
   `docs/thesis/data/<date>/`; needs `make otel:up`. Runs are committed and cited by directory name.
 - `make workbench:e2e`: the Playwright browser suite against the full local stack; in GitHub it is the

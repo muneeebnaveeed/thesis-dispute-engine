@@ -14,7 +14,7 @@ TEST_DB_URL     ?= postgres://dispute:dispute@localhost:5432/dispute?sslmode=dis
 TEST_APP_DB_URL ?= postgres://dispute_api:dispute_api@localhost:5432/dispute?sslmode=disable
 GENERATED       := $(BACKEND)/internal/dispute/infrastructure/postgres/sqlcgen $(BACKEND)/internal/dispute/ports/http/oapi deploy/keycloak/import
 
-.PHONY: help demo ci versions hooks \
+.PHONY: help demo demo\:check demo\:down ci versions hooks \
 	db\:up db\:down db\:logs db\:seed db\:migrate \
 	api\:run api\:dev api\:build api\:test api\:test-race api\:test-integration api\:cover \
 	api\:generate api\:generate-check api\:lint api\:vet api\:fmt api\:fmt-fix api\:tidy api\:vuln api\:image \
@@ -32,8 +32,14 @@ help: ## Every target, grouped by domain
 			printf "    \033[36m%-22s\033[0m %s\n", substr(line, 1, RLENGTH - 1), substr(line, index(line, "## ") + 3); \
 		}' $(MAKEFILE_LIST)
 
-demo: ## Bring the whole system up for a demonstration and verify it (ARGS='--otel', '--check', '--down')
-	scripts/demo $(ARGS)
+demo: ## The whole system for a demonstration, verified: Keycloak, API, workbench, Mailpit, Grafana
+	scripts/demo
+
+demo\:check: ## Verify a demonstration stack that is already up, change nothing
+	scripts/demo --check
+
+demo\:down: ## Stop everything the demonstration started, keep the data
+	scripts/demo --down
 
 ci: versions api\:generate-check api\:fmt api\:vet api\:lint api\:test api\:tidy workbench\:check ## Everything CI runs, locally (the race detector and integration tests need extras; see api:test-race, api:test-integration)
 
