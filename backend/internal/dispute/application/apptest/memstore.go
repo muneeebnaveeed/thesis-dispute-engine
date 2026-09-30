@@ -81,6 +81,18 @@ type MemStore struct {
 	Calendars map[uuid.UUID]domain.Calendar
 	// Cores holds a tenant's banking-core configuration; a tenant without one books postings without a core.
 	Cores map[uuid.UUID]application.CoreConfig
+	// Access holds a tenant's teams and grants; a tenant without one gets application.DefaultAccess.
+	Access map[uuid.UUID]*MemAccess
+}
+
+// MemAccess is one tenant's access data, members keyed by subject.
+type MemAccess struct {
+	Version int64
+	Teams   []string
+	Default string
+	Grants  []application.Grant
+	Routing []application.RoutingRule
+	Members map[string][]application.Membership
 }
 
 type avatarKey struct {
@@ -105,6 +117,7 @@ func NewMemStore() *MemStore {
 		Names:        map[uuid.UUID]string{},
 		Calendars:    map[uuid.UUID]domain.Calendar{},
 		Cores:        map[uuid.UUID]application.CoreConfig{},
+		Access:       map[uuid.UUID]*MemAccess{},
 		TenantLogos:  map[uuid.UUID]application.Image{},
 		TenantLogoAt: map[uuid.UUID]time.Time{},
 		Avatars:      map[avatarKey]application.Image{},
@@ -140,7 +153,8 @@ func (m *MemStore) WithTx(ctx context.Context, fn func(application.Tx) error) er
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	snap := m.snapshot()
-	if err := fn(&memTx{s: m, tenant: id}); err != nil {
+	p, _ := principal.From(ctx)
+	if err := fn(&memTx{s: m, tenant: id, principal: p}); err != nil {
 		m.restore(snap)
 		return err
 	}
@@ -341,8 +355,9 @@ func (m *MemStore) CountOverdue(_ context.Context) ([]application.OverdueCount, 
 }
 
 type memTx struct {
-	s      *MemStore
-	tenant uuid.UUID
+	s         *MemStore
+	tenant    uuid.UUID
+	principal principal.Principal
 }
 
 func (t *memTx) GetTransaction(_ context.Context, id uuid.UUID) (application.TransactionRecord, error) {
@@ -359,14 +374,36 @@ func (t *memTx) InsertDispute(_ context.Context, d application.DisputeRecord) er
 	return nil
 }
 
-// Access implements application.Tx; every tenant has the default access until PR B's tables exist.
+// Access implements application.Tx from the tenant's MemAccess, or the default access when it has none.
 func (t *memTx) Access(_ context.Context, p principal.Principal) (application.Access, error) {
-	return application.DefaultAccess(p), nil
+	ma, ok := t.s.Access[t.tenant]
+	if !ok {
+		return application.DefaultAccess(p), nil
+	}
+	a := application.Access{Version: ma.Version, DefaultTeam: ma.Default, Teams: ma.Teams, Grants: ma.Grants, Routing: ma.Routing}
+	if p.Kind == principal.Analyst {
+		a.Members = ma.Members[p.ID]
+	}
+	return a, nil
+}
+
+// visible mirrors the team_scope policies: keys see the tenant, analysts their teams.
+func (t *memTx) visible(rec application.DisputeRecord) bool {
+	if t.principal.Kind == principal.Key {
+		return true
+	}
+	a, _ := t.Access(context.Background(), t.principal)
+	for _, m := range a.Members {
+		if m.Team == rec.Team {
+			return true
+		}
+	}
+	return false
 }
 
 func (t *memTx) GetDispute(_ context.Context, id uuid.UUID) (application.DisputeRecord, error) {
 	r, ok := t.s.Disputes[id]
-	if !ok || r.TenantID != t.tenant {
+	if !ok || r.TenantID != t.tenant || !t.visible(r) {
 		return application.DisputeRecord{}, application.ErrNotFound
 	}
 	return r, nil
@@ -415,7 +452,7 @@ func (t *memTx) PutIdempotent(_ context.Context, scope, key string, r applicatio
 func (t *memTx) ListDisputes(_ context.Context, q application.ListQuery) ([]application.DisputeRecord, error) {
 	var all []application.DisputeRecord
 	for _, d := range t.s.Disputes {
-		if d.TenantID != t.tenant || (q.State != nil && d.State != *q.State) {
+		if d.TenantID != t.tenant || !t.visible(d) || (q.State != nil && d.State != *q.State) {
 			continue
 		}
 		if q.Reason != nil && d.Reason != *q.Reason {

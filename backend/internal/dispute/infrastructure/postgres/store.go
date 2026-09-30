@@ -35,15 +35,18 @@ type Store struct {
 // NewStore wraps a pool.
 func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 
-// WithTx implements application.Store. The tenant is bound to the transaction with a LOCAL setting, which the
-// row-level policies and the tenant_id column defaults read; a pooled connection never carries it past commit.
+// WithTx implements application.Store. The tenant and the principal are bound to the transaction with LOCAL settings,
+// which the row-level policies and the tenant_id column defaults read; a pooled connection never carries them past commit.
 func (s *Store) WithTx(ctx context.Context, fn func(application.Tx) error) error {
 	id, ok := tenant.IDFrom(ctx)
 	if !ok {
 		return tenant.ErrMissing
 	}
+	p, _ := principal.From(ctx)
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, id.String()); err != nil {
+		// an absent principal binds empty settings, which the team-scope policies treat as no teams
+		if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true), set_config('app.subject', $2, true), set_config('app.principal_kind', $3, true)`,
+			id.String(), p.ID, string(p.Kind)); err != nil {
 			return mapErr(err)
 		}
 		return fn(&txn{q: sqlcgen.New(tx)})
