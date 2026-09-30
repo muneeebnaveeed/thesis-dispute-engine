@@ -1,9 +1,9 @@
 import type { paths } from '#/api/schema.gen'
-import { type Static, Type } from '@sinclair/typebox'
-import { Value } from '@sinclair/typebox/value'
+import { Type } from '@sinclair/typebox'
 import createClient from 'openapi-fetch'
 
 import { serverEnv } from '#/server/runtime/env'
+import { validate, type Output } from '#/validation/validate'
 import { open, seal } from './crypto'
 
 const SessionSchema = Type.Object({
@@ -33,7 +33,7 @@ const SessionSchema = Type.Object({
     }),
   ),
 })
-export type Session = Static<typeof SessionSchema>
+export type Session = Output<typeof SessionSchema>
 
 const internalApi = () => {
   const env = serverEnv()
@@ -81,5 +81,7 @@ export const remove = async (sessionId: string): Promise<void> => {
 }
 
 // an older build's payload that no longer fits is no session
-const asSession = (unsealed: unknown): Session | null =>
-  Value.Check(SessionSchema, unsealed) ? unsealed : null
+const asSession = (unsealed: unknown): Session | null => {
+  const result = validate(SessionSchema, unsealed)
+  return result.ok ? result.value : null
+}

@@ -42,8 +42,9 @@ files into `src/api/`, both committed and diffed in CI (`pnpm generate:check`):
   the same JSON Schema the backend validates with. Each carries a compile-time assertion that its
   static type equals the openapi-typescript type, so the two files cannot drift from each other.
 
-`src/api/validate.ts` runs a TypeBox schema over form input (registering the `uuid` and `email`
-formats, which neither side validates by default) and returns field errors in the same shape the API uses. Only
+`src/validation/validate.ts` runs any Standard Schema over input and returns field errors in the same shape
+the API uses (ADR 0025); TypeBox schemas pass through the adapter in `src/validation/typebox.ts`, which registers
+the `uuid` and `email` formats neither side validates by default. Only
 structural rules are shared; business rules arrive from the API (`allowedEvents`,
 `Problem.errors[].field` as a JSON pointer) and are never duplicated in the UI.
 

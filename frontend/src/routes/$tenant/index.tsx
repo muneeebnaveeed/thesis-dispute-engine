@@ -1,8 +1,6 @@
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate, useRouteContext } from '@tanstack/react-router'
 import { useState } from 'react'
-import type { Static } from '@sinclair/typebox'
-import { Value } from '@sinclair/typebox/value'
 
 import {
   CreateDisputeRequest,
@@ -24,6 +22,7 @@ import { disputeQuery, disputesQuery, type DisputeListSearch } from '#/queries/d
 import { useDisputeReasonSuggestion } from '#/queries/suggestions'
 import { useServerMutation } from '#/queries/use-server-mutation'
 import { openDispute } from '#/server/functions/disputes'
+import { is, type Output } from '#/validation/validate'
 
 // from the generated schema, so the filter cannot offer a state the API lacks
 const DISPUTE_STATES = DisputeStateSchema.anyOf.map((literal) => ({
@@ -34,8 +33,7 @@ const DISPUTE_REASONS = DisputeReasonSchema.anyOf.map((literal) => ({
   value: literal.const,
   label: literal.const,
 }))
-const isDisputeState = (value: unknown): value is DisputeState =>
-  typeof value === 'string' && Value.Check(DisputeStateSchema, value)
+const isDisputeState = (value: unknown): value is DisputeState => is(DisputeStateSchema, value)
 
 const DEFAULT_PAGE_SIZE = 25
 
@@ -65,7 +63,7 @@ const Workbench = () => {
     })
   }
   const openDisputeMutation = useServerMutation(
-    (request: Static<typeof CreateDisputeRequest>) => openDispute({ data: { ...request, actor: 'analyst' } }),
+    (request: Output<typeof CreateDisputeRequest>) => openDispute({ data: { ...request, actor: 'analyst' } }),
     {
       invalidates: () => [disputeQuery(null).queryKey],
       onSuccess: (openedDispute) => {

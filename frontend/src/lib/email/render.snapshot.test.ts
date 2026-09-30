@@ -1,11 +1,10 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { Value } from '@sinclair/typebox/value'
-
 import { EmailTemplate as EmailTemplateSchema } from '#/api/schemas.gen'
 import { renderEmailPreview } from './render'
 import type { EmailTemplate } from './render'
+import { validate } from '#/validation/validate'
 
 // the same inputs as the Go golden tests, so the two halves of the template language can be compared by eye
 const templatesDir = join(__dirname, '../../../../backend/internal/dispute/notice/templates')
@@ -13,11 +12,9 @@ const templates: EmailTemplate[] = readdirSync(templatesDir)
   .filter((filename) => filename.endsWith('.json'))
   .map((filename) => {
     const parsed: unknown = JSON.parse(readFileSync(join(templatesDir, filename), 'utf8'))
-    if (!Value.Check(EmailTemplateSchema, parsed))
-      throw new Error(
-        `${filename} is not an EmailTemplate: ${JSON.stringify([...Value.Errors(EmailTemplateSchema, parsed)].slice(0, 2))}`,
-      )
-    return parsed
+    const result = validate(EmailTemplateSchema, parsed)
+    if (!result.ok) throw new Error(`${filename} is not an EmailTemplate: ${JSON.stringify(result.errors)}`)
+    return result.value
   })
 
 const facts: Record<string, string> = {

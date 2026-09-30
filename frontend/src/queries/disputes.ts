@@ -1,11 +1,11 @@
 import { queryOptions } from '@tanstack/react-query'
-import type { Static } from '@sinclair/typebox'
 
 import { getDispute, listDisputes, type DisputeListSearch } from '#/server/functions/disputes'
 import { keyArgument } from './key-argument'
 import { classified } from './loaded'
+import type { Output } from '#/validation/validate'
 
-export type DisputeListSearch = Static<typeof DisputeListSearch>
+export type DisputeListSearch = Output<typeof DisputeListSearch>
 
 export const disputeQuery = (disputeId: string | null) =>
   queryOptions({

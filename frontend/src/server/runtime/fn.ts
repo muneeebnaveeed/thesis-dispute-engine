@@ -1,22 +1,21 @@
-import { Type, type Static, type TSchema } from '@sinclair/typebox'
-import { Value } from '@sinclair/typebox/value'
+import { Type } from '@sinclair/typebox'
 import { createServerFn } from '@tanstack/react-start'
+
+import { validate, type Input, type Output, type Schema } from '#/validation/validate'
 
 import { traced } from '#/server/telemetry/server-fn'
 import { authed } from './middleware'
 
 export const uuid = Type.String({ format: 'uuid' })
 
-// typed as Static<T> so call sites are checked; the RPC boundary still validates whatever arrives
+// typed as the schema's input so call sites are checked; the RPC boundary still validates whatever arrives
 export const parse =
-  <T extends TSchema>(schema: T) =>
-  (input: Static<T>): Static<T> => {
-    const value = Value.Default(schema, Value.Clean(schema, structuredClone(input)))
-    if (!Value.Check(schema, value)) {
-      const firstError = Value.Errors(schema, value).First()
-      throw new Error(`invalid input${firstError ? ` at ${firstError.path}: ${firstError.message}` : ''}`)
-    }
-    return value
+  <S extends Schema>(schema: S) =>
+  (input: Input<S>): Output<S> => {
+    const result = validate(schema, input)
+    if (result.ok) return result.value
+    const [field, message] = Object.entries(result.errors)[0] ?? []
+    throw new Error(`invalid input${field ? ` at ${field}: ${message}` : ''}`)
   }
 
 export const publicGet = createServerFn({ method: 'GET' }).middleware([traced])
