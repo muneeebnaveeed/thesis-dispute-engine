@@ -133,7 +133,7 @@ jobs:
       pull-requests: write
     services:
       postgres:
-        image: postgres:17-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: dispute
           POSTGRES_PASSWORD: dispute
@@ -204,7 +204,7 @@ jobs:
     services:
       # The API checks the schema at startup, so the smoke test needs a migrated database.
       postgres:
-        image: postgres:17-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: dispute
           POSTGRES_PASSWORD: dispute
