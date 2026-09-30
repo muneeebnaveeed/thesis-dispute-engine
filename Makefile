@@ -9,6 +9,8 @@ FRONTEND := frontend
 GO       := cd $(BACKEND) && go
 PNPM     := pnpm -C $(FRONTEND)
 COMPOSE  := docker compose -f deploy/compose.yml
+# every image this file builds carries the commit it was built from; the workbench uses it to notice a stale tab
+export VERSION ?= $(shell git describe --always --dirty 2>/dev/null || echo dev)
 
 TEST_DB_URL     ?= postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable
 TEST_APP_DB_URL ?= postgres://dispute_api:dispute_api@localhost:5432/dispute?sslmode=disable
@@ -152,7 +154,7 @@ workbench\:build: ## Production build into frontend/.output
 # traffic on Docker's bridge, so `go mod download` inside the build would time
 # out. Runtime containers get the same via compose. CI does not need it.
 workbench\:image: ## Build the frontend container image
-	docker build --network host -t dispute-engine-frontend:dev --build-arg NODE_VERSION=$$(sed -n 's/^node = "\(.*\)"$$/\1/p' mise.toml) --build-arg PNPM_VERSION=$$(sed -n 's/^pnpm = "\(.*\)"$$/\1/p' mise.toml) $(FRONTEND)
+	docker build --network host -t dispute-engine-frontend:dev --build-arg VERSION=$(VERSION) --build-arg NODE_VERSION=$$(sed -n 's/^node = "\(.*\)"$$/\1/p' mise.toml) --build-arg PNPM_VERSION=$$(sed -n 's/^pnpm = "\(.*\)"$$/\1/p' mise.toml) $(FRONTEND)
 
 workbench\:e2e: ## Browser suite against the full local stack (starts Postgres, API and Keycloak, seeds, builds the frontend)
 	deploy/keycloak/render-realms.sh >/dev/null

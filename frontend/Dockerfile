@@ -13,6 +13,9 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm config set store-dir /root/.local/share/pnpm/store && pnpm fetch
 COPY . .
+# Stamped into the client bundle and the server alike; an open tab compares the two to notice it outlived a deploy.
+ARG VERSION=dev
+ENV VITE_BUILD_VERSION=${VERSION}
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm install --offline --frozen-lockfile --ignore-scripts && pnpm generate-routes && pnpm build
 

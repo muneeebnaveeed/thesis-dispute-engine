@@ -87,6 +87,7 @@ services:
       args:
         NODE_VERSION: ${NODE_VERSION:-24.21.0}
         PNPM_VERSION: ${PNPM_VERSION:-12.5.1}
+        VERSION: ${VERSION:-dev}
     network_mode: host
     profiles: [app, otel]
     depends_on:

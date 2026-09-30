@@ -49,6 +49,8 @@ lint and format fixes. `make workbench:dev` for the dev server on :3002. Inside 
   and `useServerMutation` follows it for actions, so never call a server function imperatively
   outside that hook.
   Never use `inputValidator`; never call `createServerFn` directly for an analyst endpoint.
+- A tab that outlived its build reloads itself (ADR 0028, `src/lib/stale-build.ts`): a new place that catches a failed
+  server function call or a thrown read should call `staleBuildGuard().check()` before showing a generic failure.
 - Validation goes through `#/validation/validate` only (ADR 0025): `validate`, `is`, and the `Input`/`Output`
   types instead of `Static`. It accepts any Standard Schema and adapts TypeBox itself; never import
   `@sinclair/typebox/value` outside `src/validation/`. Schemas must validate synchronously.
