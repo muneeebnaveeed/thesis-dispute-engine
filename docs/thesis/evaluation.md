@@ -45,6 +45,9 @@ Runs are committed; the thesis cites the directory name.
 | `2026-09-21_2304` | state row, event log | 25 ms | 5 ms | 5 ms |
 | `2026-09-22_0126` | plus clocks, ledger, simulated core call, notices, risk assessment | 25 ms | 14 ms | 5 ms |
 | `2026-09-22_1257` | the same, at 20 requests/s with 3 workbench pages/s beside it | 24 ms | 9 ms | 5 ms |
+| `2026-09-30_1050` | main before authorization (df94471), 20 requests/s, API only | 21 ms | 9 ms | 5 ms |
+| `2026-09-30_1052` | first authorization build (6613298): Cedar decision per operation, team-scope RLS | 25 ms | 21 ms | 10 ms |
+| `2026-09-30_1057` | final authorization build (1c9ecad): access data read once per transaction | 25 ms | 20 ms | 10 ms |
 
 Server-side percentiles from Prometheus; the first two runs at 7.6 requests/s on the laptop, the second showing
 the cost of the six domain components landing in the same transaction. The third run (2439 API requests, 359
@@ -53,6 +56,16 @@ p95, of which the two server functions it runs take 9 ms each against the API; t
 stayed under 12 ms p99 delay at 3 percent utilisation, the API at 62 goroutines and 2 MB of heap, Postgres
 under 1 ms at p95, the outbox empty. Every dispute-page trace in the window contained both services, no
 trace carried an error and none exceeded 50 ms.
+
+The last three runs are one comparison: the same machine, minutes apart, each on a fresh database, 4 iterations/s
+for 120 s (about 20 requests/s, rate limit raised to 6000/min), no workbench. Authorization raised the server-side
+p50 of a read from 2.1 to 4.2 ms, of an event from 3.0 to 5.0 ms and of a create from 6.3 to 9.3 ms; the client saw
+p50 3.0 to 5.4 ms and p99 11.9 to 16.0 ms. Correctness was unchanged: the same status mix and the same deliberate
+409s. The policy engine itself costs about 25 microseconds a decision (Go benchmark), and Postgres' per-query p95
+stayed at 0.96 ms in both runs, so the restrictive policies did not make queries slower. The difference is round
+trips: a request now also reads its caller's access data and the dispute's facts (its event log and transaction)
+beside what it already read. Reading access data once per transaction instead of once per decision won back about
+0.6 ms at p50 on writes; reusing the event log the view already loads is the next saving.
 
 ## Limitations to state
 

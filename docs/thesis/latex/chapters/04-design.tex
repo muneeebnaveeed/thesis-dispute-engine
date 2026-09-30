@@ -324,9 +324,16 @@ sees rather than narrowed it \cite{pgrls}. The two lines disagree in one place b
 Reassigning a dispute to a team the lead is not in cannot pass a row policy, because an update's
 new row must also be readable by the caller; that single move therefore runs as the owner,
 bounded to the caller's tenant, current membership and the version they read, after the policy
-engine has allowed it. The cost of all this is small beside a database round trip: a decision
-against a cached policy set takes about 25 microseconds on the development machine, and
-recompiling a tenant's policies after a change about 0.3 milliseconds.
+engine has allowed it. The policy engine itself is cheap: a decision against a cached policy set
+takes about 25 microseconds on the development machine, and recompiling a tenant's policies after a
+change about 0.3 milliseconds. The second line is not. Measured end to end at twenty requests a
+second against the same build without authorization, the median read rose from 2.1 to 4.2
+milliseconds and the median event from 3.0 to 5.0 (runs \code{2026-09-30\_1050} and
+\code{2026-09-30\_1057}). The row policies did not make queries slower, since the database's own
+95th percentile per query stayed at 0.96 milliseconds; the time is extra round trips, as each
+request now also reads its caller's access data and the facts a decision needs. That is a cost of
+where the decision is taken, inside the request's transaction on committed facts, and it can be
+reduced without moving it.
 
 % Distils ADR 0017.
 \section{Communications}

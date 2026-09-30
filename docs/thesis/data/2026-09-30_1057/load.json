@@ -1,0 +1,49 @@
+{
+  "started": "2026-09-30T10:57:32.723888822+02:00",
+  "ended": "2026-09-30T10:59:32.724517824+02:00",
+  "targetRps": 4,
+  "achievedRps": 20.19989411064008,
+  "requests": 2424,
+  "statuses": {
+    "200": 1437,
+    "201": 508,
+    "409": 479
+  },
+  "idempotentReplays": 29,
+  "disputesOpened": 479,
+  "transitionsApplied": 958,
+  "latencyByRoute": {
+    "p50": {
+      "GET /disputes/{disputeId}": "0.004178200692041523",
+      "POST /disputes": "0.009341539533532294",
+      "POST /disputes/{disputeId}/events": "0.0049961960597688475"
+    },
+    "p95": {
+      "GET /disputes/{disputeId}": "0.00912",
+      "POST /disputes": "0.023332920792079208",
+      "POST /disputes/{disputeId}/events": "0.00978628389154705"
+    },
+    "p99": {
+      "GET /disputes/{disputeId}": "0.009824",
+      "POST /disputes": "0.0247259900990099",
+      "POST /disputes/{disputeId}/events": "0.020246153846153837"
+    }
+  },
+  "problemsByCode": {
+    "contract-violation": "0",
+    "invalid-transition": "476.3477459920759",
+    "unauthenticated": "0"
+  },
+  "clientLatencyOverall": {
+    "p50": "5.448134ms",
+    "p95": "12.048041ms",
+    "p99": "16.030601ms"
+  },
+  "runtime": {
+    "apiGoroutinesMax": "59",
+    "apiHeapUsedMaxBytes": "27199768",
+    "apiPostgresP95Seconds": "0.0009661801601852745",
+    "noticeDeliveryDelayP95": "4.75",
+    "outboxBacklogMax": "0"
+  }
+}

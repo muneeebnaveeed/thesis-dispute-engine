@@ -1,0 +1,274 @@
+{
+  "internal/dispute/application": {
+    "failed": 0,
+    "passed": 46,
+    "tests": [
+      "TestActorComesFromPrincipal",
+      "TestNoPrincipalIsRefused",
+      "TestSeparationOfDuties",
+      "TestAllowedEventsExcludeForbidden",
+      "TestKeysCannotActForPeople",
+      "TestTenantAdministrationNeedsTheRole",
+      "TestReplayIsPerCaller",
+      "TestUnrecordedInvestigatorFailsClosed",
+      "TestCreditGoesToTheCoreAndItsReceiptIsKept",
+      "TestADeclineRollsTheTransitionBack",
+      "TestARetryAfterSilenceIsADuplicateNotADoublePayment",
+      "TestATenantWithoutACoreBooksOnly",
+      "TestCreateStartsTheRegimeClocksInTheTenantCalendar",
+      "TestRefundClockIsMetLateOrBreachedByTime",
+      "TestClosingWithoutCreditVoidsTheRefundClockAndMeetsResolution",
+      "TestAppealRestartsTheResolutionClock",
+      "TestListShowsTheNextClockAndFiltersOverdue",
+      "TestProposeAllKeepsOnlyWhatClearedTheGate",
+      "TestProposeAllSurvivesAnUnavailableModel",
+      "TestSuggestDisputeReasonRefusesTextThatIsNotADispute",
+      "TestOpenedEventRecordsTheSuggestionBesideTheChoice",
+      "TestRefundPostsTheCreditLessLiabilityAndCloseSettlesSuspense",
+      "TestBadLiabilityOrSettlementIsRefusedWithoutWriting",
+      "TestProvisionalCreditRoundTrip",
+      "TestNoticesFollowTheLifecycleAndTheRegime",
+      "TestDispatcherDrainsTheOutboxAndRetriesFailures",
+      "TestResendIsANewNoticeChainedToTheOriginal",
+      "TestResendCarriesTheOriginalAttachments",
+      "TestReasonDefaultsAndIsValidated",
+      "TestQuestionnaireIsSentAnsweredAndChecked",
+      "TestReceivingWithoutSendingIsRefused",
+      "TestReassign",
+      "TestReplayMetricIsLabelledByOperationOnly",
+      "TestRiskIsAssessedAtOpeningAndAgainWithTheQuestionnaire",
+      "TestRepeatOffendersScoreHighAndCreditsNeedAJustification",
+      "TestListRowsCarryTheTier",
+      "TestRouteFirstMatchThenDefault",
+      "TestCreateIntoAnotherTeamIsForbidden",
+      "TestCreateDerivesRegimeAndLogsOpened",
+      "TestCreateRejectsUnknownTransactionAndRegimelessRail",
+      "TestApplyAdvancesVersionAndLog",
+      "TestApplyRejectsInvalidTransitionWithoutWriting",
+      "TestIdempotentReplayAndMismatch",
+      "TestApplyRollsBackWhenTheLogRejectsTheEvent",
+      "TestMemStoreScopesByTenant",
+      "TestTeamScopeInMemory"
+    ]
+  },
+  "internal/dispute/authz": {
+    "failed": 0,
+    "passed": 10,
+    "tests": [
+      "TestDecide",
+      "TestAmountsBeyondCedarRange",
+      "TestCompile",
+      "TestCompileSkipsBadRows",
+      "TestParseFixture",
+      "TestParseFixtureRefusesUnknownFieldsAndTeams",
+      "TestSeedFixtureGoldens",
+      "TestNoGrantBypassesSeparationOfDuties",
+      "TestGrantsStayInTheirTeam",
+      "TestGrantsNeverAdministerTheTenant"
+    ]
+  },
+  "internal/dispute/domain": {
+    "failed": 0,
+    "passed": 26,
+    "tests": [
+      "TestCalendarDueBusinessDaysSkipWeekendsAndHolidays",
+      "TestCalendarDueUsesTheTenantZoneNotUTC",
+      "TestNewCalendarRejectsBadInput",
+      "TestDeadlineStatus",
+      "TestOpeningDeadlinesPerRegime",
+      "TestAppealRestartsOnlyTheResolutionClock",
+      "TestSettle",
+      "TestCreditAmountAppliesTheRegimeCap",
+      "TestParseSettlement",
+      "TestPostingsOnTheMainPaths",
+      "TestSuspenseBalancesOnEveryPath",
+      "TestEveryReasonHasAQuestionSetWithUniqueIDs",
+      "TestValidateAnswersReportsEveryProblemPerField",
+      "TestInconsistencies",
+      "TestLoadQuestionSetsRefusesBadFiles",
+      "TestRegimeFor",
+      "TestAssessTiersAndExplains",
+      "TestCreditAllowed",
+      "TestHighRiskMCC",
+      "TestHappyPaths",
+      "TestRegimeGates",
+      "TestAppeals",
+      "TestAllowedMatchesApply",
+      "TestReachableStates",
+      "TestEveryReachableStateCanReachClosed",
+      "TestRulesAreConsistent"
+    ]
+  },
+  "internal/dispute/infrastructure/mail": {
+    "failed": 0,
+    "passed": 1,
+    "tests": [
+      "TestMessageMatchesGolden"
+    ]
+  },
+  "internal/dispute/infrastructure/mockcore": {
+    "failed": 0,
+    "passed": 4,
+    "tests": [
+      "TestApprovesAndDetectsDuplicates",
+      "TestDeclinesPerTenantSettings",
+      "TestOutageAndTimeoutAreUnavailable",
+      "TestMessageFields"
+    ]
+  },
+  "internal/dispute/infrastructure/postgres": {
+    "failed": 0,
+    "passed": 1,
+    "tests": [
+      "TestMapErr"
+    ]
+  },
+  "internal/dispute/infrastructure/typedmodel": {
+    "failed": 0,
+    "passed": 4,
+    "tests": [
+      "TestDecideMapsBothQuestionKinds",
+      "TestDecideReportsUnavailable",
+      "TestNewWithoutKeyIsNil",
+      "TestProposeDropsWhatItIsNotSureOf"
+    ]
+  },
+  "internal/dispute/notice": {
+    "failed": 0,
+    "passed": 12,
+    "tests": [
+      "TestAutomaticNoticesMatchGolden",
+      "TestAnalystTemplatesMatchGolden",
+      "TestEveryKindComposesAndRendersBothWays",
+      "TestWordsFollowTheFacts",
+      "TestHTMLEscapesEverything",
+      "TestEveryManualKindHasATemplate",
+      "TestRequestForInformationFillsListsAndDueDate",
+      "TestSectionsAndSelectText",
+      "TestValidateReportsEveryProblem",
+      "TestPlaceholdersKeepFieldsForTheBrowser",
+      "TestLoadTemplatesRefusesBadFiles",
+      "TestApplyOverrideChangesWordsNotForm"
+    ]
+  },
+  "internal/dispute/ports/http": {
+    "failed": 0,
+    "passed": 21,
+    "tests": [
+      "TestEveryOperationIsClassified",
+      "TestUnclassifiedOperationFails",
+      "TestErrorCodesMatchContract",
+      "TestRetryableCodes",
+      "TestReadyz",
+      "TestCreateApplyGetRoundTrip",
+      "TestInvalidTransitionIs409WithAllowedEvents",
+      "TestContractViolationsAre400",
+      "TestIdempotencyKeyReplayAndReuse",
+      "TestUnknownDisputeIs404AndSpecIsServed",
+      "TestAuthenticationFollowsTheSpec",
+      "TestInternalSessionsRequireTheServiceKey",
+      "TestInternalBulkSessionDeleteAndTenantDirectory",
+      "TestTenantKeySelfService",
+      "TestListDisputesPagesNewestFirstWithinTheTenant",
+      "TestAnalystsComposeEmailsFromTemplatesAndTenantKeysCannot",
+      "TestAttachmentsTravelWithComposedEmails",
+      "TestTenantAdminsRewordTemplatesAndAnalystsSeeTheResult",
+      "TestTenantLogoAndAnalystAvatar",
+      "TestSearchFilterSuggestionWithoutAModel",
+      "TestReassignDispute"
+    ]
+  },
+  "internal/platform/auth": {
+    "failed": 0,
+    "passed": 5,
+    "tests": [
+      "TestBearer",
+      "TestBearerSetsKeyPrincipal",
+      "TestFailureLimiter",
+      "TestOIDCVerify",
+      "TestBearerAcceptsBothCredentialKinds"
+    ]
+  },
+  "internal/platform/config": {
+    "failed": 0,
+    "passed": 4,
+    "tests": [
+      "TestLoadDefaults",
+      "TestLoadOverrides",
+      "TestLoadLogLevel",
+      "TestLoadRejectsBadTimeout"
+    ]
+  },
+  "internal/platform/errs": {
+    "failed": 0,
+    "passed": 3,
+    "tests": [
+      "TestClassificationSurvivesWrapping",
+      "TestUnclassifiedIsInternalWithNoUserMessage",
+      "TestRetryable"
+    ]
+  },
+  "internal/platform/httpserver": {
+    "failed": 0,
+    "passed": 9,
+    "tests": [
+      "TestCORS",
+      "TestInternalOnly",
+      "TestRoutedRequestCarriesRequestID",
+      "TestWrongMethodIs405",
+      "TestPanicBecomes500",
+      "TestChainOrder",
+      "TestSpanIsNamedByRoute",
+      "TestProblemFromClassifiesAndHidesInternals",
+      "TestRequestLogCarriesRouteAndAnnotationsThroughClonedRequests"
+    ]
+  },
+  "internal/platform/money": {
+    "failed": 0,
+    "passed": 1,
+    "tests": [
+      "TestFormatUsesTheCurrencyMinorUnit"
+    ]
+  },
+  "internal/platform/postgres": {
+    "failed": 0,
+    "passed": 1,
+    "tests": [
+      "TestSpanName"
+    ]
+  },
+  "internal/platform/principal": {
+    "failed": 0,
+    "passed": 1,
+    "tests": [
+      "TestRoundTrip"
+    ]
+  },
+  "internal/platform/ratelimit": {
+    "failed": 0,
+    "passed": 1,
+    "tests": [
+      "TestMiddleware"
+    ]
+  },
+  "internal/platform/telemetry": {
+    "failed": 0,
+    "passed": 6,
+    "tests": [
+      "TestRedactDropsSensitiveKeysAtAnyDepth",
+      "TestSetupWithoutEnvInstallsProvidersAndExportsNothing",
+      "TestSetupHonoursConsoleExporterEnv",
+      "TestSpanIDs",
+      "TestHandlerFansOutAndKeepsBaseBehaviour",
+      "TestTraceparentRoundTripsIntoALink"
+    ]
+  },
+  "internal/platform/tenant": {
+    "failed": 0,
+    "passed": 2,
+    "tests": [
+      "TestIDFrom",
+      "TestStatic"
+    ]
+  }
+}
