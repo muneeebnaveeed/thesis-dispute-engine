@@ -347,11 +347,21 @@ func (s *Service) CreateDispute(ctx context.Context, in CreateDisputeInput) (Res
 		if err != nil {
 			return DisputeView{}, err
 		}
-		if _, err := s.authorize(ctx, tx, ActionCreate, &DisputeFacts{Team: DefaultTeam}); err != nil {
+		// risk is assessed after the insert, so a new dispute routes without a tier
+		p, ok := principal.From(ctx)
+		if !ok {
+			return DisputeView{}, ErrForbidden
+		}
+		access, err := tx.Access(ctx, p)
+		if err != nil {
+			return DisputeView{}, err
+		}
+		team := Route(access, txn.Rail, reason, "", txn.Amount)
+		if _, err := s.authorize(ctx, tx, ActionCreate, &DisputeFacts{Team: team}); err != nil {
 			return DisputeView{}, err
 		}
 		rec := DisputeRecord{
-			ID: id, Team: DefaultTeam, Regime: regime, State: domain.StateInitiated, Version: 1,
+			ID: id, Team: team, Regime: regime, State: domain.StateInitiated, Version: 1,
 			TransactionID: txn.ID, AccountID: txn.AccountID,
 			DisputedAmount: txn.Amount, Currency: txn.Currency,
 			OpenedAt: now, UpdatedAt: now, Reason: reason,
