@@ -14,7 +14,7 @@ export const openDisputeViaApi = async (
   const seeded = tenants[tenant]
   const response = await request.post(`${api}/disputes`, {
     headers: { Authorization: `Bearer ${seeded.key}`, 'Idempotency-Key': crypto.randomUUID() },
-    data: { transactionId: seeded.transaction, actor: 'e2e' },
+    data: { transactionId: seeded.transaction },
   })
   expect(response.status(), await response.text()).toBe(201)
   const body: unknown = await response.json()

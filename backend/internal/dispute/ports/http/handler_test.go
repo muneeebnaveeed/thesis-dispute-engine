@@ -136,8 +136,13 @@ func TestCreateApplyGetRoundTrip(t *testing.T) {
 	}
 	events := applied["events"].([]any)
 	last := events[1].(map[string]any)
-	if last["actor"] != "analyst:7" || last["payload"].(map[string]any)["note"] != "looks odd" {
+	// the body's actor is ignored: the log names the caller, here tenant key key-a
+	if last["actor"] != "key:key-a" || last["payload"].(map[string]any)["note"] != "looks odd" {
 		t.Errorf("last event = %v", last)
+	}
+	stored := a.store.Events[uuid.MustParse(id)]
+	if got := stored[len(stored)-1].ActorID; got != uuid.NewSHA1(uuid.Nil, []byte("key-a")).String() {
+		t.Errorf("actor id = %q", got)
 	}
 
 	rec, got := a.do(http.MethodGet, "/disputes/"+id, nil, nil)

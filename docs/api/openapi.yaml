@@ -963,7 +963,6 @@ components:
         reason:
           description: Why the customer disputes it; selects the questionnaire. Defaults to UNAUTHORISED.
           $ref: "#/components/schemas/DisputeReason"
-        actor: { type: string, description: "Who opened it; defaults to customer.", default: customer }
         suggestion:
           description: >
             What a model proposed for the reason, if the analyst was shown one. Recorded beside the reason
@@ -977,7 +976,6 @@ components:
       required: [event]
       properties:
         event: { $ref: "#/components/schemas/DisputeEvent" }
-        actor: { type: string, default: system }
         payload:
           type: object
           description: >-

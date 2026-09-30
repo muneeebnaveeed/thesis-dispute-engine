@@ -49,6 +49,7 @@ type EventRecord struct {
 	FromState      domain.State
 	ToState        domain.State
 	Actor          string
+	ActorID        string
 	Payload        []byte
 	IdempotencyKey *string
 	TraceID        *string

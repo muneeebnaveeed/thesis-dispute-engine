@@ -5,10 +5,10 @@ import { FindTenantInput } from '#/forms/schemas'
 import { ApplyEventRequest, CreateDisputeRequest, CreateTenantKeyRequest } from '#/api/schemas.gen'
 import { is, validate } from './validate'
 
-test('accepts a well-formed create request and applies defaults', () => {
+test('accepts a well-formed create request', () => {
   expect(validate(CreateDisputeRequest, { transactionId: '00000000-0000-8000-8000-000000000101' })).toEqual({
     ok: true,
-    value: { transactionId: '00000000-0000-8000-8000-000000000101', actor: 'customer' },
+    value: { transactionId: '00000000-0000-8000-8000-000000000101' },
   })
 })
 
@@ -39,7 +39,7 @@ test('messages say what to do, named after the field', () => {
 test('drops unknown fields instead of failing on them', () => {
   expect(validate(ApplyEventRequest, { event: 'CLOSE', extra: 1 })).toEqual({
     ok: true,
-    value: { event: 'CLOSE', actor: 'system' },
+    value: { event: 'CLOSE' },
   })
 })
 

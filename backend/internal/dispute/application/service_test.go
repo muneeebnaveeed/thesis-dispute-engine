@@ -11,6 +11,7 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application/apptest"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/principal"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
@@ -29,7 +30,7 @@ func TestCreateDerivesRegimeAndLogsOpened(t *testing.T) {
 	svc, store := newService(t)
 	txn := store.AddTransaction(domain.RailCard, "EUR", "EUR", "125.40")
 
-	res, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn, Actor: "customer"})
+	res, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,8 +68,9 @@ func TestApplyAdvancesVersionAndLog(t *testing.T) {
 	txn := store.AddTransaction(domain.RailCard, "USD", "USD", "50")
 	created, _ := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn})
 
-	res, err := svc.ApplyEvent(apptest.Ctx(), application.ApplyEventInput{
-		DisputeID: created.View.ID, Event: domain.EventOpenInvestigation, Actor: "analyst:1",
+	analyst := apptest.CtxAs(principal.Principal{Kind: principal.Analyst, ID: "sub-1", Display: "analyst:1"})
+	res, err := svc.ApplyEvent(analyst, application.ApplyEventInput{
+		DisputeID: created.View.ID, Event: domain.EventOpenInvestigation,
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -148,7 +148,7 @@ func (c *client) count(k string) {
 func iteration(ctx context.Context, c *client, replays, disputes, transitions *atomic.Int64, ids *opened) {
 	txn := transactions[rand.IntN(len(transactions))] //nolint:gosec // load mix, not a secret
 	idem := uuid.NewString()
-	body := map[string]any{"transactionId": txn, "actor": "eval"}
+	body := map[string]any{"transactionId": txn}
 	code, d := c.do(ctx, http.MethodPost, "/disputes", body, idem)
 	if code != 201 {
 		return
@@ -169,12 +169,12 @@ func iteration(ctx context.Context, c *client, replays, disputes, transitions *a
 		}
 		ev := allowed[rand.IntN(len(allowed))] //nolint:gosec // load mix, not a secret
 		var next int
-		next, d = c.do(ctx, http.MethodPost, "/disputes/"+id+"/events", map[string]any{"event": ev, "actor": "eval"}, uuid.NewString())
+		next, d = c.do(ctx, http.MethodPost, "/disputes/"+id+"/events", map[string]any{"event": ev}, uuid.NewString())
 		if next == 200 {
 			transitions.Add(1)
 		}
 	}
-	c.do(ctx, http.MethodPost, "/disputes/"+id+"/events", map[string]any{"event": "WIN_CHARGEBACK", "actor": "eval"}, uuid.NewString())
+	c.do(ctx, http.MethodPost, "/disputes/"+id+"/events", map[string]any{"event": "WIN_CHARGEBACK"}, uuid.NewString())
 }
 
 type runOptions struct {

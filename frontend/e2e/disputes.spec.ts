@@ -154,7 +154,7 @@ test("the tenant's banking core answers each credit, and a decline leaves the di
   // OTP's simulated core refuses credits above 5000 EUR; the seeded 7450 EUR Apple Store purchase trips it.
   const res = await request.post(`${api}/disputes`, {
     headers: { Authorization: `Bearer ${tenants.otp.key}`, 'Idempotency-Key': crypto.randomUUID() },
-    data: { transactionId: '00000000-0000-8000-8000-000000000104', actor: 'e2e' },
+    data: { transactionId: '00000000-0000-8000-8000-000000000104' },
   })
   expect(res.status()).toBe(201)
   const { id } = (await res.json()) as { id: string }
@@ -241,7 +241,7 @@ test('a repeat disputer scores HIGH, the credit is held until the analyst record
   for (let earlier = 0; earlier < 3; earlier++) await openDisputeViaApi(request, 'otp')
   const res = await request.post(`${api}/disputes`, {
     headers: { Authorization: `Bearer ${tenants.otp.key}`, 'Idempotency-Key': crypto.randomUUID() },
-    data: { transactionId: '00000000-0000-8000-8000-000000000104', actor: 'e2e' }, // 7450 EUR, MCC 5815
+    data: { transactionId: '00000000-0000-8000-8000-000000000104' }, // 7450 EUR, MCC 5815
   })
   const { id } = (await res.json()) as { id: string }
   await page.goto(`/otp/disputes/${id}`)

@@ -97,7 +97,7 @@ func TestOpenedEventRecordsTheSuggestionBesideTheChoice(t *testing.T) {
 			}
 			txn := store.AddTransaction("CARD", "EUR", "EUR", "42.00")
 			res, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{
-				TransactionID: txn, Reason: tc.chosen, Actor: "analyst", Suggestion: tc.proposal,
+				TransactionID: txn, Reason: tc.chosen, Suggestion: tc.proposal,
 			})
 			if err != nil {
 				t.Fatal(err)

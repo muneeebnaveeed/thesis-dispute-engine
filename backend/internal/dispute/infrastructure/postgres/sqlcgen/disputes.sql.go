@@ -914,8 +914,8 @@ func (q *Queries) InsertDispute(ctx context.Context, arg InsertDisputeParams) er
 }
 
 const insertDisputeEvent = `-- name: InsertDisputeEvent :one
-INSERT INTO dispute_events (dispute_id, seq, event, from_state, to_state, actor, payload, idempotency_key, trace_id, occurred_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+INSERT INTO dispute_events (dispute_id, seq, event, from_state, to_state, actor, payload, idempotency_key, trace_id, occurred_at, actor_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 RETURNING id
 `
 
@@ -930,6 +930,7 @@ type InsertDisputeEventParams struct {
 	IdempotencyKey *string
 	TraceID        *string
 	OccurredAt     time.Time
+	ActorID        *string
 }
 
 func (q *Queries) InsertDisputeEvent(ctx context.Context, arg InsertDisputeEventParams) (int64, error) {
@@ -944,6 +945,7 @@ func (q *Queries) InsertDisputeEvent(ctx context.Context, arg InsertDisputeEvent
 		arg.IdempotencyKey,
 		arg.TraceID,
 		arg.OccurredAt,
+		arg.ActorID,
 	)
 	var id int64
 	err := row.Scan(&id)
@@ -1265,7 +1267,7 @@ func (q *Queries) ListDeadlines(ctx context.Context, disputeID uuid.UUID) ([]Lis
 }
 
 const listDisputeEvents = `-- name: ListDisputeEvents :many
-SELECT id, dispute_id, seq, event, from_state, to_state, actor, payload, idempotency_key, trace_id, occurred_at
+SELECT id, dispute_id, seq, event, from_state, to_state, actor, payload, idempotency_key, trace_id, occurred_at, actor_id
 FROM dispute_events
 WHERE dispute_id = $1
 ORDER BY seq
@@ -1283,6 +1285,7 @@ type ListDisputeEventsRow struct {
 	IdempotencyKey *string
 	TraceID        *string
 	OccurredAt     time.Time
+	ActorID        *string
 }
 
 func (q *Queries) ListDisputeEvents(ctx context.Context, disputeID uuid.UUID) ([]ListDisputeEventsRow, error) {
@@ -1306,6 +1309,7 @@ func (q *Queries) ListDisputeEvents(ctx context.Context, disputeID uuid.UUID) ([
 			&i.IdempotencyKey,
 			&i.TraceID,
 			&i.OccurredAt,
+			&i.ActorID,
 		); err != nil {
 			return nil, err
 		}

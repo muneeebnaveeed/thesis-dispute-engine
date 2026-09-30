@@ -347,7 +347,6 @@ func (h *Handler) CreateDispute(ctx context.Context, req oapi.CreateDisputeReque
 	res, err := h.svc.CreateDispute(ctx, application.CreateDisputeInput{
 		TransactionID: req.Body.TransactionId,
 		Reason:        reason,
-		Actor:         orDefault(req.Body.Actor, "customer"),
 		Idempotency:   idempotency(req.Params.IdempotencyKey, body),
 		Suggestion:    suggestion,
 	})
@@ -752,7 +751,6 @@ func (h *Handler) ApplyDisputeEvent(ctx context.Context, req oapi.ApplyDisputeEv
 	res, err := h.svc.ApplyEvent(ctx, application.ApplyEventInput{
 		DisputeID:   id,
 		Event:       domain.Event(req.Body.Event),
-		Actor:       orDefault(req.Body.Actor, "system"),
 		Payload:     payload,
 		Idempotency: idempotency(req.Params.IdempotencyKey, body),
 	})
@@ -849,13 +847,6 @@ func idempotency(key *string, body []byte) application.Idempotency {
 		return application.Idempotency{}
 	}
 	return application.Idempotency{Key: *key, RequestBody: body}
-}
-
-func orDefault(s *string, d string) string {
-	if s == nil || *s == "" {
-		return d
-	}
-	return *s
 }
 
 func toAPI(v application.DisputeView) oapi.Dispute {

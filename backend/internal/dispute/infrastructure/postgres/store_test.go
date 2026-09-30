@@ -66,7 +66,7 @@ func TestLifecycleRoundTripThroughPostgres(t *testing.T) {
 	ctx := apptest.Ctx()
 	txn := seed(t, pool, domain.RailCard, "EUR")
 
-	created, err := svc.CreateDispute(ctx, application.CreateDisputeInput{TransactionID: txn, Actor: "customer"})
+	created, err := svc.CreateDispute(ctx, application.CreateDisputeInput{TransactionID: txn})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestLifecycleRoundTripThroughPostgres(t *testing.T) {
 		t.Errorf("created = %+v", created.View)
 	}
 	for _, e := range []domain.Event{domain.EventOpenInvestigation, domain.EventIssueRefund, domain.EventFileChargeback} {
-		if _, err := svc.ApplyEvent(ctx, application.ApplyEventInput{DisputeID: created.View.ID, Event: e, Actor: "analyst:1"}); err != nil {
+		if _, err := svc.ApplyEvent(ctx, application.ApplyEventInput{DisputeID: created.View.ID, Event: e}); err != nil {
 			t.Fatalf("apply %s: %v", e, err)
 		}
 	}

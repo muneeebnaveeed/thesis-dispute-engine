@@ -20,6 +20,7 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/notice"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/principal"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
@@ -293,7 +294,6 @@ type Idempotency struct {
 type CreateDisputeInput struct {
 	TransactionID uuid.UUID
 	Reason        string
-	Actor         string
 	Idempotency   Idempotency
 	// Suggestion is what a model proposed for the reason, when the analyst was shown one. It is recorded
 	// beside the reason they chose and changes nothing about the dispute (ADR 0024).
@@ -304,7 +304,6 @@ type CreateDisputeInput struct {
 type ApplyEventInput struct {
 	DisputeID   uuid.UUID
 	Event       domain.Event
-	Actor       string
 	Payload     json.RawMessage
 	Idempotency Idempotency
 }
@@ -334,6 +333,7 @@ func (s *Service) CreateDispute(ctx context.Context, in CreateDisputeInput) (Res
 			return DisputeView{}, err
 		}
 		now := s.now()
+		display, actorID := actorOf(ctx)
 		id, err := uuid.NewV7()
 		if err != nil {
 			return DisputeView{}, err
@@ -349,7 +349,7 @@ func (s *Service) CreateDispute(ctx context.Context, in CreateDisputeInput) (Res
 		}
 		ev := EventRecord{
 			Seq: 1, Event: "OPENED", FromState: "", ToState: domain.StateInitiated,
-			Actor: in.Actor, Payload: openedPayload(in.Suggestion, reason), IdempotencyKey: keyPtr(in.Idempotency),
+			Actor: display, ActorID: actorID, Payload: openedPayload(in.Suggestion, reason), IdempotencyKey: keyPtr(in.Idempotency),
 			TraceID: traceIDPtr(ctx), OccurredAt: now,
 		}
 		if in.Suggestion != nil && in.Suggestion.Confident {
@@ -384,6 +384,12 @@ func (s *Service) CreateDispute(ctx context.Context, in CreateDisputeInput) (Res
 	})
 }
 
+// actorOf is who the audit trail names; a request without a principal is refused before it gets here.
+func actorOf(ctx context.Context) (display, id string) {
+	p, _ := principal.From(ctx)
+	return p.Display, p.ID
+}
+
 // ApplyEvent runs the state machine and, if it accepts, appends the event and advances the record under a version check.
 func (s *Service) ApplyEvent(ctx context.Context, in ApplyEventInput) (Result, error) {
 	ctx, span := s.tracer.Start(ctx, "dispute.apply_event", trace.WithAttributes(
@@ -412,9 +418,10 @@ func (s *Service) ApplyEvent(ctx context.Context, in ApplyEventInput) (Result, e
 		if len(payload) == 0 {
 			payload = json.RawMessage("{}")
 		}
+		display, actorID := actorOf(ctx)
 		ev := EventRecord{
 			Seq: int(rec.Version) + 1, Event: in.Event, FromState: rec.State, ToState: next.State,
-			Actor: in.Actor, Payload: payload, IdempotencyKey: keyPtr(in.Idempotency),
+			Actor: display, ActorID: actorID, Payload: payload, IdempotencyKey: keyPtr(in.Idempotency),
 			TraceID: traceIDPtr(ctx), OccurredAt: now,
 		}
 		if err := tx.AppendEvent(ctx, rec.ID, ev); err != nil {

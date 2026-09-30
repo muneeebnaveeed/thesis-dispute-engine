@@ -13,6 +13,7 @@ import (
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/principal"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
@@ -24,6 +25,11 @@ var (
 
 // Ctx returns a context for TenantA.
 func Ctx() context.Context { return tenant.WithID(context.Background(), TenantA) }
+
+// CtxAs returns a TenantA context carrying p.
+func CtxAs(p principal.Principal) context.Context {
+	return principal.With(tenant.WithID(context.Background(), TenantA), p)
+}
 
 // MemStore keeps everything in maps; WithTx snapshots and restores on error to mimic rollback, and every
 // read is scoped to the tenant in the context the way row-level security scopes the real store.

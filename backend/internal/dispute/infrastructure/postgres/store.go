@@ -174,6 +174,14 @@ func (t *txn) GetTransaction(ctx context.Context, id uuid.UUID) (application.Tra
 	}, nil
 }
 
+// nonEmpty stores an absent value as NULL rather than an empty string.
+func nonEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
 func derefString(p *string) string {
 	if p == nil {
 		return ""
@@ -219,7 +227,7 @@ func (t *txn) AppendEvent(ctx context.Context, disputeID uuid.UUID, e applicatio
 	_, err := t.q.InsertDisputeEvent(ctx, sqlcgen.InsertDisputeEventParams{
 		DisputeID: disputeID, Seq: int32Of(e.Seq), Event: string(e.Event), FromState: string(e.FromState),
 		ToState: string(e.ToState), Actor: e.Actor, Payload: e.Payload, IdempotencyKey: e.IdempotencyKey,
-		TraceID: e.TraceID, OccurredAt: e.OccurredAt,
+		TraceID: e.TraceID, OccurredAt: e.OccurredAt, ActorID: nonEmpty(e.ActorID),
 	})
 	return mapErr(err)
 }
@@ -233,7 +241,7 @@ func (t *txn) ListEvents(ctx context.Context, disputeID uuid.UUID) ([]applicatio
 	for _, r := range rows {
 		out = append(out, application.EventRecord{
 			Seq: int(r.Seq), Event: domain.Event(r.Event), FromState: domain.State(r.FromState), ToState: domain.State(r.ToState),
-			Actor: r.Actor, Payload: r.Payload, IdempotencyKey: r.IdempotencyKey, TraceID: r.TraceID, OccurredAt: r.OccurredAt,
+			Actor: r.Actor, ActorID: derefString(r.ActorID), Payload: r.Payload, IdempotencyKey: r.IdempotencyKey, TraceID: r.TraceID, OccurredAt: r.OccurredAt,
 		})
 	}
 	return out, nil

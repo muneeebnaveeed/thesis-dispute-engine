@@ -37,7 +37,7 @@ const DisputePage = () => {
 
   const applyEventMutation = useServerMutation(
     ({ event, payload }: { event: DisputeEvent; payload: Record<string, unknown> }) =>
-      applyEvent({ data: { disputeId, body: { event, actor: 'analyst', payload } } }),
+      applyEvent({ data: { disputeId, body: { event, payload } } }),
     {
       invalidates: () => [disputeQuery(null).queryKey],
       onSuccess: () => actionForm.reset(),
