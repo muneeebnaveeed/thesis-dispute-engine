@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/shopspring/decimal"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
@@ -194,7 +195,7 @@ func (t *txn) InsertDispute(ctx context.Context, d application.DisputeRecord) er
 	return mapErr(t.q.InsertDispute(ctx, sqlcgen.InsertDisputeParams{
 		ID: d.ID, Regime: string(d.Regime), State: string(d.State), Appeals: int32Of(d.Appeals), Version: d.Version,
 		TransactionID: d.TransactionID, AccountID: d.AccountID, DisputedAmount: d.DisputedAmount,
-		Currency: d.Currency, OpenedAt: d.OpenedAt, Reason: string(d.Reason),
+		Currency: d.Currency, OpenedAt: d.OpenedAt, Reason: string(d.Reason), Team: d.Team,
 	}))
 }
 
@@ -207,7 +208,7 @@ func (t *txn) GetDispute(ctx context.Context, id uuid.UUID) (application.Dispute
 		ID: row.ID, TenantID: row.TenantID, Regime: domain.Regime(row.Regime), State: domain.State(row.State), Appeals: int(row.Appeals),
 		Version: row.Version, TransactionID: row.TransactionID, AccountID: row.AccountID,
 		DisputedAmount: row.DisputedAmount, Currency: row.Currency, OpenedAt: row.OpenedAt, UpdatedAt: row.UpdatedAt,
-		Reason: domain.Reason(row.Reason), Team: application.DefaultTeam,
+		Reason: domain.Reason(row.Reason), Team: row.Team,
 	}, nil
 }
 
@@ -224,9 +225,65 @@ func (t *txn) UpdateDisputeState(ctx context.Context, id uuid.UUID, expectedVers
 	return nil
 }
 
-// Access implements application.Tx; every tenant has the default access until its teams are stored.
-func (t *txn) Access(_ context.Context, p principal.Principal) (application.Access, error) {
-	return application.DefaultAccess(p), nil
+// Access implements application.Tx; RLS already limits every table to the tenant.
+func (t *txn) Access(ctx context.Context, p principal.Principal) (application.Access, error) {
+	version, err := t.q.GetPolicyVersion(ctx)
+	if err != nil {
+		return application.Access{}, mapErr(err)
+	}
+	a := application.Access{Version: version}
+	teams, err := t.q.ListTeams(ctx)
+	if err != nil {
+		return application.Access{}, mapErr(err)
+	}
+	for _, tm := range teams {
+		a.Teams = append(a.Teams, tm.Slug)
+		if tm.IsDefault {
+			a.DefaultTeam = tm.Slug
+		}
+	}
+	grants, err := t.q.ListRoleGrants(ctx)
+	if err != nil {
+		return application.Access{}, mapErr(err)
+	}
+	for _, g := range grants {
+		a.Grants = append(a.Grants, application.Grant{Team: g.Team, Role: application.Role(g.Role), Action: application.Action(g.Action), AmountLimit: decimalPtr(g.AmountLimit)})
+	}
+	rules, err := t.q.ListRoutingRules(ctx)
+	if err != nil {
+		return application.Access{}, mapErr(err)
+	}
+	for _, r := range rules {
+		rule := application.RoutingRule{RiskTier: r.RiskTier, MinAmount: decimalPtr(r.MinAmount), Team: r.Team}
+		if r.Rail != nil {
+			rail := domain.Rail(*r.Rail)
+			rule.Rail = &rail
+		}
+		if r.Reason != nil {
+			reason := domain.Reason(*r.Reason)
+			rule.Reason = &reason
+		}
+		a.Routing = append(a.Routing, rule)
+	}
+	if p.Kind == principal.Analyst {
+		ms, err := t.q.ListMemberships(ctx, p.ID)
+		if err != nil {
+			return application.Access{}, mapErr(err)
+		}
+		for _, m := range ms {
+			a.Members = append(a.Members, application.Membership{Team: m.Team, Role: application.Role(m.Role)})
+		}
+	}
+	return a, nil
+}
+
+// decimalPtr reads a nullable numeric column.
+func decimalPtr(n pgtype.Numeric) *decimal.Decimal {
+	if !n.Valid || n.Int == nil {
+		return nil
+	}
+	d := decimal.NewFromBigInt(n.Int, n.Exp)
+	return &d
 }
 
 func (t *txn) AppendEvent(ctx context.Context, disputeID uuid.UUID, e application.EventRecord) error {
@@ -328,7 +385,7 @@ func (t *txn) ListDisputes(ctx context.Context, q application.ListQuery) ([]appl
 	for _, r := range rows {
 		out = append(out, application.DisputeRecord{ID: r.ID, Regime: domain.Regime(r.Regime), State: domain.State(r.State),
 			TransactionID: r.TransactionID, DisputedAmount: r.DisputedAmount, Currency: r.Currency, OpenedAt: r.OpenedAt, UpdatedAt: r.UpdatedAt,
-			Reason: domain.Reason(r.Reason)})
+			Reason: domain.Reason(r.Reason), Team: r.Team})
 	}
 	return out, nil
 }

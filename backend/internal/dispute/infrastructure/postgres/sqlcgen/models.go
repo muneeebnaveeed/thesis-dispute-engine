@@ -64,6 +64,7 @@ type Dispute struct {
 	UpdatedAt      time.Time
 	TenantID       uuid.UUID
 	Reason         string
+	Team           string
 }
 
 type DisputeDeadline struct {
@@ -148,6 +149,11 @@ type Notice struct {
 	TraceContext  *string
 }
 
+type PolicyVersion struct {
+	TenantID uuid.UUID
+	Version  int64
+}
+
 type Questionnaire struct {
 	TenantID   uuid.UUID
 	DisputeID  uuid.UUID
@@ -169,11 +175,43 @@ type RiskAssessment struct {
 	AssessedAt time.Time
 }
 
+type RoleGrant struct {
+	TenantID    uuid.UUID
+	Team        string
+	Role        string
+	Action      string
+	AmountLimit pgtype.Numeric
+}
+
+type RoutingRule struct {
+	TenantID  uuid.UUID
+	Position  int32
+	Rail      *string
+	Reason    *string
+	RiskTier  *string
+	MinAmount pgtype.Numeric
+	Team      string
+}
+
 type SuspenseByRegime struct {
 	TenantID uuid.UUID
 	Regime   string
 	Currency string
 	Balance  int32
+}
+
+type Team struct {
+	TenantID  uuid.UUID
+	Slug      string
+	Name      string
+	IsDefault bool
+}
+
+type TeamMember struct {
+	TenantID uuid.UUID
+	Team     string
+	Subject  string
+	Role     string
 }
 
 type Tenant struct {

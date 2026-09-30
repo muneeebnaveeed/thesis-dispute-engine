@@ -433,7 +433,7 @@ func (q *Queries) GetAttachment(ctx context.Context, arg GetAttachmentParams) (G
 }
 
 const getDispute = `-- name: GetDispute :one
-SELECT id, tenant_id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at, reason
+SELECT id, tenant_id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at, reason, team
 FROM disputes
 WHERE id = $1
 `
@@ -452,6 +452,7 @@ type GetDisputeRow struct {
 	OpenedAt       time.Time
 	UpdatedAt      time.Time
 	Reason         string
+	Team           string
 }
 
 func (q *Queries) GetDispute(ctx context.Context, id uuid.UUID) (GetDisputeRow, error) {
@@ -471,6 +472,7 @@ func (q *Queries) GetDispute(ctx context.Context, id uuid.UUID) (GetDisputeRow, 
 		&i.OpenedAt,
 		&i.UpdatedAt,
 		&i.Reason,
+		&i.Team,
 	)
 	return i, err
 }
@@ -878,8 +880,8 @@ func (q *Queries) InsertDeadline(ctx context.Context, arg InsertDeadlineParams) 
 }
 
 const insertDispute = `-- name: InsertDispute :exec
-INSERT INTO disputes (id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at, reason)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10, $11)
+INSERT INTO disputes (id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at, reason, team)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10, $11, $12)
 `
 
 type InsertDisputeParams struct {
@@ -894,6 +896,7 @@ type InsertDisputeParams struct {
 	Currency       string
 	OpenedAt       time.Time
 	Reason         string
+	Team           string
 }
 
 func (q *Queries) InsertDispute(ctx context.Context, arg InsertDisputeParams) error {
@@ -909,6 +912,7 @@ func (q *Queries) InsertDispute(ctx context.Context, arg InsertDisputeParams) er
 		arg.Currency,
 		arg.OpenedAt,
 		arg.Reason,
+		arg.Team,
 	)
 	return err
 }
@@ -1322,7 +1326,7 @@ func (q *Queries) ListDisputeEvents(ctx context.Context, disputeID uuid.UUID) ([
 }
 
 const listDisputes = `-- name: ListDisputes :many
-SELECT id, regime, state, transaction_id, disputed_amount, currency, opened_at, updated_at, reason
+SELECT id, regime, state, transaction_id, disputed_amount, currency, opened_at, updated_at, reason, team
 FROM disputes
 WHERE ($1::text IS NULL OR state = $1::text)
   AND ($2::text IS NULL OR reason = $2::text)
@@ -1354,6 +1358,7 @@ type ListDisputesRow struct {
 	OpenedAt       time.Time
 	UpdatedAt      time.Time
 	Reason         string
+	Team           string
 }
 
 // Keyset pagination on (opened_at, id) descending; row-level security scopes the tenant.
@@ -1384,6 +1389,7 @@ func (q *Queries) ListDisputes(ctx context.Context, arg ListDisputesParams) ([]L
 			&i.OpenedAt,
 			&i.UpdatedAt,
 			&i.Reason,
+			&i.Team,
 		); err != nil {
 			return nil, err
 		}
