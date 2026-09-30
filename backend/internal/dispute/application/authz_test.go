@@ -105,3 +105,27 @@ func TestTenantAdministrationNeedsTheRole(t *testing.T) {
 		t.Fatalf("admin logo: %v", err)
 	}
 }
+
+// An idempotency key is the caller's own: another principal reusing it is a new request, not a replay of a
+// response they were never authorized to see.
+func TestReplayIsPerCaller(t *testing.T) {
+	svc, store := newService(t)
+	txn := store.AddTransaction(domain.RailCard, "EUR", "EUR", "40.00")
+	body := []byte(`{"transactionId":"` + txn.String() + `"}`)
+	idem := application.Idempotency{Key: "shared", RequestBody: body}
+	first, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn, Idempotency: idem})
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := svc.CreateDispute(secondAnalyst, application.CreateDisputeInput{TransactionID: txn, Idempotency: idem})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.Replayed || again.View.ID == first.View.ID {
+		t.Fatalf("second caller got the first caller's response: replayed=%v", again.Replayed)
+	}
+	same, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn, Idempotency: idem})
+	if err != nil || !same.Replayed || same.View.ID != first.View.ID {
+		t.Fatalf("same caller: replayed=%v err=%v", same.Replayed, err)
+	}
+}

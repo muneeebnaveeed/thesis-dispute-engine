@@ -918,6 +918,10 @@ func (s *Service) GetDispute(ctx context.Context, id uuid.UUID) (DisputeView, er
 
 // idempotent wraps a write so a repeated key returns the first response and a mismatched body is refused.
 func (s *Service) idempotent(ctx context.Context, scope string, idem Idempotency, fn func(Tx) (DisputeView, error)) (Result, error) {
+	// keys are the caller's own, so a replay never hands one principal a response only another was authorized for
+	if p, ok := principal.From(ctx); ok {
+		scope += "@" + string(p.Kind) + ":" + p.ID
+	}
 	var out Result
 	err := s.store.WithTx(ctx, func(tx Tx) error {
 		var hash []byte
