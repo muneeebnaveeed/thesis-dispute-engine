@@ -10,7 +10,7 @@ Fixed early so the text can be written against them. Format to be applied in the
 6. Sakimura, N. et al. (2014). OpenID Connect Core 1.0; and OpenID Connect Back-Channel Logout 1.0.
 7. Evans, E. (2003). Domain-Driven Design: Tackling Complexity in the Heart of Software. Addison-Wesley.
 8. Kleppmann, M. (2017). Designing Data-Intensive Applications. O'Reilly. (idempotency, logs, isolation)
-9. PostgreSQL Global Development Group. PostgreSQL 17 Documentation: Row Security Policies.
+9. PostgreSQL Global Development Group. PostgreSQL 18 Documentation: Row Security Policies.
 10. OpenTelemetry Authors. OpenTelemetry Specification, semantic conventions for HTTP and database spans.
 
 Reserve: Nygard, M. (2007). Release It! (for the error taxonomy and retry semantics), only if one of the above is dropped.

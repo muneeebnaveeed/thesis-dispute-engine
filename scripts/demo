@@ -45,7 +45,7 @@ wait_for() {
 if ((down)); then
   info "stopping every profile, keeping the database volume"
   "${compose[@]}" --profile app --profile otel --profile auth down
-  info "done. Data is kept in the deploy_pgdata volume; scripts/demo brings it all back."
+  info "done. Data is kept in the deploy_pgdata18 volume; scripts/demo brings it all back."
   exit 0
 fi
 

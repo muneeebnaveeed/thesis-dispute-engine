@@ -20,7 +20,9 @@ services:
       POSTGRES_PASSWORD: dispute
       POSTGRES_DB: dispute
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # From 18 the image keeps data under /var/lib/postgresql/<major>/docker and refuses a mount at .../data. The
+      # volume is named per major so an upgrade starts empty beside the old one instead of failing on it.
+      - pgdata18:/var/lib/postgresql
       # Fresh volumes get the API login at init; `make db:up` also applies it to existing ones.
       - ./postgres/roles.sql:/docker-entrypoint-initdb.d/10-roles.sql:ro
     healthcheck:
@@ -211,7 +213,7 @@ services:
       INTERVAL: ${PROBE_INTERVAL:-60}
 
 volumes:
-  pgdata:
+  pgdata18:
   gomod:
   gobuild:
   lgtm:
