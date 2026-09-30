@@ -33,8 +33,8 @@ func TestRefundPostsTheCreditLessLiabilityAndCloseSettlesSuspense(t *testing.T) 
 	if v.Balances.Customer.String() != "75.4" || v.Balances.Suspense.String() != "75.4" {
 		t.Errorf("balances = %+v", v.Balances)
 	}
-	// The note travelled with the event untouched.
-	if string(v.Events[2].Payload) != `{"liability":"50.00","note":"card reported lost"}` {
+	// The note travelled with the event untouched, beside the policy that allowed it.
+	if string(v.Events[2].Payload) != `{"authorizedBy":["grant:general/junior/ISSUE_REFUND"],"liability":"50.00","note":"card reported lost"}` {
 		t.Errorf("payload = %s", v.Events[2].Payload)
 	}
 

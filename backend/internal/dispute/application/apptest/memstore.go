@@ -3,15 +3,18 @@ package apptest
 
 import (
 	"context"
+	"log/slog"
 	"slices"
 	"sort"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/authz"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/principal"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
@@ -24,7 +27,29 @@ var (
 )
 
 // Ctx returns a context for TenantA.
-func Ctx() context.Context { return tenant.WithID(context.Background(), TenantA) }
+func Ctx() context.Context { return CtxFor(TenantA) }
+
+// Lead is the analyst test contexts act as: a lead of every team and a tenant admin.
+var Lead = principal.Principal{Kind: principal.Analyst, ID: "analyst-lead", Display: "lead@example.test", TenantAdmin: true}
+
+// CtxFor is a tenant context acting as Lead.
+func CtxFor(tenantID uuid.UUID) context.Context {
+	return principal.With(tenant.WithID(context.Background(), tenantID), Lead)
+}
+
+// NewService builds a service over store with the policy engine every production service has.
+func NewService(t testing.TB, store application.Store, now application.Clock, opts ...application.Option) *application.Service {
+	t.Helper()
+	engine, err := authz.New(slog.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc, err := application.NewService(store, now, append([]application.Option{application.WithAuthorizer(engine)}, opts...)...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return svc
+}
 
 // CtxAs returns a TenantA context carrying p.
 func CtxAs(p principal.Principal) context.Context {
@@ -332,6 +357,11 @@ func (t *memTx) InsertDispute(_ context.Context, d application.DisputeRecord) er
 	d.TenantID = t.tenant
 	t.s.Disputes[d.ID] = d
 	return nil
+}
+
+// Access implements application.Tx; every tenant has the default access until PR B's tables exist.
+func (t *memTx) Access(_ context.Context, p principal.Principal) (application.Access, error) {
+	return application.DefaultAccess(p), nil
 }
 
 func (t *memTx) GetDispute(_ context.Context, id uuid.UUID) (application.DisputeRecord, error) {

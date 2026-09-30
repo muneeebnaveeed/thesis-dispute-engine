@@ -16,10 +16,7 @@ func clockService(t *testing.T) (*application.Service, *apptest.MemStore, *time.
 	t.Helper()
 	store := apptest.NewMemStore()
 	now := time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC) // a Monday
-	svc, err := application.NewService(store, func() time.Time { return now })
-	if err != nil {
-		t.Fatal(err)
-	}
+	svc := apptest.NewService(t, store, func() time.Time { return now })
 	return svc, store, &now
 }
 

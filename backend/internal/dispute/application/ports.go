@@ -10,6 +10,7 @@ import (
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/principal"
 )
 
 // Errors the use cases return; infrastructure maps storage failures onto them.
@@ -24,6 +25,7 @@ var (
 type DisputeRecord struct {
 	ID             uuid.UUID
 	TenantID       uuid.UUID
+	Team           string
 	Regime         domain.Regime
 	State          domain.State
 	Appeals        int
@@ -146,6 +148,8 @@ type StoredResponse struct {
 
 // Tx is the set of storage operations available inside one transaction.
 type Tx interface {
+	// Access is the caller's teams, grants and routing, read in this transaction.
+	Access(ctx context.Context, p principal.Principal) (Access, error)
 	GetTransaction(ctx context.Context, id uuid.UUID) (TransactionRecord, error)
 	InsertDispute(ctx context.Context, d DisputeRecord) error
 	GetDispute(ctx context.Context, id uuid.UUID) (DisputeRecord, error)

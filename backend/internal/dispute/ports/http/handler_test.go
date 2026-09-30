@@ -36,10 +36,7 @@ type api struct {
 func newAPI(t *testing.T, ready disputehttp.Readiness) api {
 	t.Helper()
 	store := apptest.NewMemStore()
-	svc, err := application.NewService(store, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	svc := apptest.NewService(t, store, nil)
 	mux := http.NewServeMux()
 	directory := memTenants{{ID: apptest.TenantA, Slug: "otp", Name: "OTP Bank", Issuer: "http://kc/realms/otp", EmailDomains: []string{"otpbank.hu"}}}
 	if err := disputehttp.Mount(mux, svc, ready, disputehttp.WithSessions(memSessions{}), disputehttp.WithTenants(directory), disputehttp.WithKeys(&memKeys{})); err != nil {

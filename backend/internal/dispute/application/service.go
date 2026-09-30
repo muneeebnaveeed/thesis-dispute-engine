@@ -35,16 +35,18 @@ type Service struct {
 	coreTimeout time.Duration
 	decisions   Decisions // proposes values an analyst confirms; nil is supported and means no proposals
 	afterCommit func()    // nudges the notice dispatcher once a transition is durable
+	authz       Authorizer
 
-	transitions   metric.Int64Counter
-	replays       metric.Int64Counter
-	timeInState   metric.Float64Histogram
-	deadlineSlack metric.Float64Histogram
-	postings      metric.Int64Counter
-	coreMessages  metric.Int64Counter
-	coreLatency   metric.Float64Histogram
-	riskTiers     metric.Int64Counter
-	composed      metric.Int64Counter
+	transitions    metric.Int64Counter
+	replays        metric.Int64Counter
+	timeInState    metric.Float64Histogram
+	deadlineSlack  metric.Float64Histogram
+	postings       metric.Int64Counter
+	coreMessages   metric.Int64Counter
+	coreLatency    metric.Float64Histogram
+	riskTiers      metric.Int64Counter
+	composed       metric.Int64Counter
+	authzDecisions metric.Int64Counter
 }
 
 // Option configures a Service beyond its store and clock.
@@ -105,6 +107,10 @@ func NewService(store Store, now Clock, opts ...Option) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	authzDecisions, err := m.Int64Counter("authz.decisions", metric.WithDescription("Authorization decisions, by action and outcome"), metric.WithUnit("{decision}"))
+	if err != nil {
+		return nil, err
+	}
 	if _, err := m.Float64ObservableGauge("dispute.suspense", metric.WithDescription("What the bank has advanced on open disputes and not yet cleared"),
 		metric.WithFloat64Callback(func(ctx context.Context, o metric.Float64Observer) error {
 			balances, err := store.SuspenseBalances(ctx)
@@ -150,9 +156,12 @@ func NewService(store Store, now Clock, opts ...Option) (*Service, error) {
 	}
 	svc := &Service{store: store, now: now, tracer: otel.Tracer(scopeName), core: CoreRouter{}, coreTimeout: 5 * time.Second, afterCommit: func() {},
 		transitions: transitions, replays: replays, timeInState: timeInState, deadlineSlack: deadlineSlack, postings: postings,
-		coreMessages: coreMessages, coreLatency: coreLatency, riskTiers: riskTiers, composed: composed}
+		coreMessages: coreMessages, coreLatency: coreLatency, riskTiers: riskTiers, composed: composed, authzDecisions: authzDecisions}
 	for _, o := range opts {
 		o(svc)
+	}
+	if svc.authz == nil {
+		return nil, errors.New("application: an Authorizer is required")
 	}
 	return svc, nil
 }
@@ -338,8 +347,11 @@ func (s *Service) CreateDispute(ctx context.Context, in CreateDisputeInput) (Res
 		if err != nil {
 			return DisputeView{}, err
 		}
+		if _, err := s.authorize(ctx, tx, ActionCreate, &DisputeFacts{Team: DefaultTeam}); err != nil {
+			return DisputeView{}, err
+		}
 		rec := DisputeRecord{
-			ID: id, Regime: regime, State: domain.StateInitiated, Version: 1,
+			ID: id, Team: DefaultTeam, Regime: regime, State: domain.StateInitiated, Version: 1,
 			TransactionID: txn.ID, AccountID: txn.AccountID,
 			DisputedAmount: txn.Amount, Currency: txn.Currency,
 			OpenedAt: now, UpdatedAt: now, Reason: reason,
@@ -401,6 +413,14 @@ func (s *Service) ApplyEvent(ctx context.Context, in ApplyEventInput) (Result, e
 		if err != nil {
 			return DisputeView{}, err
 		}
+		f, err := facts(ctx, tx, rec)
+		if err != nil {
+			return DisputeView{}, err
+		}
+		dec, err := s.authorize(ctx, tx, EventAction(in.Event), &f)
+		if err != nil {
+			return DisputeView{}, err
+		}
 		next, err := rec.Lifecycle().Apply(in.Event)
 		if err != nil {
 			return DisputeView{}, err
@@ -417,6 +437,9 @@ func (s *Service) ApplyEvent(ctx context.Context, in ApplyEventInput) (Result, e
 		payload := in.Payload
 		if len(payload) == 0 {
 			payload = json.RawMessage("{}")
+		}
+		if payload, err = withAuthorizedBy(payload, dec.Policies); err != nil {
+			return DisputeView{}, err
 		}
 		display, actorID := actorOf(ctx)
 		ev := EventRecord{
@@ -949,9 +972,13 @@ func (s *Service) view(ctx context.Context, tx Tx, rec DisputeRecord) (DisputeVi
 		views = append(views, EventView{Seq: e.Seq, Event: e.Event, FromState: e.FromState, ToState: e.ToState,
 			Actor: e.Actor, Payload: json.RawMessage(e.Payload), TraceID: e.TraceID, OccurredAt: e.OccurredAt})
 	}
-	allowed := rec.Lifecycle().Allowed()
-	if allowed == nil {
-		allowed = []domain.Event{}
+	f, err := facts(ctx, tx, rec)
+	if err != nil {
+		return DisputeView{}, err
+	}
+	allowed, err := s.permitted(ctx, tx, rec.Lifecycle().Allowed(), f)
+	if err != nil {
+		return DisputeView{}, err
 	}
 	deadlines, err := tx.ListDeadlines(ctx, rec.ID)
 	if err != nil {

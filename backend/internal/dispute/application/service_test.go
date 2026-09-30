@@ -19,10 +19,7 @@ func newService(t *testing.T) (*application.Service, *apptest.MemStore) {
 	t.Helper()
 	store := apptest.NewMemStore()
 	now := time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)
-	svc, err := application.NewService(store, func() time.Time { now = now.Add(time.Minute); return now })
-	if err != nil {
-		t.Fatal(err)
-	}
+	svc := apptest.NewService(t, store, func() time.Time { now = now.Add(time.Minute); return now })
 	return svc, store
 }
 
@@ -82,8 +79,8 @@ func TestApplyAdvancesVersionAndLog(t *testing.T) {
 	if last.Seq != 2 || last.FromState != domain.StateInitiated || last.ToState != domain.StateInvestigating || last.Actor != "analyst:1" {
 		t.Errorf("event = %+v", last)
 	}
-	if string(last.Payload) != "{}" {
-		t.Errorf("payload = %s, want {}", last.Payload)
+	if want := `{"authorizedBy":["grant:general/junior/OPEN_INVESTIGATION"]}`; string(last.Payload) != want {
+		t.Errorf("payload = %s, want %s", last.Payload, want)
 	}
 }
 
@@ -156,13 +153,13 @@ func TestApplyRollsBackWhenTheLogRejectsTheEvent(t *testing.T) {
 
 func TestMemStoreScopesByTenant(t *testing.T) {
 	store := apptest.NewMemStore()
-	svc, _ := application.NewService(store, nil)
+	svc := apptest.NewService(t, store, nil)
 	txn := store.AddTransaction(domain.RailCard, "EUR", "EUR", "10.00")
 	created, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn})
 	if err != nil {
 		t.Fatal(err)
 	}
-	other := tenant.WithID(context.Background(), apptest.TenantB)
+	other := apptest.CtxFor(apptest.TenantB)
 	if _, err := svc.GetDispute(other, created.View.ID); !errors.Is(err, application.ErrNotFound) {
 		t.Errorf("cross-tenant read: err = %v", err)
 	}

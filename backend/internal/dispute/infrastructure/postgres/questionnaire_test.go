@@ -3,7 +3,6 @@
 package postgres_test
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -13,19 +12,15 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 	disputepg "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/postgres/pgtest"
-	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
 // The reason persists, the questionnaire round-trips as JSON under RLS, and refused answers leave it unanswered.
 func TestQuestionnaireThroughPostgres(t *testing.T) {
 	owner, schema := pgtest.PoolWithSchema(t)
 	app := pgtest.AppPool(t, schema)
-	svc, err := application.NewService(disputepg.NewStore(app), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctxA := tenant.WithID(context.Background(), apptest.TenantA)
-	ctxB := tenant.WithID(context.Background(), apptest.TenantB)
+	svc := apptest.NewService(t, disputepg.NewStore(app), nil)
+	ctxA := apptest.CtxFor(apptest.TenantA)
+	ctxB := apptest.CtxFor(apptest.TenantB)
 	txn := seedFor(t, owner, apptest.TenantA, domain.RailCard, "EUR")
 	seedFor(t, owner, apptest.TenantB, domain.RailCard, "EUR")
 

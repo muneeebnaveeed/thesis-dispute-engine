@@ -28,19 +28,10 @@ import (
 var ErrUnauthenticated = errs.New(errs.Unauthorized, "unauthenticated", "a valid tenant key is required")
 
 // ErrForbidden is a valid credential that may not perform the operation.
-var ErrForbidden = errs.New(errs.Forbidden, "forbidden", "this operation needs an analyst with the tenant-admin role")
+var ErrForbidden = errs.New(errs.Forbidden, "forbidden", "this credential may not perform this operation")
 
 // RoleTenantAdmin manages the tenant's keys and users.
 const RoleTenantAdmin = "tenant-admin"
-
-// RequireRole passes only analyst tokens whose realm granted the role; tenant keys and other analysts are refused.
-func RequireRole(ctx context.Context, role string) error {
-	p, ok := PrincipalFrom(ctx)
-	if !ok || !p.HasRole(role) {
-		return ErrForbidden
-	}
-	return nil
-}
 
 // KeyIdentity is a live tenant key.
 type KeyIdentity struct {

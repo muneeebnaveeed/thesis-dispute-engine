@@ -13,7 +13,6 @@ import (
 	disputepg "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/notice"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/postgres/pgtest"
-	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
 // As dispute_api: notices are rows the tenant owns; the outbox is claimed across tenants through the owner-defined
@@ -22,12 +21,9 @@ func TestNoticeOutboxThroughPostgres(t *testing.T) {
 	owner, schema := pgtest.PoolWithSchema(t)
 	app := pgtest.AppPool(t, schema)
 	store := disputepg.NewStore(app)
-	svc, err := application.NewService(store, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctxA := tenant.WithID(context.Background(), apptest.TenantA)
-	ctxB := tenant.WithID(context.Background(), apptest.TenantB)
+	svc := apptest.NewService(t, store, nil)
+	ctxA := apptest.CtxFor(apptest.TenantA)
+	ctxB := apptest.CtxFor(apptest.TenantB)
 	txnA := seedFor(t, owner, apptest.TenantA, domain.RailCard, "USD") // Reg E: email and letter
 	txnB := seedFor(t, owner, apptest.TenantB, domain.RailCard, "EUR")
 
@@ -117,12 +113,9 @@ func TestNoticeOutboxThroughPostgres(t *testing.T) {
 func TestTenantTemplatesAreIsolated(t *testing.T) {
 	owner, schema := pgtest.PoolWithSchema(t)
 	app := pgtest.AppPool(t, schema)
-	svc, err := application.NewService(disputepg.NewStore(app), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctxA := tenant.WithID(context.Background(), apptest.TenantA)
-	ctxB := tenant.WithID(context.Background(), apptest.TenantB)
+	svc := apptest.NewService(t, disputepg.NewStore(app), nil)
+	ctxA := apptest.CtxFor(apptest.TenantA)
+	ctxB := apptest.CtxFor(apptest.TenantB)
 	seedFor(t, owner, apptest.TenantA, domain.RailCard, "EUR")
 	seedFor(t, owner, apptest.TenantB, domain.RailCard, "EUR")
 	if _, err := svc.PutTemplateSetting(ctxA, domain.NoticeCustom, notice.Override{Subject: "From A: {{subject}}"}, "admin@a"); err != nil {

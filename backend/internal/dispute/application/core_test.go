@@ -22,11 +22,8 @@ func coreService(t *testing.T, core application.BankingCore, settings string) (*
 	t.Helper()
 	store := apptest.NewMemStore()
 	store.Cores[apptest.TenantA] = application.CoreConfig{Kind: mockcore.Kind, Settings: json.RawMessage(settings)}
-	svc, err := application.NewService(store, nil, application.WithCore(application.CoreRouter{Adapters: map[string]application.BankingCore{mockcore.Kind: core}}),
+	svc := apptest.NewService(t, store, nil, application.WithCore(application.CoreRouter{Adapters: map[string]application.BankingCore{mockcore.Kind: core}}),
 		application.WithCoreTimeout(50*time.Millisecond))
-	if err != nil {
-		t.Fatal(err)
-	}
 	return svc, store
 }
 
