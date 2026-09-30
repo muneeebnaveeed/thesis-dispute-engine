@@ -35,3 +35,16 @@ func TestCompileSkipsBadRows(t *testing.T) {
 		t.Fatalf("skipped %v\n%s", skipped, src)
 	}
 }
+
+// Data-type reads are actions named read:<type>:<level>; the colon is allowed in actions, never in team slugs.
+func TestCompileAcceptsDataTypeActions(t *testing.T) {
+	a := access()
+	a.Grants = []application.Grant{
+		{Team: "cb", Role: application.RoleJunior, Action: "read:pii:masked"},
+		{Team: "cb:x", Role: application.RoleJunior, Action: application.ActionCreate},
+	}
+	src, skipped := authz.Compile(tenantID, a)
+	if len(skipped) != 1 || !strings.Contains(src, `action == Action::"read:pii:masked"`) {
+		t.Fatalf("skipped %v\n%s", skipped, src)
+	}
+}

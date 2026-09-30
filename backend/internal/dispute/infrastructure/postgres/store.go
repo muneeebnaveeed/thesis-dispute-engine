@@ -164,7 +164,8 @@ func (s *Store) PurgeIdempotencyKeys(ctx context.Context, before time.Time) (int
 }
 
 type txn struct {
-	q *sqlcgen.Queries
+	q      *sqlcgen.Queries
+	access map[string]application.Access // by analyst subject; "" for a tenant key
 }
 
 func (t *txn) GetTransaction(ctx context.Context, id uuid.UUID) (application.TransactionRecord, error) {
@@ -240,36 +241,62 @@ func (t *txn) UpdateDisputeTeam(ctx context.Context, id uuid.UUID, expectedVersi
 	return nil
 }
 
-// Access implements application.Tx; RLS already limits every table to the tenant.
+// Access implements application.Tx: one query, read once per transaction however many decisions it makes.
 func (t *txn) Access(ctx context.Context, p principal.Principal) (application.Access, error) {
-	version, err := t.q.GetPolicyVersion(ctx)
+	subject := ""
+	if p.Kind == principal.Analyst {
+		subject = p.ID
+	}
+	if a, ok := t.access[subject]; ok {
+		return a, nil
+	}
+	row, err := t.q.GetAccess(ctx, subject)
 	if err != nil {
 		return application.Access{}, mapErr(err)
 	}
-	a := application.Access{Version: version}
-	teams, err := t.q.ListTeams(ctx)
-	if err != nil {
-		return application.Access{}, mapErr(err)
+	var doc struct {
+		Teams []struct {
+			Slug    string `json:"slug"`
+			Default bool   `json:"default"`
+		}
+		Grants []struct {
+			Team, Role, Action string
+			Limit              *string
+		}
+		Routing []struct {
+			Rail, Reason, Tier, Min *string
+			Team                    string
+		}
+		Members []struct{ Team, Role string }
 	}
-	for _, tm := range teams {
+	for _, part := range []struct {
+		raw  []byte
+		into any
+	}{{row.Teams, &doc.Teams}, {row.Grants, &doc.Grants}, {row.Routing, &doc.Routing}, {row.Members, &doc.Members}} {
+		if err := json.Unmarshal(part.raw, part.into); err != nil {
+			return application.Access{}, fmt.Errorf("postgres: access: %w", err)
+		}
+	}
+	a := application.Access{Version: row.Version}
+	for _, tm := range doc.Teams {
 		a.Teams = append(a.Teams, tm.Slug)
-		if tm.IsDefault {
+		if tm.Default {
 			a.DefaultTeam = tm.Slug
 		}
 	}
-	grants, err := t.q.ListRoleGrants(ctx)
-	if err != nil {
-		return application.Access{}, mapErr(err)
+	for _, g := range doc.Grants {
+		limit, err := decimalOf(g.Limit)
+		if err != nil {
+			return application.Access{}, err
+		}
+		a.Grants = append(a.Grants, application.Grant{Team: g.Team, Role: application.Role(g.Role), Action: application.Action(g.Action), AmountLimit: limit})
 	}
-	for _, g := range grants {
-		a.Grants = append(a.Grants, application.Grant{Team: g.Team, Role: application.Role(g.Role), Action: application.Action(g.Action), AmountLimit: decimalPtr(g.AmountLimit)})
-	}
-	rules, err := t.q.ListRoutingRules(ctx)
-	if err != nil {
-		return application.Access{}, mapErr(err)
-	}
-	for _, r := range rules {
-		rule := application.RoutingRule{RiskTier: r.RiskTier, MinAmount: decimalPtr(r.MinAmount), Team: r.Team}
+	for _, r := range doc.Routing {
+		min, err := decimalOf(r.Min)
+		if err != nil {
+			return application.Access{}, err
+		}
+		rule := application.RoutingRule{RiskTier: r.Tier, MinAmount: min, Team: r.Team}
 		if r.Rail != nil {
 			rail := domain.Rail(*r.Rail)
 			rule.Rail = &rail
@@ -280,25 +307,26 @@ func (t *txn) Access(ctx context.Context, p principal.Principal) (application.Ac
 		}
 		a.Routing = append(a.Routing, rule)
 	}
-	if p.Kind == principal.Analyst {
-		ms, err := t.q.ListMemberships(ctx, p.ID)
-		if err != nil {
-			return application.Access{}, mapErr(err)
-		}
-		for _, m := range ms {
-			a.Members = append(a.Members, application.Membership{Team: m.Team, Role: application.Role(m.Role)})
-		}
+	for _, m := range doc.Members {
+		a.Members = append(a.Members, application.Membership{Team: m.Team, Role: application.Role(m.Role)})
 	}
+	if t.access == nil {
+		t.access = map[string]application.Access{}
+	}
+	t.access[subject] = a
 	return a, nil
 }
 
-// decimalPtr reads a nullable numeric column.
-func decimalPtr(n pgtype.Numeric) *decimal.Decimal {
-	if !n.Valid || n.Int == nil {
-		return nil
+// decimalOf reads a nullable numeric that arrived as text.
+func decimalOf(s *string) (*decimal.Decimal, error) {
+	if s == nil {
+		return nil, nil
 	}
-	d := decimal.NewFromBigInt(n.Int, n.Exp)
-	return &d
+	d, err := decimal.NewFromString(*s)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: access: %w", err)
+	}
+	return &d, nil
 }
 
 func (t *txn) AppendEvent(ctx context.Context, disputeID uuid.UUID, e application.EventRecord) error {

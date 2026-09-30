@@ -30,6 +30,7 @@ jobs:
       sqlc: ${{ steps.versions.outputs.sqlc }}
       node: ${{ steps.versions.outputs.node }}
       pnpm: ${{ steps.versions.outputs.pnpm }}
+      cedar: ${{ steps.versions.outputs.cedar }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -56,6 +57,7 @@ jobs:
           echo "golangci=$(sed -n 's/^golangci-lint = "\(.*\)"$/\1/p' mise.toml)" >> "$GITHUB_OUTPUT"
           echo "sqlc=$(sed -n 's/^sqlc = "\(.*\)"$/\1/p' mise.toml)" >> "$GITHUB_OUTPUT"
           echo "node=$(sed -n 's/^node = "\(.*\)"$/\1/p' mise.toml)" >> "$GITHUB_OUTPUT"
+          echo "cedar=$(sed -n 's/^CEDAR_CLI_VERSION = "\(.*\)"$/\1/p' mise.toml)" >> "$GITHUB_OUTPUT"
           echo "pnpm=$(sed -n 's/^pnpm = "\(.*\)"$/\1/p' mise.toml)" >> "$GITHUB_OUTPUT"
 
   runtime-versions:
@@ -110,10 +112,10 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.cargo/bin/cedar
-          key: cedar-cli-${{ runner.os }}-4.13.0
+          key: cedar-cli-${{ runner.os }}-${{ needs.changes.outputs.cedar }}
       - name: Install Cedar CLI
         if: steps.cedar-cache.outputs.cache-hit != 'true'
-        run: cargo install cedar-policy-cli --version 4.13.0 --locked
+        run: cargo install cedar-policy-cli --version ${{ needs.changes.outputs.cedar }} --locked
       - name: format
         run: golangci-lint fmt --diff
       - name: generate

@@ -16,8 +16,8 @@ A dispute belongs to one team. What each role in each team may do is tenant data
 Cedar in the binary. Row-level security enforces team membership a second time, independently of the policy engine.
 
 - **Data.** Tenant-scoped tables hold teams (one of them the default), memberships (Keycloak subject, team, role),
-  grants (team, role, action, optional amount ceiling) and routing rules (first match on rail, reason, risk tier and
-  a minimum amount). The migration gives every tenant a `general` team holding today's grants, and new tenants get
+  grants (team, role, action, optional amount ceiling) and routing rules (first match on rail, reason and a minimum
+  amount; a risk tier column is reserved, see Routing). The migration gives every tenant a `general` team holding today's grants, and new tenants get
   it from a trigger. Every change to these tables bumps a per-tenant policy version by trigger. The engine caches
   each tenant's compiled policy set by that version, so a change applies on the next request.
 - **Why grants can be edited safely.** Grants compile only to `permit` policies whose resource is inside their own
@@ -27,7 +27,8 @@ Cedar in the binary. Row-level security enforces team membership a second time, 
   (`scripts/tenant member add`); a tenant-admin interface is the next step and needs no change to the model.
 - **The ladder.** `lead` is a member of `senior`, which is a member of `junior`, as Cedar entities. A grant to junior
   reaches every rung above it through Cedar's `in`, so there is no role logic in code.
-- **Routing.** A new dispute goes to the first matching rule's team, else the default. Creating a dispute is
+- **Routing.** A new dispute goes to the first matching rule's team, else the default. A dispute is routed before
+  its first risk assessment, so rules on risk tier are refused until routing can see one. Creating a dispute is
   authorized against that team, so an analyst cannot open a dispute that would land outside their teams. A lead
   moves a dispute with `POST /disputes/{id}/team`, logged as a `REASSIGNED` event.
 - **Row-level security.** `WithTx` binds the principal next to the tenant, and restrictive policies on `disputes`

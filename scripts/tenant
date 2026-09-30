@@ -77,8 +77,10 @@ cmd_onboard() {
   cat <<SUMMARY
   tenant:     $name ($slug, $id)
   front door: $APP_URL/$slug
-  next steps: add analysts with 'scripts/tenant user add --slug $slug ...', deliver the keys over the customer's
-              secret channel, and have them bookmark the front door.
+  next steps: add analysts with 'scripts/tenant user add --slug $slug ...' and put each in a team with
+              'scripts/tenant member add --slug $slug --username <u> --team general --role junior|senior|lead'
+              (an analyst in no team sees no disputes), deliver the keys over the customer's secret channel, and
+              have them bookmark the front door.
 SUMMARY
 }
 

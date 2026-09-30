@@ -148,9 +148,9 @@ func ParseFixture(b []byte) (Fixture, error) {
 			reason := domain.Reason(rr.Reason)
 			rule.Reason = &reason
 		}
+		// a dispute is routed before its first risk assessment, so a tier condition could never match
 		if rr.RiskTier != "" {
-			tier := rr.RiskTier
-			rule.RiskTier = &tier
+			return Fixture{}, fmt.Errorf("authz: fixture: routing on risk_tier is not possible, disputes are routed before they are assessed")
 		}
 		f.Routing = append(f.Routing, rule)
 	}

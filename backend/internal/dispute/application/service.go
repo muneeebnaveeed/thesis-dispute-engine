@@ -490,7 +490,12 @@ func (s *Service) ApplyEvent(ctx context.Context, in ApplyEventInput) (Result, e
 			attribute.String("regime", string(rec.Regime)), attribute.String("state", string(rec.State))))
 
 		rec.State, rec.Appeals, rec.Version, rec.UpdatedAt = next.State, next.Appeals, rec.Version+1, now
-		return s.view(ctx, tx, rec)
+		// the facts as they now stand, without reading the log and the transaction a second time
+		f.State = next.State
+		if in.Event == domain.EventOpenInvestigation {
+			f.InvestigationOpenedBy = actorID
+		}
+		return s.viewWith(ctx, tx, rec, &f)
 	})
 }
 
@@ -955,6 +960,14 @@ func (s *Service) idempotent(ctx context.Context, scope string, idem Idempotency
 			case !errors.Is(err, ErrNotFound):
 				return err
 			}
+			// stored before keys belonged to their caller, so its owner is unknown: refuse rather than replay or repeat
+			if storeScope != scope {
+				if _, err := tx.GetIdempotent(ctx, scope, idem.Key); err == nil {
+					return ErrIdempotencyReuse
+				} else if !errors.Is(err, ErrNotFound) {
+					return err
+				}
+			}
 		}
 		view, err := fn(tx)
 		if err != nil {
@@ -979,6 +992,11 @@ func (s *Service) idempotent(ctx context.Context, scope string, idem Idempotency
 }
 
 func (s *Service) view(ctx context.Context, tx Tx, rec DisputeRecord) (DisputeView, error) {
+	return s.viewWith(ctx, tx, rec, nil)
+}
+
+// viewWith builds the view; f, when the caller already holds the dispute's current facts, spares reading them again.
+func (s *Service) viewWith(ctx context.Context, tx Tx, rec DisputeRecord, f *DisputeFacts) (DisputeView, error) {
 	events, err := tx.ListEvents(ctx, rec.ID)
 	if err != nil {
 		return DisputeView{}, err
@@ -988,11 +1006,14 @@ func (s *Service) view(ctx context.Context, tx Tx, rec DisputeRecord) (DisputeVi
 		views = append(views, EventView{Seq: e.Seq, Event: e.Event, FromState: e.FromState, ToState: e.ToState,
 			Actor: e.Actor, Payload: json.RawMessage(e.Payload), TraceID: e.TraceID, OccurredAt: e.OccurredAt})
 	}
-	f, err := facts(ctx, tx, rec)
-	if err != nil {
-		return DisputeView{}, err
+	if f == nil {
+		loaded, err := facts(ctx, tx, rec)
+		if err != nil {
+			return DisputeView{}, err
+		}
+		f = &loaded
 	}
-	allowed, err := s.permitted(ctx, tx, rec.Lifecycle().Allowed(), f)
+	allowed, err := s.permitted(ctx, tx, rec.Lifecycle().Allowed(), *f)
 	if err != nil {
 		return DisputeView{}, err
 	}

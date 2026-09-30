@@ -3,11 +3,13 @@
 # (cedar-go's validator is experimental). The compiled grants are the authz golden files, so what is validated is
 # exactly what the tests pin.
 #
-#   scripts/validate-policies        needs `cedar` (cedar-policy-cli, pinned in CI) on PATH
+#   scripts/validate-policies        needs `cedar` at mise.toml's CEDAR_CLI_VERSION on PATH
 set -euo pipefail
 source "$(dirname "$0")/lib/common.sh"
 dir=$(repo_root)/backend/internal/dispute/authz
-command -v cedar >/dev/null || die "cedar is not on PATH (cargo install cedar-policy-cli --version 4.13.0 --locked)"
+want=$(sed -n 's/^CEDAR_CLI_VERSION = "\(.*\)"$/\1/p' "$(repo_root)/mise.toml")
+command -v cedar >/dev/null || die "cedar is not on PATH (cargo install cedar-policy-cli --version $want --locked)"
+[[ "$(cedar --version)" == "cedar-policy-cli $want" ]] || die "cedar is $(cedar --version), mise.toml pins $want"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 cat "$dir/policy/guardrails.cedar" > "$tmp/guardrails.cedar"

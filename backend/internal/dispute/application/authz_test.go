@@ -156,3 +156,41 @@ func TestUnrecordedInvestigatorFailsClosed(t *testing.T) {
 		t.Fatalf("tenant key: %v", err)
 	}
 }
+
+// A key stored before keys belonged to their caller cannot be attributed to anyone: a retry with it is refused as a
+// reused key rather than opening a second dispute or replaying a response to someone who may not own it.
+func TestPreDeployIdempotencyKeyIsRefused(t *testing.T) {
+	svc, store := newService(t)
+	txn := store.AddTransaction(domain.RailCard, "EUR", "EUR", "40.00")
+	store.Idempotent[apptest.TenantA.String()+"\x00dispute.create\x00legacy"] = application.StoredResponse{RequestHash: []byte("x"), Body: []byte(`{}`)}
+	_, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn,
+		Idempotency: application.Idempotency{Key: "legacy", RequestBody: []byte(`{}`)}})
+	if !errors.Is(err, application.ErrIdempotencyReuse) {
+		t.Fatalf("err = %v", err)
+	}
+	if len(store.Disputes) != 0 {
+		t.Fatal("a second dispute was opened")
+	}
+}
+
+// The view an apply returns is decided on the dispute as it now is: after the investigator wins the chargeback, their
+// own response already withholds the final credit.
+func TestApplyResponseReflectsTheNewFacts(t *testing.T) {
+	svc, store := newService(t)
+	txn := store.AddTransaction(domain.RailCard, "USD", "USD", "40.00")
+	created, err := svc.CreateDispute(secondAnalyst, application.CreateDisputeInput{TransactionID: txn})
+	if err != nil {
+		t.Fatal(err)
+	}
+	opened, err := svc.ApplyEvent(apptest.Ctx(), application.ApplyEventInput{DisputeID: created.View.ID, Event: domain.EventOpenInvestigation})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opened.View.State != domain.StateInvestigating {
+		t.Fatalf("state = %s", opened.View.State)
+	}
+	view := apply(t, svc, created.View.ID, domain.EventIssueRefund, domain.EventFileChargeback, domain.EventAcknowledgeChargeback, domain.EventWinChargeback)
+	if slices.Contains(view.AllowedEvents, domain.EventIssueFinalCredit) {
+		t.Fatalf("investigator offered final credit in the apply response: %v", view.AllowedEvents)
+	}
+}

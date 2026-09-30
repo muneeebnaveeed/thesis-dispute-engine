@@ -50,6 +50,7 @@ func TestParseFixtureRefusesUnknownFieldsAndTeams(t *testing.T) {
 		"undeclared team": "teams: [{ slug: general, name: G, default: true }]\ngrants: [{ team: nope, role: junior, actions: [create] }]",
 		"no default":      "teams: [{ slug: general, name: G }]",
 		"bad role":        "teams: [{ slug: general, name: G, default: true }]\nmembers: [{ subject: s, team: general, role: owner }]",
+		"risk tier":       "teams: [{ slug: general, name: G, default: true }]\nrouting: [{ risk_tier: HIGH, team: general }]",
 	} {
 		if _, err := authz.ParseFixture([]byte(doc)); err == nil {
 			t.Errorf("%s: parsed", name)

@@ -50,3 +50,27 @@ func TestReassign(t *testing.T) {
 		t.Fatalf("fraud lead cannot see it: %v", err)
 	}
 }
+
+// A caller who may not reassign learns nothing about which teams exist, and a move to the dispute's own team changes
+// and logs nothing.
+func TestReassignDecidesBeforeRevealingTeams(t *testing.T) {
+	svc, store := newService(t)
+	store.Access = map[uuid.UUID]*apptest.MemAccess{apptest.TenantA: twoTeams()}
+	txn := store.AddTransaction(domain.RailCard, "EUR", "EUR", "40.00")
+	created, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := created.View.ID
+	junior := apptest.CtxAs(principal.Principal{Kind: principal.Analyst, ID: "junior-general", Display: "j@x"})
+	if err := svc.Reassign(junior, id, "nope"); !errors.Is(err, application.ErrForbidden) {
+		t.Fatalf("junior to an unknown team: %v", err)
+	}
+	before := len(store.Events[id])
+	if err := svc.Reassign(apptest.Ctx(), id, "general"); err != nil {
+		t.Fatalf("same team: %v", err)
+	}
+	if len(store.Events[id]) != before || store.Disputes[id].Version != 1 {
+		t.Fatalf("a no-op move was recorded: events %d -> %d, version %d", before, len(store.Events[id]), store.Disputes[id].Version)
+	}
+}

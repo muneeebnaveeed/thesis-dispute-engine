@@ -46,6 +46,15 @@ func (s *Service) Reassign(ctx context.Context, disputeID uuid.UUID, team string
 		if err != nil {
 			return err
 		}
+		// decided before the target is looked at, so a caller who may not move it learns nothing about the teams
+		f, err := facts(ctx, tx, rec)
+		if err != nil {
+			return err
+		}
+		dec, err := s.authorize(ctx, tx, ActionReassign, &f)
+		if err != nil {
+			return err
+		}
 		p, _ := principal.From(ctx)
 		a, err := tx.Access(ctx, p)
 		if err != nil {
@@ -54,13 +63,8 @@ func (s *Service) Reassign(ctx context.Context, disputeID uuid.UUID, team string
 		if !slices.Contains(a.Teams, team) {
 			return ErrUnknownTeam
 		}
-		f, err := facts(ctx, tx, rec)
-		if err != nil {
-			return err
-		}
-		dec, err := s.authorize(ctx, tx, ActionReassign, &f)
-		if err != nil {
-			return err
+		if team == rec.Team {
+			return nil
 		}
 		now := s.now()
 		payload, err := json.Marshal(map[string]any{"from": rec.Team, "to": team, "authorizedBy": dec.Policies})

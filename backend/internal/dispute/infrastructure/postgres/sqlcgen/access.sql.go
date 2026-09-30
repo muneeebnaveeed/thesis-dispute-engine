@@ -7,151 +7,38 @@ package sqlcgen
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getPolicyVersion = `-- name: GetPolicyVersion :one
-SELECT COALESCE((SELECT version FROM policy_versions), 0)::bigint AS version
+const getAccess = `-- name: GetAccess :one
+SELECT
+    COALESCE((SELECT version FROM policy_versions), 0)::bigint AS version,
+    COALESCE((SELECT jsonb_agg(jsonb_build_object('slug', slug, 'default', is_default) ORDER BY slug) FROM teams), '[]')::jsonb AS teams,
+    COALESCE((SELECT jsonb_agg(jsonb_build_object('team', team, 'role', role, 'action', action, 'limit', amount_limit::text)
+        ORDER BY team, role, action) FROM role_grants), '[]')::jsonb AS grants,
+    COALESCE((SELECT jsonb_agg(jsonb_build_object('rail', rail, 'reason', reason, 'tier', risk_tier, 'min', min_amount::text, 'team', team)
+        ORDER BY position) FROM routing_rules), '[]')::jsonb AS routing,
+    COALESCE((SELECT jsonb_agg(jsonb_build_object('team', team, 'role', role) ORDER BY team)
+        FROM team_members WHERE subject = $1::text), '[]')::jsonb AS members
 `
 
-func (q *Queries) GetPolicyVersion(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, getPolicyVersion)
-	var version int64
-	err := row.Scan(&version)
-	return version, err
+type GetAccessRow struct {
+	Version int64
+	Teams   []byte
+	Grants  []byte
+	Routing []byte
+	Members []byte
 }
 
-const listMemberships = `-- name: ListMemberships :many
-SELECT team, role FROM team_members WHERE subject = $1 ORDER BY team
-`
-
-type ListMembershipsRow struct {
-	Team string
-	Role string
-}
-
-func (q *Queries) ListMemberships(ctx context.Context, subject string) ([]ListMembershipsRow, error) {
-	rows, err := q.db.Query(ctx, listMemberships, subject)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListMembershipsRow{}
-	for rows.Next() {
-		var i ListMembershipsRow
-		if err := rows.Scan(&i.Team, &i.Role); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listRoleGrants = `-- name: ListRoleGrants :many
-SELECT team, role, action, amount_limit FROM role_grants ORDER BY team, role, action
-`
-
-type ListRoleGrantsRow struct {
-	Team        string
-	Role        string
-	Action      string
-	AmountLimit pgtype.Numeric
-}
-
-func (q *Queries) ListRoleGrants(ctx context.Context) ([]ListRoleGrantsRow, error) {
-	rows, err := q.db.Query(ctx, listRoleGrants)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListRoleGrantsRow{}
-	for rows.Next() {
-		var i ListRoleGrantsRow
-		if err := rows.Scan(
-			&i.Team,
-			&i.Role,
-			&i.Action,
-			&i.AmountLimit,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listRoutingRules = `-- name: ListRoutingRules :many
-SELECT position, rail, reason, risk_tier, min_amount, team FROM routing_rules ORDER BY position
-`
-
-type ListRoutingRulesRow struct {
-	Position  int32
-	Rail      *string
-	Reason    *string
-	RiskTier  *string
-	MinAmount pgtype.Numeric
-	Team      string
-}
-
-func (q *Queries) ListRoutingRules(ctx context.Context) ([]ListRoutingRulesRow, error) {
-	rows, err := q.db.Query(ctx, listRoutingRules)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListRoutingRulesRow{}
-	for rows.Next() {
-		var i ListRoutingRulesRow
-		if err := rows.Scan(
-			&i.Position,
-			&i.Rail,
-			&i.Reason,
-			&i.RiskTier,
-			&i.MinAmount,
-			&i.Team,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listTeams = `-- name: ListTeams :many
-SELECT slug, is_default FROM teams ORDER BY slug
-`
-
-type ListTeamsRow struct {
-	Slug      string
-	IsDefault bool
-}
-
-func (q *Queries) ListTeams(ctx context.Context) ([]ListTeamsRow, error) {
-	rows, err := q.db.Query(ctx, listTeams)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListTeamsRow{}
-	for rows.Next() {
-		var i ListTeamsRow
-		if err := rows.Scan(&i.Slug, &i.IsDefault); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+// One round trip for everything a decision needs; RLS limits every table to the tenant.
+func (q *Queries) GetAccess(ctx context.Context, subject string) (GetAccessRow, error) {
+	row := q.db.QueryRow(ctx, getAccess, subject)
+	var i GetAccessRow
+	err := row.Scan(
+		&i.Version,
+		&i.Teams,
+		&i.Grants,
+		&i.Routing,
+		&i.Members,
+	)
+	return i, err
 }

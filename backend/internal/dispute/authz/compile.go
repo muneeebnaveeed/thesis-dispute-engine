@@ -15,8 +15,12 @@ import (
 // cedarMax is the largest Cedar decimal; beyond it a limit would fail at evaluation, and evaluation errors deny
 var cedarMax = decimal.RequireFromString("922337203685477.5807")
 
-// slugs and actions reach Cedar source as string literals; anything else is refused rather than escaped
-var safe = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+// slugs and actions reach Cedar source as string literals; anything else is refused rather than escaped. Actions may
+// carry colons (read:pii:masked); team slugs may not, since they are joined with a role inside TeamRole ids.
+var (
+	safeTeam   = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+	safeAction = regexp.MustCompile(`^[A-Za-z0-9_:-]{1,64}$`)
+)
 
 // Compile turns a tenant's grants into Cedar permits, one per row, each resource-bounded to its team. Rows it cannot
 // express safely are skipped and returned, never escaped.
@@ -24,7 +28,7 @@ func Compile(_ uuid.UUID, a application.Access) (string, []string) {
 	var b strings.Builder
 	var skipped []string
 	for _, g := range a.Grants {
-		if !slices.Contains(application.Roles, g.Role) || !safe.MatchString(g.Team) || !safe.MatchString(string(g.Action)) ||
+		if !slices.Contains(application.Roles, g.Role) || !safeTeam.MatchString(g.Team) || !safeAction.MatchString(string(g.Action)) ||
 			(g.AmountLimit != nil && (g.AmountLimit.IsNegative() || g.AmountLimit.GreaterThan(cedarMax))) {
 			skipped = append(skipped, fmt.Sprintf("%q/%q/%q", g.Team, g.Role, g.Action))
 			continue

@@ -23,7 +23,7 @@ CREATE TABLE role_grants (
     tenant_id    uuid NOT NULL DEFAULT current_tenant_id(),
     team         text NOT NULL,
     role         text NOT NULL CHECK (role IN ('junior', 'senior', 'lead')),
-    action       text NOT NULL CHECK (action ~ '^[A-Za-z0-9_-]{1,64}$'),
+    action       text NOT NULL CHECK (action ~ '^[A-Za-z0-9_:-]{1,64}$'),
     -- the ceiling is Cedar's decimal range; a larger limit could not be evaluated
     amount_limit numeric(19, 4) CHECK (amount_limit IS NULL OR amount_limit BETWEEN 0 AND 922337203685477),
     PRIMARY KEY (tenant_id, team, role, action),

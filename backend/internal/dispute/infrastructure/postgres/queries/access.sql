@@ -1,14 +1,11 @@
--- name: GetPolicyVersion :one
-SELECT COALESCE((SELECT version FROM policy_versions), 0)::bigint AS version;
-
--- name: ListTeams :many
-SELECT slug, is_default FROM teams ORDER BY slug;
-
--- name: ListRoleGrants :many
-SELECT team, role, action, amount_limit FROM role_grants ORDER BY team, role, action;
-
--- name: ListMemberships :many
-SELECT team, role FROM team_members WHERE subject = $1 ORDER BY team;
-
--- name: ListRoutingRules :many
-SELECT position, rail, reason, risk_tier, min_amount, team FROM routing_rules ORDER BY position;
+-- name: GetAccess :one
+-- One round trip for everything a decision needs; RLS limits every table to the tenant.
+SELECT
+    COALESCE((SELECT version FROM policy_versions), 0)::bigint AS version,
+    COALESCE((SELECT jsonb_agg(jsonb_build_object('slug', slug, 'default', is_default) ORDER BY slug) FROM teams), '[]')::jsonb AS teams,
+    COALESCE((SELECT jsonb_agg(jsonb_build_object('team', team, 'role', role, 'action', action, 'limit', amount_limit::text)
+        ORDER BY team, role, action) FROM role_grants), '[]')::jsonb AS grants,
+    COALESCE((SELECT jsonb_agg(jsonb_build_object('rail', rail, 'reason', reason, 'tier', risk_tier, 'min', min_amount::text, 'team', team)
+        ORDER BY position) FROM routing_rules), '[]')::jsonb AS routing,
+    COALESCE((SELECT jsonb_agg(jsonb_build_object('team', team, 'role', role) ORDER BY team)
+        FROM team_members WHERE subject = sqlc.arg(subject)::text), '[]')::jsonb AS members;
