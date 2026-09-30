@@ -51,9 +51,11 @@ func TestNoGrantBypassesSeparationOfDuties(t *testing.T) {
 	}
 	rapid.Check(t, func(t *rapid.T) {
 		a := genAccess(t)
+		// a fresh tenant per case, so the engine's cache never answers with a set compiled for an earlier case
+		tenant := uuid.New()
 		p := principal.Principal{Kind: principal.Analyst, ID: "investigator"}
 		d := genDispute(t, rapid.SampledFrom(a.Teams).Draw(t, "disputeTeam"), "investigator")
-		dec, err := e.Decide(uuid.Nil, p, a, application.EventAction(domain.EventIssueFinalCredit), d)
+		dec, err := e.Decide(tenant, p, a, application.EventAction(domain.EventIssueFinalCredit), d)
 		if err != nil || dec.Allowed {
 			t.Fatalf("allowed=%v err=%v members=%v grants=%v", dec.Allowed, err, a.Members, a.Grants)
 		}
@@ -69,6 +71,8 @@ func TestGrantsStayInTheirTeam(t *testing.T) {
 	}
 	rapid.Check(t, func(t *rapid.T) {
 		a := genAccess(t)
+		// a fresh tenant per case, so the engine's cache never answers with a set compiled for an earlier case
+		tenant := uuid.New()
 		var outside []string
 		for _, team := range a.Teams {
 			if !slices.ContainsFunc(a.Members, func(m application.Membership) bool { return m.Team == team }) {
@@ -81,7 +85,7 @@ func TestGrantsStayInTheirTeam(t *testing.T) {
 		p := principal.Principal{Kind: principal.Analyst, ID: "caller"}
 		d := genDispute(t, rapid.SampledFrom(outside).Draw(t, "disputeTeam"), "someone-else")
 		for _, action := range disputeActions() {
-			if dec, err := e.Decide(uuid.Nil, p, a, action, d); err != nil || dec.Allowed {
+			if dec, err := e.Decide(tenant, p, a, action, d); err != nil || dec.Allowed {
 				t.Fatalf("%s allowed=%v err=%v", action, dec.Allowed, err)
 			}
 		}
@@ -96,6 +100,8 @@ func TestGrantsNeverAdministerTheTenant(t *testing.T) {
 	}
 	rapid.Check(t, func(t *rapid.T) {
 		a := genAccess(t)
+		// a fresh tenant per case, so the engine's cache never answers with a set compiled for an earlier case
+		tenant := uuid.New()
 		for _, team := range a.Teams {
 			for _, role := range application.Roles {
 				for _, action := range []application.Action{application.ActionManageKeys, application.ActionManageTemplates, application.ActionManageBranding} {
@@ -105,7 +111,7 @@ func TestGrantsNeverAdministerTheTenant(t *testing.T) {
 		}
 		p := principal.Principal{Kind: principal.Analyst, ID: "caller"}
 		for _, action := range []application.Action{application.ActionManageKeys, application.ActionManageTemplates, application.ActionManageBranding} {
-			if dec, err := e.Decide(uuid.Nil, p, a, action, nil); err != nil || dec.Allowed {
+			if dec, err := e.Decide(tenant, p, a, action, nil); err != nil || dec.Allowed {
 				t.Fatalf("%s allowed=%v err=%v", action, dec.Allowed, err)
 			}
 		}

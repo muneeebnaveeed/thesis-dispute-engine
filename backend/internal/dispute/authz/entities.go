@@ -4,6 +4,7 @@ import (
 	"github.com/cedar-policy/cedar-go"
 	"github.com/cedar-policy/cedar-go/types"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/principal"
@@ -56,7 +57,8 @@ func entities(p principal.Principal, a application.Access, d *application.Disput
 	if d.ID == uuid.Nil {
 		return m, uid("Team", d.Team), nil
 	}
-	amount, err := types.ParseDecimal(d.Amount.StringFixed(4))
+	// an amount past Cedar's range is still decided: capped, it stays above every limit a grant can carry
+	amount, err := types.ParseDecimal(decimal.Min(d.Amount, cedarMax).StringFixed(4))
 	if err != nil {
 		return nil, cedar.EntityUID{}, err
 	}

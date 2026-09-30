@@ -3,6 +3,11 @@
 forbid (principal is Analyst, action == Action::"ISSUE_FINAL_CREDIT", resource is Dispute)
 when { resource.investigationOpenedBy == principal.id };
 
+// An investigation opened before actors were recorded names nobody, so no analyst can be shown not to be its investigator.
+@id("sod-unrecorded-investigator")
+forbid (principal is Analyst, action == Action::"ISSUE_FINAL_CREDIT", resource is Dispute)
+when { resource.investigationOpenedBy == "?unrecorded" };
+
 // Only a lead of the dispute's team may move it to another team.
 @id("reassign-leads-only")
 forbid (principal, action == Action::"reassign", resource is Dispute)

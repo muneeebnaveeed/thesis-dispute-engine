@@ -7,9 +7,13 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
 )
+
+// cedarMax is the largest Cedar decimal; beyond it a limit would fail at evaluation, and evaluation errors deny
+var cedarMax = decimal.RequireFromString("922337203685477.5807")
 
 // slugs and actions reach Cedar source as string literals; anything else is refused rather than escaped
 var safe = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
@@ -20,7 +24,8 @@ func Compile(_ uuid.UUID, a application.Access) (string, []string) {
 	var b strings.Builder
 	var skipped []string
 	for _, g := range a.Grants {
-		if !slices.Contains(application.Roles, g.Role) || !safe.MatchString(g.Team) || !safe.MatchString(string(g.Action)) {
+		if !slices.Contains(application.Roles, g.Role) || !safe.MatchString(g.Team) || !safe.MatchString(string(g.Action)) ||
+			(g.AmountLimit != nil && (g.AmountLimit.IsNegative() || g.AmountLimit.GreaterThan(cedarMax))) {
 			skipped = append(skipped, fmt.Sprintf("%q/%q/%q", g.Team, g.Role, g.Action))
 			continue
 		}

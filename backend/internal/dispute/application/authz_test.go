@@ -129,3 +129,30 @@ func TestReplayIsPerCaller(t *testing.T) {
 		t.Fatalf("same caller: replayed=%v err=%v", same.Replayed, err)
 	}
 }
+
+// Investigations opened before actor ids were recorded name nobody, so separation of duties cannot be checked; the
+// final credit is refused to every analyst rather than allowed to all of them. A tenant key can still finish it.
+func TestUnrecordedInvestigatorFailsClosed(t *testing.T) {
+	svc, store := newService(t)
+	txn := store.AddTransaction(domain.RailCard, "USD", "USD", "40.00")
+	created, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := created.View.ID
+	apply(t, svc, id, domain.EventOpenInvestigation, domain.EventIssueRefund, domain.EventFileChargeback,
+		domain.EventAcknowledgeChargeback, domain.EventWinChargeback)
+	for i, e := range store.Events[id] {
+		if e.Event == domain.EventOpenInvestigation {
+			store.Events[id][i].ActorID = ""
+		}
+	}
+	_, err = svc.ApplyEvent(secondAnalyst, application.ApplyEventInput{DisputeID: id, Event: domain.EventIssueFinalCredit})
+	if !errors.Is(err, application.ErrForbidden) || !strings.Contains(err.Error(), "sod-unrecorded-investigator") {
+		t.Fatalf("analyst on an unrecorded investigation: %v", err)
+	}
+	key := apptest.CtxAs(principal.Principal{Kind: principal.Key, ID: uuid.NewString(), Display: "key:tk_x"})
+	if _, err := svc.ApplyEvent(key, application.ApplyEventInput{DisputeID: id, Event: domain.EventIssueFinalCredit}); err != nil {
+		t.Fatalf("tenant key: %v", err)
+	}
+}

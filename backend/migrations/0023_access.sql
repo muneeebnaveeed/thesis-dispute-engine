@@ -24,7 +24,8 @@ CREATE TABLE role_grants (
     team         text NOT NULL,
     role         text NOT NULL CHECK (role IN ('junior', 'senior', 'lead')),
     action       text NOT NULL CHECK (action ~ '^[A-Za-z0-9_-]{1,64}$'),
-    amount_limit numeric(19, 4) CHECK (amount_limit IS NULL OR amount_limit >= 0),
+    -- the ceiling is Cedar's decimal range; a larger limit could not be evaluated
+    amount_limit numeric(19, 4) CHECK (amount_limit IS NULL OR amount_limit BETWEEN 0 AND 922337203685477),
     PRIMARY KEY (tenant_id, team, role, action),
     FOREIGN KEY (tenant_id, team) REFERENCES teams (tenant_id, slug) ON DELETE CASCADE
 );

@@ -928,9 +928,11 @@ func (s *Service) GetDispute(ctx context.Context, id uuid.UUID) (DisputeView, er
 
 // idempotent wraps a write so a repeated key returns the first response and a mismatched body is refused.
 func (s *Service) idempotent(ctx context.Context, scope string, idem Idempotency, fn func(Tx) (DisputeView, error)) (Result, error) {
-	// keys are the caller's own, so a replay never hands one principal a response only another was authorized for
+	// keys are the caller's own, so a replay never hands one principal a response only another was authorized for;
+	// the metric keeps the bare scope so it carries no identities
+	storeScope := scope
 	if p, ok := principal.From(ctx); ok {
-		scope += "@" + string(p.Kind) + ":" + p.ID
+		storeScope += "@" + string(p.Kind) + ":" + p.ID
 	}
 	var out Result
 	err := s.store.WithTx(ctx, func(tx Tx) error {
@@ -938,7 +940,7 @@ func (s *Service) idempotent(ctx context.Context, scope string, idem Idempotency
 		if idem.Key != "" {
 			sum := sha256.Sum256(idem.RequestBody)
 			hash = sum[:]
-			stored, err := tx.GetIdempotent(ctx, scope, idem.Key)
+			stored, err := tx.GetIdempotent(ctx, storeScope, idem.Key)
 			switch {
 			case err == nil:
 				if !bytes.Equal(stored.RequestHash, hash) {
@@ -963,7 +965,7 @@ func (s *Service) idempotent(ctx context.Context, scope string, idem Idempotency
 			if err != nil {
 				return err
 			}
-			if err := tx.PutIdempotent(ctx, scope, idem.Key, StoredResponse{RequestHash: hash, StatusCode: 0, Body: body}); err != nil {
+			if err := tx.PutIdempotent(ctx, storeScope, idem.Key, StoredResponse{RequestHash: hash, StatusCode: 0, Body: body}); err != nil {
 				return err
 			}
 		}
