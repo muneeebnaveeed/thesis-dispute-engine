@@ -264,7 +264,9 @@ void _DisputeState
 
 export const LoggedEvent = Type.Object({
   seq: Type.Integer(),
-  event: Type.String({ description: 'A DisputeEvent, or OPENED for entry 1.' }),
+  event: Type.String({
+    description: 'A DisputeEvent, OPENED for entry 1, or REASSIGNED when a lead moved it to another team.',
+  }),
   fromState: Type.String(),
   toState: DisputeState,
   actor: Type.String(),
@@ -612,6 +614,7 @@ export const ErrorCode = Type.Union(
     Type.Literal('idempotency-key-reuse'),
     Type.Literal('image-refused'),
     Type.Literal('no-regime'),
+    Type.Literal('unknown-team'),
     Type.Literal('unknown-regime'),
     Type.Literal('unavailable'),
     Type.Literal('internal'),

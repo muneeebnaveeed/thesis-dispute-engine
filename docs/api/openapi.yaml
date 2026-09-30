@@ -255,6 +255,35 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+  /disputes/{disputeId}/team:
+    post:
+      operationId: reassignDispute
+      summary: Move a dispute to another team
+      description: >-
+        Moves the dispute to another team of the tenant, recorded as a REASSIGNED entry in its log. Only a lead of
+        the dispute's current team may do it; afterwards the caller may no longer see the dispute. Analysts only.
+      tags: [disputes]
+      parameters:
+        - name: disputeId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [team]
+              properties:
+                team: { type: string, minLength: 1, maxLength: 32 }
+      responses:
+        "204": { description: Moved. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
   /disputes/{disputeId}/notices/{noticeId}/resend:
     post:
       operationId: resendNotice
@@ -755,6 +784,7 @@ components:
         - idempotency-key-reuse
         - image-refused
         - no-regime
+        - unknown-team
         - unknown-regime
         - unavailable
         - internal
@@ -1043,7 +1073,7 @@ components:
       required: [seq, event, fromState, toState, actor, payload, occurredAt]
       properties:
         seq: { type: integer }
-        event: { type: string, description: "A DisputeEvent, or OPENED for entry 1." }
+        event: { type: string, description: "A DisputeEvent, OPENED for entry 1, or REASSIGNED when a lead moved it to another team." }
         fromState: { type: string }
         toState: { $ref: "#/components/schemas/DisputeState" }
         actor: { type: string }

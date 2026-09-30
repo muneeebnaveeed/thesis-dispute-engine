@@ -52,6 +52,9 @@ UPDATE disputes
 SET state = $2, appeals = $3, version = version + 1, updated_at = $4
 WHERE id = $1 AND version = $5;
 
+-- name: UpdateDisputeTeam :one
+SELECT reassign_dispute(sqlc.arg(id), sqlc.arg(expected), sqlc.arg(team), sqlc.arg(at))::bigint AS moved;
+
 -- name: InsertDisputeEvent :one
 INSERT INTO dispute_events (dispute_id, seq, event, from_state, to_state, actor, payload, idempotency_key, trace_id, occurred_at, actor_id)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)

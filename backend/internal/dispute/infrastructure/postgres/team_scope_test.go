@@ -67,3 +67,30 @@ func TestTeamScopeUnderRLS(t *testing.T) {
 		t.Fatalf("outsider sees %d events (%v)", events, err)
 	}
 }
+
+func TestReassignOutOfOwnTeamsThroughPostgres(t *testing.T) {
+	owner, schema := pgtest.PoolWithSchema(t)
+	app := pgtest.AppPool(t, schema)
+	svc := apptest.NewService(t, disputepg.NewStore(app), nil)
+	txn := seedFor(t, owner, apptest.TenantA, domain.RailCard, "EUR")
+	mustExec(t, owner, `INSERT INTO teams (tenant_id, slug, name) VALUES ($1, 'fraud', 'Fraud')`, apptest.TenantA)
+	mustExec(t, owner, `INSERT INTO team_members (tenant_id, team, subject, role) VALUES ($1, 'fraud', 'fraud-only', 'lead')`, apptest.TenantA)
+	created, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Reassign(apptest.Ctx(), created.View.ID, "fraud"); err != nil {
+		t.Fatalf("reassign: %v", err)
+	}
+	fraud := apptest.CtxAs(principal.Principal{Kind: principal.Analyst, ID: "fraud-only", Display: "f@x"})
+	view, err := svc.GetDispute(fraud, created.View.ID)
+	if err != nil {
+		t.Fatalf("new team read: %v", err)
+	}
+	if last := view.Events[len(view.Events)-1]; last.Event != application.EventReassigned {
+		t.Fatalf("last event = %s", last.Event)
+	}
+	if _, err := svc.GetDispute(apptest.Ctx(), created.View.ID); !errors.Is(err, application.ErrNotFound) {
+		t.Fatalf("old team still reads it: %v", err)
+	}
+}

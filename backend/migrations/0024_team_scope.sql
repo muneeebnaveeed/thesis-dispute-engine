@@ -13,8 +13,22 @@ $$;
 
 CREATE POLICY team_scope_read   ON disputes AS RESTRICTIVE FOR SELECT USING (in_team(tenant_id, team));
 CREATE POLICY team_scope_insert ON disputes AS RESTRICTIVE FOR INSERT WITH CHECK (in_team(tenant_id, team));
--- reassign moves a dispute out of the caller's teams; Cedar decides it, so the new row is not checked here
-CREATE POLICY team_scope_update ON disputes AS RESTRICTIVE FOR UPDATE USING (in_team(tenant_id, team)) WITH CHECK (true);
+CREATE POLICY team_scope_update ON disputes AS RESTRICTIVE FOR UPDATE USING (in_team(tenant_id, team));
+
+-- Reassigning moves a dispute out of the caller's teams, which no policy above can allow: an UPDATE's new row must
+-- also pass the SELECT policies. The move runs as the owner, still bounded to the caller's tenant, to a dispute the
+-- caller can see now, and to the version they read; whether they may move it at all is Cedar's decision.
+CREATE FUNCTION reassign_dispute(dispute uuid, expected bigint, new_team text, at timestamptz) RETURNS bigint
+LANGUAGE sql SECURITY DEFINER SET search_path FROM CURRENT AS $$
+    WITH moved AS (
+        UPDATE disputes SET team = new_team, version = version + 1, updated_at = at
+        WHERE id = dispute AND version = expected AND tenant_id = current_tenant_id() AND in_team(tenant_id, team)
+        RETURNING 1
+    )
+    SELECT count(*) FROM moved
+$$;
+REVOKE EXECUTE ON FUNCTION reassign_dispute(uuid, bigint, text, timestamptz) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION reassign_dispute(uuid, bigint, text, timestamptz) TO dispute_app;
 
 CREATE POLICY team_scope ON dispute_events    AS RESTRICTIVE USING (EXISTS (SELECT 1 FROM disputes d WHERE d.id = dispute_id));
 CREATE POLICY team_scope ON dispute_deadlines AS RESTRICTIVE USING (EXISTS (SELECT 1 FROM disputes d WHERE d.id = dispute_id));

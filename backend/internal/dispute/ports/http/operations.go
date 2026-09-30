@@ -25,7 +25,7 @@ var operationClass = map[string]opClass{
 	"GetMyAvatar": tenantWide, "PutMyAvatar": tenantWide,
 	"SuggestQuestionnaireAnswers": tenantWide, "SuggestSearchFilters": tenantWide, "SuggestDisputeReason": tenantWide,
 	"CreateDispute": decided, "ApplyDisputeEvent": decided, "ComposeEmail": decided, "UploadAttachment": decided,
-	"ResendNotice": decided, "ListTenantTemplates": decided, "PutTenantTemplate": decided,
+	"ResendNotice": decided, "ReassignDispute": decided, "ListTenantTemplates": decided, "PutTenantTemplate": decided,
 	"DeleteTenantTemplate": decided, "PutTenantLogo": decided,
 	"ListTenantKeys": decided, "CreateTenantKey": decided, "RevokeTenantKey": decided,
 	"PutSession": internal, "GetSession": internal, "DeleteSession": internal, "DeleteSessions": internal, "ListTenants": internal,

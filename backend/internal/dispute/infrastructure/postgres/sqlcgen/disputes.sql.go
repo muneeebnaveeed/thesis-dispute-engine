@@ -2187,6 +2187,29 @@ func (q *Queries) UpdateDisputeState(ctx context.Context, arg UpdateDisputeState
 	return result.RowsAffected(), nil
 }
 
+const updateDisputeTeam = `-- name: UpdateDisputeTeam :one
+SELECT reassign_dispute($1, $2, $3, $4)::bigint AS moved
+`
+
+type UpdateDisputeTeamParams struct {
+	ID       uuid.UUID
+	Expected int64
+	Team     string
+	At       time.Time
+}
+
+func (q *Queries) UpdateDisputeTeam(ctx context.Context, arg UpdateDisputeTeamParams) (int64, error) {
+	row := q.db.QueryRow(ctx, updateDisputeTeam,
+		arg.ID,
+		arg.Expected,
+		arg.Team,
+		arg.At,
+	)
+	var moved int64
+	err := row.Scan(&moved)
+	return moved, err
+}
+
 const upsertQuestionnaire = `-- name: UpsertQuestionnaire :exec
 INSERT INTO questionnaires (dispute_id, reason, questions, sent_at) VALUES ($1, $2, $3, $4)
 ON CONFLICT (dispute_id) DO UPDATE SET reason = EXCLUDED.reason, questions = EXCLUDED.questions, sent_at = EXCLUDED.sent_at,

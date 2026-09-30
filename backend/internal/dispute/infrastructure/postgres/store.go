@@ -228,6 +228,18 @@ func (t *txn) UpdateDisputeState(ctx context.Context, id uuid.UUID, expectedVers
 	return nil
 }
 
+// UpdateDisputeTeam implements application.Tx with the same version check as a state change.
+func (t *txn) UpdateDisputeTeam(ctx context.Context, id uuid.UUID, expectedVersion int64, team string, at time.Time) error {
+	n, err := t.q.UpdateDisputeTeam(ctx, sqlcgen.UpdateDisputeTeamParams{ID: id, Expected: expectedVersion, Team: team, At: at})
+	if err != nil {
+		return mapErr(err)
+	}
+	if n == 0 {
+		return application.ErrConflict
+	}
+	return nil
+}
+
 // Access implements application.Tx; RLS already limits every table to the tenant.
 func (t *txn) Access(ctx context.Context, p principal.Principal) (application.Access, error) {
 	version, err := t.q.GetPolicyVersion(ctx)

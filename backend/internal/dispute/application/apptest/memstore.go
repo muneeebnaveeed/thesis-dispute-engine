@@ -419,6 +419,16 @@ func (t *memTx) UpdateDisputeState(_ context.Context, id uuid.UUID, expected int
 	return nil
 }
 
+func (t *memTx) UpdateDisputeTeam(_ context.Context, id uuid.UUID, expected int64, team string, at time.Time) error {
+	r, ok := t.s.Disputes[id]
+	if !ok || r.TenantID != t.tenant || r.Version != expected {
+		return application.ErrConflict
+	}
+	r.Team, r.Version, r.UpdatedAt = team, expected+1, at
+	t.s.Disputes[id] = r
+	return nil
+}
+
 func (t *memTx) AppendEvent(_ context.Context, id uuid.UUID, e application.EventRecord) error {
 	for _, existing := range t.s.Events[id] {
 		if existing.Seq == e.Seq {

@@ -153,6 +153,8 @@ type Tx interface {
 	GetTransaction(ctx context.Context, id uuid.UUID) (TransactionRecord, error)
 	InsertDispute(ctx context.Context, d DisputeRecord) error
 	GetDispute(ctx context.Context, id uuid.UUID) (DisputeRecord, error)
+	// UpdateDisputeTeam moves a dispute to another team under the same version check as a state change.
+	UpdateDisputeTeam(ctx context.Context, id uuid.UUID, expectedVersion int64, team string, at time.Time) error
 	// UpdateDisputeState applies a compare-and-set on version; ErrConflict when it no longer matches.
 	UpdateDisputeState(ctx context.Context, id uuid.UUID, expectedVersion int64, state domain.State, appeals int, at time.Time) error
 	AppendEvent(ctx context.Context, disputeID uuid.UUID, e EventRecord) error
