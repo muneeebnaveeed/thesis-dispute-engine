@@ -100,6 +100,9 @@ func Mount(mux *http.ServeMux, svc *application.Service, ready Readiness, opts .
 		return fmt.Errorf("disputehttp: load spec: %w", err)
 	}
 	spec.Servers = nil
+	if err := checkCoverage(spec); err != nil {
+		return err
+	}
 	h := &Handler{svc: svc, ready: ready}
 	for _, o := range opts {
 		o(h)
