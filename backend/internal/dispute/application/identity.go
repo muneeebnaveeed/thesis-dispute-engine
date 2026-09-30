@@ -80,6 +80,9 @@ func (s *Service) PutTenantLogo(ctx context.Context, img Image) (TenantProfile, 
 	}
 	var out TenantProfile
 	err := s.store.WithTx(ctx, func(tx Tx) error {
+		if _, err := s.authorize(ctx, tx, ActionManageBranding, nil); err != nil {
+			return err
+		}
 		now := s.now()
 		if err := tx.PutTenantLogo(ctx, img, now); err != nil {
 			return err

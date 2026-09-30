@@ -13,7 +13,6 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 	disputepg "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/postgres/pgtest"
-	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
 // Runs as dispute_api: the clocks are rows behind row-level security, the calendar comes from tenants.settings,
@@ -29,12 +28,9 @@ func TestDeadlinesThroughPostgres(t *testing.T) {
 	holiday := now.AddDate(0, 0, 1)    // Tuesday, for tenant A only
 	refundDueA := now.AddDate(0, 0, 2) // the holiday pushes one business day to Wednesday
 	refundDueB := now.AddDate(0, 0, 1) // tenant B has no calendar: Tuesday
-	svc, err := application.NewService(store, func() time.Time { return now })
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctxA := tenant.WithID(context.Background(), apptest.TenantA)
-	ctxB := tenant.WithID(context.Background(), apptest.TenantB)
+	svc := apptest.NewService(t, store, func() time.Time { return now })
+	ctxA := apptest.CtxFor(apptest.TenantA)
+	ctxB := apptest.CtxFor(apptest.TenantB)
 	txnA := seedFor(t, owner, apptest.TenantA, domain.RailCard, "EUR")
 	txnB := seedFor(t, owner, apptest.TenantB, domain.RailCard, "EUR")
 	settings := fmt.Sprintf(`{"timezone":"Europe/Budapest","holidays":[%q]}`, holiday.Format(time.DateOnly))

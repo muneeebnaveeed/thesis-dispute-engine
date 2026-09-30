@@ -20,7 +20,6 @@ import (
 	disputepg "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres/sqlcgen"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/postgres/pgtest"
-	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
 func seed(t *testing.T, pool *pgxpool.Pool, rail domain.Rail, currency string) uuid.UUID {
@@ -54,10 +53,7 @@ func seedFor(t *testing.T, pool *pgxpool.Pool, tenantID uuid.UUID, rail domain.R
 func newService(t *testing.T) (*application.Service, *pgxpool.Pool) {
 	t.Helper()
 	pool := pgtest.Pool(t)
-	svc, err := application.NewService(disputepg.NewStore(pool), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	svc := apptest.NewService(t, disputepg.NewStore(pool), nil)
 	return svc, pool
 }
 
@@ -66,7 +62,7 @@ func TestLifecycleRoundTripThroughPostgres(t *testing.T) {
 	ctx := apptest.Ctx()
 	txn := seed(t, pool, domain.RailCard, "EUR")
 
-	created, err := svc.CreateDispute(ctx, application.CreateDisputeInput{TransactionID: txn, Actor: "customer"})
+	created, err := svc.CreateDispute(ctx, application.CreateDisputeInput{TransactionID: txn})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +70,7 @@ func TestLifecycleRoundTripThroughPostgres(t *testing.T) {
 		t.Errorf("created = %+v", created.View)
 	}
 	for _, e := range []domain.Event{domain.EventOpenInvestigation, domain.EventIssueRefund, domain.EventFileChargeback} {
-		if _, err := svc.ApplyEvent(ctx, application.ApplyEventInput{DisputeID: created.View.ID, Event: e, Actor: "analyst:1"}); err != nil {
+		if _, err := svc.ApplyEvent(ctx, application.ApplyEventInput{DisputeID: created.View.ID, Event: e}); err != nil {
 			t.Fatalf("apply %s: %v", e, err)
 		}
 	}
@@ -249,12 +245,9 @@ func TestPurgeIdempotencyKeys(t *testing.T) {
 func TestListDisputesKeysetOrderUnderRLS(t *testing.T) {
 	owner, schema := pgtest.PoolWithSchema(t)
 	app := pgtest.AppPool(t, schema)
-	svc, err := application.NewService(disputepg.NewStore(app), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctxA := tenant.WithID(context.Background(), apptest.TenantA)
-	ctxB := tenant.WithID(context.Background(), apptest.TenantB)
+	svc := apptest.NewService(t, disputepg.NewStore(app), nil)
+	ctxA := apptest.CtxFor(apptest.TenantA)
+	ctxB := apptest.CtxFor(apptest.TenantB)
 	txnA := seedFor(t, owner, apptest.TenantA, domain.RailCard, "EUR")
 	txnB := seedFor(t, owner, apptest.TenantB, domain.RailCard, "EUR")
 	order := make([]uuid.UUID, 0, 7)

@@ -91,6 +91,7 @@ type DisputeEvent struct {
 	TraceID        *string
 	OccurredAt     time.Time
 	TenantID       uuid.UUID
+	ActorID        *string
 }
 
 type DisputesByState struct {

@@ -1,0 +1,21 @@
+entity Team;
+entity TeamRole in [TeamRole];
+entity Tenant;
+entity Analyst in [TeamRole] { id: String, leadOf: Set<Team>, tenantAdmin: Bool };
+entity TenantKey { profile: String };
+entity Dispute in [Team] {
+  team: Team,
+  amount: decimal,
+  currency: String,
+  rail: String,
+  state: String,
+  investigationOpenedBy: String,
+};
+
+action "OPEN_INVESTIGATION", "SEND_QUESTIONNAIRE", "RECEIVE_QUESTIONNAIRE", "ISSUE_REFUND", "FILE_CHARGEBACK",
+       "ACKNOWLEDGE_CHARGEBACK", "SUBMIT_EVIDENCE", "WIN_CHARGEBACK", "LOSE_CHARGEBACK", "ISSUE_FINAL_CREDIT",
+       "REVERSE_PROVISIONAL_CREDIT", "CLOSE", "APPEAL", "compose-email", "upload-attachment", "resend-notice",
+       "reassign"
+  appliesTo { principal: [Analyst, TenantKey], resource: [Dispute] };
+action "create" appliesTo { principal: [Analyst, TenantKey], resource: [Team] };
+action "manage-keys", "manage-templates", "manage-branding" appliesTo { principal: [Analyst, TenantKey], resource: [Tenant] };

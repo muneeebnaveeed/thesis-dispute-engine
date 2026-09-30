@@ -67,6 +67,9 @@ func (s *Service) ComposeEmail(ctx context.Context, in ComposeEmailInput) (Dispu
 		if err != nil {
 			return err
 		}
+		if err := s.authorizeDispute(ctx, tx, ActionComposeEmail, rec.ID); err != nil {
+			return err
+		}
 		tpl, err := tenantTemplate(ctx, tx, in.Template)
 		if err != nil {
 			return err
@@ -151,6 +154,9 @@ func (s *Service) Resend(ctx context.Context, in ResendInput) (DisputeView, erro
 	err := s.store.WithTx(ctx, func(tx Tx) error {
 		rec, err := tx.GetDispute(ctx, in.DisputeID)
 		if err != nil {
+			return err
+		}
+		if err := s.authorizeDispute(ctx, tx, ActionResendNotice, rec.ID); err != nil {
 			return err
 		}
 		orig, err := tx.GetNotice(ctx, rec.ID, in.NoticeID)
@@ -249,6 +255,9 @@ type TemplateSetting struct {
 func (s *Service) ListTemplateSettings(ctx context.Context) ([]TemplateSetting, error) {
 	var out []TemplateSetting
 	err := s.store.WithTx(ctx, func(tx Tx) error {
+		if _, err := s.authorize(ctx, tx, ActionManageTemplates, nil); err != nil {
+			return err
+		}
 		overrides, err := tx.TenantTemplates(ctx)
 		if err != nil {
 			return err
@@ -294,6 +303,9 @@ func (s *Service) PutTemplateSetting(ctx context.Context, kind domain.NoticeKind
 	}
 	now := s.now()
 	err = s.store.WithTx(ctx, func(tx Tx) error {
+		if _, err := s.authorize(ctx, tx, ActionManageTemplates, nil); err != nil {
+			return err
+		}
 		return tx.PutTenantTemplate(ctx, TenantTemplate{Kind: kind, Override: raw, UpdatedBy: actor, UpdatedAt: now})
 	})
 	return TemplateSetting{Base: base, Override: &o, Effective: effective, UpdatedBy: actor, UpdatedAt: &now}, err
@@ -305,6 +317,9 @@ func (s *Service) DeleteTemplateSetting(ctx context.Context, kind domain.NoticeK
 		return notice.ErrUnknownTemplate.WithDetail("%q", kind)
 	}
 	return s.store.WithTx(ctx, func(tx Tx) error {
+		if _, err := s.authorize(ctx, tx, ActionManageTemplates, nil); err != nil {
+			return err
+		}
 		found, err := tx.DeleteTenantTemplate(ctx, kind)
 		if err != nil {
 			return err

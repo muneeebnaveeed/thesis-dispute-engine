@@ -16,10 +16,7 @@ func clockService(t *testing.T) (*application.Service, *apptest.MemStore, *time.
 	t.Helper()
 	store := apptest.NewMemStore()
 	now := time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC) // a Monday
-	svc, err := application.NewService(store, func() time.Time { return now })
-	if err != nil {
-		t.Fatal(err)
-	}
+	svc := apptest.NewService(t, store, func() time.Time { return now })
 	return svc, store, &now
 }
 
@@ -27,7 +24,7 @@ func apply(t *testing.T, svc *application.Service, id uuid.UUID, events ...domai
 	t.Helper()
 	var v application.DisputeView
 	for _, e := range events {
-		res, err := svc.ApplyEvent(apptest.Ctx(), application.ApplyEventInput{DisputeID: id, Event: e, Actor: "analyst"})
+		res, err := svc.ApplyEvent(apptest.Ctx(), application.ApplyEventInput{DisputeID: id, Event: e})
 		if err != nil {
 			t.Fatalf("%s: %v", e, err)
 		}
@@ -51,7 +48,7 @@ func TestCreateStartsTheRegimeClocksInTheTenantCalendar(t *testing.T) {
 	store.Calendars[apptest.TenantA] = cal
 	txn := store.AddTransaction(domain.RailCard, "EUR", "EUR", "125.40")
 
-	res, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn, Actor: "customer"})
+	res, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn})
 	if err != nil {
 		t.Fatal(err)
 	}

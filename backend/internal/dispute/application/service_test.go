@@ -11,6 +11,7 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application/apptest"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/principal"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
@@ -18,10 +19,7 @@ func newService(t *testing.T) (*application.Service, *apptest.MemStore) {
 	t.Helper()
 	store := apptest.NewMemStore()
 	now := time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)
-	svc, err := application.NewService(store, func() time.Time { now = now.Add(time.Minute); return now })
-	if err != nil {
-		t.Fatal(err)
-	}
+	svc := apptest.NewService(t, store, func() time.Time { now = now.Add(time.Minute); return now })
 	return svc, store
 }
 
@@ -29,7 +27,7 @@ func TestCreateDerivesRegimeAndLogsOpened(t *testing.T) {
 	svc, store := newService(t)
 	txn := store.AddTransaction(domain.RailCard, "EUR", "EUR", "125.40")
 
-	res, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn, Actor: "customer"})
+	res, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,8 +65,9 @@ func TestApplyAdvancesVersionAndLog(t *testing.T) {
 	txn := store.AddTransaction(domain.RailCard, "USD", "USD", "50")
 	created, _ := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn})
 
-	res, err := svc.ApplyEvent(apptest.Ctx(), application.ApplyEventInput{
-		DisputeID: created.View.ID, Event: domain.EventOpenInvestigation, Actor: "analyst:1",
+	analyst := apptest.CtxAs(principal.Principal{Kind: principal.Analyst, ID: "sub-1", Display: "analyst:1"})
+	res, err := svc.ApplyEvent(analyst, application.ApplyEventInput{
+		DisputeID: created.View.ID, Event: domain.EventOpenInvestigation,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -80,8 +79,8 @@ func TestApplyAdvancesVersionAndLog(t *testing.T) {
 	if last.Seq != 2 || last.FromState != domain.StateInitiated || last.ToState != domain.StateInvestigating || last.Actor != "analyst:1" {
 		t.Errorf("event = %+v", last)
 	}
-	if string(last.Payload) != "{}" {
-		t.Errorf("payload = %s, want {}", last.Payload)
+	if want := `{"authorizedBy":["grant:general/junior/OPEN_INVESTIGATION"]}`; string(last.Payload) != want {
+		t.Errorf("payload = %s, want %s", last.Payload, want)
 	}
 }
 
@@ -154,13 +153,13 @@ func TestApplyRollsBackWhenTheLogRejectsTheEvent(t *testing.T) {
 
 func TestMemStoreScopesByTenant(t *testing.T) {
 	store := apptest.NewMemStore()
-	svc, _ := application.NewService(store, nil)
+	svc := apptest.NewService(t, store, nil)
 	txn := store.AddTransaction(domain.RailCard, "EUR", "EUR", "10.00")
 	created, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{TransactionID: txn})
 	if err != nil {
 		t.Fatal(err)
 	}
-	other := tenant.WithID(context.Background(), apptest.TenantB)
+	other := apptest.CtxFor(apptest.TenantB)
 	if _, err := svc.GetDispute(other, created.View.ID); !errors.Is(err, application.ErrNotFound) {
 		t.Errorf("cross-tenant read: err = %v", err)
 	}

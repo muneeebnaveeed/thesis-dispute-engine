@@ -23,12 +23,9 @@ func TestTenantIsolationUnderRLS(t *testing.T) {
 	owner, schema := pgtest.PoolWithSchema(t)
 	app := pgtest.AppPool(t, schema)
 	store := disputepg.NewStore(app)
-	svc, err := application.NewService(store, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctxA := tenant.WithID(context.Background(), apptest.TenantA)
-	ctxB := tenant.WithID(context.Background(), apptest.TenantB)
+	svc := apptest.NewService(t, store, nil)
+	ctxA := apptest.CtxFor(apptest.TenantA)
+	ctxB := apptest.CtxFor(apptest.TenantB)
 	txnA := seedFor(t, owner, apptest.TenantA, domain.RailCard, "EUR")
 	txnB := seedFor(t, owner, apptest.TenantB, domain.RailCard, "EUR")
 

@@ -3,6 +3,7 @@ module github.com/muneeebnaveeed/thesis-dispute-engine/backend
 go 1.27
 
 require (
+	github.com/cedar-policy/cedar-go v1.8.0
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/exaring/otelpgx v0.12.0
 	github.com/getkin/kin-openapi v0.149.0
@@ -69,6 +70,7 @@ require (
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.46.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	golang.org/x/exp v0.0.0-20240404231335-c0f41cb1a7a0 // indirect
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect

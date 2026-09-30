@@ -63,7 +63,7 @@ const Workbench = () => {
     })
   }
   const openDisputeMutation = useServerMutation(
-    (request: Output<typeof CreateDisputeRequest>) => openDispute({ data: { ...request, actor: 'analyst' } }),
+    (request: Output<typeof CreateDisputeRequest>) => openDispute({ data: request }),
     {
       invalidates: () => [disputeQuery(null).queryKey],
       onSuccess: (openedDispute) => {

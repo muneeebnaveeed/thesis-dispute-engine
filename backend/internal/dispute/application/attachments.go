@@ -58,7 +58,7 @@ func (s *Service) Upload(ctx context.Context, in UploadInput) (Attachment, error
 	a := Attachment{ID: id, DisputeID: in.DisputeID, Filename: in.Filename, ContentType: in.ContentType, Size: len(in.Content), Content: in.Content,
 		UploadedBy: in.Actor, UploadedAt: s.now()}
 	err = s.store.WithTx(ctx, func(tx Tx) error {
-		if _, err := tx.GetDispute(ctx, in.DisputeID); err != nil {
+		if err := s.authorizeDispute(ctx, tx, ActionUploadAttachment, in.DisputeID); err != nil {
 			return err
 		}
 		return tx.InsertAttachment(ctx, in.DisputeID, a)

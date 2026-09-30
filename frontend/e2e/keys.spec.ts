@@ -23,7 +23,7 @@ test('a tenant admin issues a key, the key works for that tenant, and revoking i
   expect(mine.status()).toBe(404)
   const created = await request.post(`${api}/disputes`, {
     headers: { Authorization: `Bearer ${secret}`, 'Idempotency-Key': crypto.randomUUID() },
-    data: { transactionId: '00000000-0000-8000-8000-000000000301', actor: 'e2e' },
+    data: { transactionId: '00000000-0000-8000-8000-000000000301' },
   })
   expect(created.status()).toBe(404)
 

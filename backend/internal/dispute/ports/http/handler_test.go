@@ -36,10 +36,7 @@ type api struct {
 func newAPI(t *testing.T, ready disputehttp.Readiness) api {
 	t.Helper()
 	store := apptest.NewMemStore()
-	svc, err := application.NewService(store, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	svc := apptest.NewService(t, store, nil)
 	mux := http.NewServeMux()
 	directory := memTenants{{ID: apptest.TenantA, Slug: "otp", Name: "OTP Bank", Issuer: "http://kc/realms/otp", EmailDomains: []string{"otpbank.hu"}}}
 	if err := disputehttp.Mount(mux, svc, ready, disputehttp.WithSessions(memSessions{}), disputehttp.WithTenants(directory), disputehttp.WithKeys(&memKeys{})); err != nil {
@@ -69,13 +66,13 @@ func analystHeader(next http.Handler) http.Handler {
 // keyResolver stands in for the tenant_keys table; the handler tests care about the contract, not the lookup.
 type keyResolver map[string]uuid.UUID
 
-func (k keyResolver) TenantForKeyHash(_ context.Context, hash []byte) (uuid.UUID, error) {
+func (k keyResolver) KeyForHash(_ context.Context, hash []byte) (auth.KeyIdentity, error) {
 	for key, id := range k {
 		if bytes.Equal(auth.HashKey(key), hash) {
-			return id, nil
+			return auth.KeyIdentity{Tenant: id, ID: uuid.NewSHA1(uuid.Nil, []byte(key)), Prefix: auth.Prefix(key)}, nil
 		}
 	}
-	return uuid.Nil, application.ErrNotFound
+	return auth.KeyIdentity{}, application.ErrNotFound
 }
 
 func (a api) do(method, path string, body any, headers map[string]string) (*httptest.ResponseRecorder, map[string]any) {
@@ -136,8 +133,13 @@ func TestCreateApplyGetRoundTrip(t *testing.T) {
 	}
 	events := applied["events"].([]any)
 	last := events[1].(map[string]any)
-	if last["actor"] != "analyst:7" || last["payload"].(map[string]any)["note"] != "looks odd" {
+	// the body's actor is ignored: the log names the caller, here tenant key key-a
+	if last["actor"] != "key:key-a" || last["payload"].(map[string]any)["note"] != "looks odd" {
 		t.Errorf("last event = %v", last)
+	}
+	stored := a.store.Events[uuid.MustParse(id)]
+	if got := stored[len(stored)-1].ActorID; got != uuid.NewSHA1(uuid.Nil, []byte("key-a")).String() {
+		t.Errorf("actor id = %q", got)
 	}
 
 	rec, got := a.do(http.MethodGet, "/disputes/"+id, nil, nil)

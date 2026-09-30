@@ -100,6 +100,9 @@ func Mount(mux *http.ServeMux, svc *application.Service, ready Readiness, opts .
 		return fmt.Errorf("disputehttp: load spec: %w", err)
 	}
 	spec.Servers = nil
+	if err := checkCoverage(spec); err != nil {
+		return err
+	}
 	h := &Handler{svc: svc, ready: ready}
 	for _, o := range opts {
 		o(h)
@@ -252,12 +255,12 @@ func keyView(r disputepg.KeyRecord, now time.Time) oapi.TenantKey {
 		ExpiresAt: r.ExpiresAt, RevokedAt: r.RevokedAt, Status: oapi.TenantKeyStatus(r.Status(now))}
 }
 
-// tenantAdmin is the guard shared by the key operations: an analyst token with the tenant-admin role, and a tenant.
+// tenantAdmin is the guard shared by the key operations: the engine's tenant-admin decision, and a tenant.
 func (h *Handler) tenantAdmin(ctx context.Context) (uuid.UUID, error) {
 	if h.keys == nil {
 		return uuid.Nil, application.ErrNotFound
 	}
-	if err := auth.RequireRole(ctx, auth.RoleTenantAdmin); err != nil {
+	if err := h.svc.Authorize(ctx, application.ActionManageKeys); err != nil {
 		return uuid.Nil, err
 	}
 	id, ok := tenant.IDFrom(ctx)
@@ -347,7 +350,6 @@ func (h *Handler) CreateDispute(ctx context.Context, req oapi.CreateDisputeReque
 	res, err := h.svc.CreateDispute(ctx, application.CreateDisputeInput{
 		TransactionID: req.Body.TransactionId,
 		Reason:        reason,
-		Actor:         orDefault(req.Body.Actor, "customer"),
 		Idempotency:   idempotency(req.Params.IdempotencyKey, body),
 		Suggestion:    suggestion,
 	})
@@ -579,9 +581,6 @@ func settingOf(s application.TemplateSetting) oapi.TemplateSetting {
 
 // ListTenantTemplates is the tenant admin's view of every analyst email kind.
 func (h *Handler) ListTenantTemplates(ctx context.Context, _ oapi.ListTenantTemplatesRequestObject) (oapi.ListTenantTemplatesResponseObject, error) {
-	if err := auth.RequireRole(ctx, auth.RoleTenantAdmin); err != nil {
-		return nil, err
-	}
 	settings, err := h.svc.ListTemplateSettings(ctx)
 	if err != nil {
 		return nil, err
@@ -595,9 +594,6 @@ func (h *Handler) ListTenantTemplates(ctx context.Context, _ oapi.ListTenantTemp
 
 // PutTenantTemplate stores the tenant's wording for one kind.
 func (h *Handler) PutTenantTemplate(ctx context.Context, req oapi.PutTenantTemplateRequestObject) (oapi.PutTenantTemplateResponseObject, error) {
-	if err := auth.RequireRole(ctx, auth.RoleTenantAdmin); err != nil {
-		return nil, err
-	}
 	principal, _ := auth.PrincipalFrom(ctx)
 	actor := principal.Email
 	if actor == "" {
@@ -635,9 +631,6 @@ func (h *Handler) PutTenantTemplate(ctx context.Context, req oapi.PutTenantTempl
 
 // DeleteTenantTemplate reverts one kind to the base wording.
 func (h *Handler) DeleteTenantTemplate(ctx context.Context, req oapi.DeleteTenantTemplateRequestObject) (oapi.DeleteTenantTemplateResponseObject, error) {
-	if err := auth.RequireRole(ctx, auth.RoleTenantAdmin); err != nil {
-		return nil, err
-	}
 	if err := h.svc.DeleteTemplateSetting(ctx, domain.NoticeKind(req.Kind)); err != nil {
 		if errors.Is(err, application.ErrNotFound) {
 			p := h.problem(ctx, "/tenant-templates/"+string(req.Kind), err, uuid.Nil)
@@ -752,7 +745,6 @@ func (h *Handler) ApplyDisputeEvent(ctx context.Context, req oapi.ApplyDisputeEv
 	res, err := h.svc.ApplyEvent(ctx, application.ApplyEventInput{
 		DisputeID:   id,
 		Event:       domain.Event(req.Body.Event),
-		Actor:       orDefault(req.Body.Actor, "system"),
 		Payload:     payload,
 		Idempotency: idempotency(req.Params.IdempotencyKey, body),
 	})
@@ -849,13 +841,6 @@ func idempotency(key *string, body []byte) application.Idempotency {
 		return application.Idempotency{}
 	}
 	return application.Idempotency{Key: *key, RequestBody: body}
-}
-
-func orDefault(s *string, d string) string {
-	if s == nil || *s == "" {
-		return d
-	}
-	return *s
 }
 
 func toAPI(v application.DisputeView) oapi.Dispute {
@@ -1015,9 +1000,6 @@ func (h *Handler) GetTenantLogo(ctx context.Context, _ oapi.GetTenantLogoRequest
 
 // PutTenantLogo replaces the organisation's logo.
 func (h *Handler) PutTenantLogo(ctx context.Context, req oapi.PutTenantLogoRequestObject) (oapi.PutTenantLogoResponseObject, error) {
-	if err := auth.RequireRole(ctx, auth.RoleTenantAdmin); err != nil {
-		return nil, err
-	}
 	img, err := readImagePart(req.Body)
 	if err != nil {
 		return nil, err

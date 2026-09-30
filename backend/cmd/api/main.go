@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/authz"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/mail"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/mockcore"
 	disputepg "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres"
@@ -88,8 +89,12 @@ func run(cfg config.Config, logger *slog.Logger) error {
 	if suggestions != nil {
 		logger.Info("typed decisions enabled", "model", suggestions.Model())
 	}
+	engine, err := authz.New(logger)
+	if err != nil {
+		return err
+	}
 	svc, err := application.NewService(store, nil, application.WithCore(cores), application.WithCoreTimeout(cfg.CoreTimeout),
-		application.WithDecisions(suggestions), application.WithAfterCommit(dispatcher.Kick))
+		application.WithDecisions(suggestions), application.WithAfterCommit(dispatcher.Kick), application.WithAuthorizer(engine))
 	if err != nil {
 		return err
 	}

@@ -15,7 +15,6 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/mockcore"
 	disputepg "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/postgres/pgtest"
-	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
 // The tenant's core comes from its settings row, the receipt lands on the ledger row, and a decline leaves no row.
@@ -23,12 +22,9 @@ func TestCoreReceiptsThroughPostgres(t *testing.T) {
 	owner, schema := pgtest.PoolWithSchema(t)
 	app := pgtest.AppPool(t, schema)
 	core := mockcore.New(slog.New(slog.NewTextHandler(io.Discard, nil)))
-	svc, err := application.NewService(disputepg.NewStore(app), nil,
+	svc := apptest.NewService(t, disputepg.NewStore(app), nil,
 		application.WithCore(application.CoreRouter{Adapters: map[string]application.BankingCore{mockcore.Kind: core}}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx := tenant.WithID(context.Background(), apptest.TenantA)
+	ctx := apptest.CtxFor(apptest.TenantA)
 	txn := seedFor(t, owner, apptest.TenantA, domain.RailCard, "EUR")
 	if _, err := owner.Exec(context.Background(),
 		`UPDATE tenants SET settings = settings || '{"core":{"kind":"mock","declineAbove":"100"}}' WHERE id = $1`, apptest.TenantA); err != nil {

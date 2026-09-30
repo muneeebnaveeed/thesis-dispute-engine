@@ -12,10 +12,7 @@ import (
 
 func serviceWithDecisions(t *testing.T, d application.Decisions) *application.Service {
 	t.Helper()
-	svc, err := application.NewService(apptest.NewMemStore(), nil, application.WithDecisions(d))
-	if err != nil {
-		t.Fatal(err)
-	}
+	svc := apptest.NewService(t, apptest.NewMemStore(), nil, application.WithDecisions(d))
 	return svc
 }
 
@@ -91,13 +88,10 @@ func TestOpenedEventRecordsTheSuggestionBesideTheChoice(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			store := apptest.NewMemStore()
-			svc, err := application.NewService(store, nil)
-			if err != nil {
-				t.Fatal(err)
-			}
+			svc := apptest.NewService(t, store, nil)
 			txn := store.AddTransaction("CARD", "EUR", "EUR", "42.00")
 			res, err := svc.CreateDispute(apptest.Ctx(), application.CreateDisputeInput{
-				TransactionID: txn, Reason: tc.chosen, Actor: "analyst", Suggestion: tc.proposal,
+				TransactionID: txn, Reason: tc.chosen, Suggestion: tc.proposal,
 			})
 			if err != nil {
 				t.Fatal(err)

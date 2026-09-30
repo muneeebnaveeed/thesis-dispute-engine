@@ -53,12 +53,12 @@ SET state = $2, appeals = $3, version = version + 1, updated_at = $4
 WHERE id = $1 AND version = $5;
 
 -- name: InsertDisputeEvent :one
-INSERT INTO dispute_events (dispute_id, seq, event, from_state, to_state, actor, payload, idempotency_key, trace_id, occurred_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+INSERT INTO dispute_events (dispute_id, seq, event, from_state, to_state, actor, payload, idempotency_key, trace_id, occurred_at, actor_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 RETURNING id;
 
 -- name: ListDisputeEvents :many
-SELECT id, dispute_id, seq, event, from_state, to_state, actor, payload, idempotency_key, trace_id, occurred_at
+SELECT id, dispute_id, seq, event, from_state, to_state, actor, payload, idempotency_key, trace_id, occurred_at, actor_id
 FROM dispute_events
 WHERE dispute_id = $1
 ORDER BY seq;
@@ -82,7 +82,7 @@ SELECT tenant_id, regime, state, n FROM disputes_by_state;
 INSERT INTO tenant_keys (id, tenant_id, key_hash, prefix, label, expires_at) VALUES ($1, $2, $3, $4, $5, $6);
 
 -- name: GetTenantByTenantKeyHash :one
-SELECT k.id, k.tenant_id FROM tenant_keys k
+SELECT k.id, k.tenant_id, k.prefix FROM tenant_keys k
 JOIN tenants t ON t.id = k.tenant_id AND t.disabled_at IS NULL
 WHERE k.key_hash = $1 AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at > now());
 

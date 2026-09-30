@@ -64,7 +64,6 @@ void _SuspenseSettlement
 
 export const ApplyEventRequest = Type.Object({
   event: DisputeEvent,
-  actor: Type.Optional(Type.String({ default: 'system' })),
   payload: Type.Optional(
     Type.Object(
       {
@@ -171,9 +170,6 @@ void _CoreReceipt
 export const CreateDisputeRequest = Type.Object({
   transactionId: Type.String({ format: 'uuid' }),
   reason: Type.Optional(DisputeReason),
-  actor: Type.Optional(
-    Type.String({ description: 'Who opened it; defaults to customer.', default: 'customer' }),
-  ),
   suggestion: Type.Optional(AcceptedSuggestion),
 })
 export type CreateDisputeRequest = Static<typeof CreateDisputeRequest>

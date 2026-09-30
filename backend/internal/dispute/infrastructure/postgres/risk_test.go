@@ -11,18 +11,14 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 	disputepg "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/postgres/pgtest"
-	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
 // Account history is counted within the tenant, the MCC comes from the transaction, and assessments persist.
 func TestRiskThroughPostgres(t *testing.T) {
 	owner, schema := pgtest.PoolWithSchema(t)
 	app := pgtest.AppPool(t, schema)
-	svc, err := application.NewService(disputepg.NewStore(app), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctxA := tenant.WithID(context.Background(), apptest.TenantA)
+	svc := apptest.NewService(t, disputepg.NewStore(app), nil)
+	ctxA := apptest.CtxFor(apptest.TenantA)
 	txn := seedFor(t, owner, apptest.TenantA, domain.RailCard, "EUR")
 	if _, err := owner.Exec(context.Background(), `UPDATE transactions SET mcc = '5815' WHERE id = $1`, txn); err != nil {
 		t.Fatal(err)

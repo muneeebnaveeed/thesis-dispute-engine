@@ -12,5 +12,6 @@ Fixed early so the text can be written against them. Format to be applied in the
 8. Kleppmann, M. (2017). Designing Data-Intensive Applications. O'Reilly. (idempotency, logs, isolation)
 9. PostgreSQL Global Development Group. PostgreSQL 18 Documentation: Row Security Policies.
 10. OpenTelemetry Authors. OpenTelemetry Specification, semantic conventions for HTTP and database spans.
+11. Cutler, J. W. et al. (2024). Cedar: A New Language for Expressive, Fast, Safe, and Analyzable Authorization. PACMPL 8 (OOPSLA1).
 
 Reserve: Nygard, M. (2007). Release It! (for the error taxonomy and retry semantics), only if one of the above is dropped.

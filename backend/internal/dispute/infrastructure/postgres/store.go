@@ -21,6 +21,7 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres/sqlcgen"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/principal"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/telemetry"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
@@ -174,6 +175,14 @@ func (t *txn) GetTransaction(ctx context.Context, id uuid.UUID) (application.Tra
 	}, nil
 }
 
+// nonEmpty stores an absent value as NULL rather than an empty string.
+func nonEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
 func derefString(p *string) string {
 	if p == nil {
 		return ""
@@ -198,7 +207,7 @@ func (t *txn) GetDispute(ctx context.Context, id uuid.UUID) (application.Dispute
 		ID: row.ID, TenantID: row.TenantID, Regime: domain.Regime(row.Regime), State: domain.State(row.State), Appeals: int(row.Appeals),
 		Version: row.Version, TransactionID: row.TransactionID, AccountID: row.AccountID,
 		DisputedAmount: row.DisputedAmount, Currency: row.Currency, OpenedAt: row.OpenedAt, UpdatedAt: row.UpdatedAt,
-		Reason: domain.Reason(row.Reason),
+		Reason: domain.Reason(row.Reason), Team: application.DefaultTeam,
 	}, nil
 }
 
@@ -215,11 +224,16 @@ func (t *txn) UpdateDisputeState(ctx context.Context, id uuid.UUID, expectedVers
 	return nil
 }
 
+// Access implements application.Tx; every tenant has the default access until its teams are stored.
+func (t *txn) Access(_ context.Context, p principal.Principal) (application.Access, error) {
+	return application.DefaultAccess(p), nil
+}
+
 func (t *txn) AppendEvent(ctx context.Context, disputeID uuid.UUID, e application.EventRecord) error {
 	_, err := t.q.InsertDisputeEvent(ctx, sqlcgen.InsertDisputeEventParams{
 		DisputeID: disputeID, Seq: int32Of(e.Seq), Event: string(e.Event), FromState: string(e.FromState),
 		ToState: string(e.ToState), Actor: e.Actor, Payload: e.Payload, IdempotencyKey: e.IdempotencyKey,
-		TraceID: e.TraceID, OccurredAt: e.OccurredAt,
+		TraceID: e.TraceID, OccurredAt: e.OccurredAt, ActorID: nonEmpty(e.ActorID),
 	})
 	return mapErr(err)
 }
@@ -233,7 +247,7 @@ func (t *txn) ListEvents(ctx context.Context, disputeID uuid.UUID) ([]applicatio
 	for _, r := range rows {
 		out = append(out, application.EventRecord{
 			Seq: int(r.Seq), Event: domain.Event(r.Event), FromState: domain.State(r.FromState), ToState: domain.State(r.ToState),
-			Actor: r.Actor, Payload: r.Payload, IdempotencyKey: r.IdempotencyKey, TraceID: r.TraceID, OccurredAt: r.OccurredAt,
+			Actor: r.Actor, ActorID: derefString(r.ActorID), Payload: r.Payload, IdempotencyKey: r.IdempotencyKey, TraceID: r.TraceID, OccurredAt: r.OccurredAt,
 		})
 	}
 	return out, nil

@@ -15,7 +15,6 @@ import (
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
 	disputepg "github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/infrastructure/postgres"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/postgres/pgtest"
-	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
 // As dispute_api: bytes round-trip, a claim binds only this dispute's drafts, the dispatcher reads files across
@@ -24,11 +23,8 @@ func TestAttachmentsThroughPostgres(t *testing.T) {
 	owner, schema := pgtest.PoolWithSchema(t)
 	app := pgtest.AppPool(t, schema)
 	store := disputepg.NewStore(app)
-	svc, err := application.NewService(store, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctxA := tenant.WithID(context.Background(), apptest.TenantA)
+	svc := apptest.NewService(t, store, nil)
+	ctxA := apptest.CtxFor(apptest.TenantA)
 	txn := seedFor(t, owner, apptest.TenantA, domain.RailCard, "EUR")
 	d1, _ := svc.CreateDispute(ctxA, application.CreateDisputeInput{TransactionID: txn})
 	d2, _ := svc.CreateDispute(ctxA, application.CreateDisputeInput{TransactionID: txn})
