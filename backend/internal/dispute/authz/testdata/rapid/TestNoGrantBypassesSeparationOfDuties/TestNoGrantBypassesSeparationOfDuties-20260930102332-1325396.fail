@@ -1,0 +1,57 @@
+# 2026/09/30 10:23:32.918869 [TestNoGrantBypassesSeparationOfDuties] [rapid] draw teams: []string{"bccj"}
+# 2026/09/30 10:23:32.918883 [TestNoGrantBypassesSeparationOfDuties] [rapid] draw grants: []application.Grant{}
+# 2026/09/30 10:23:32.918887 [TestNoGrantBypassesSeparationOfDuties] [rapid] draw members: []application.Membership{application.Membership{Team:"bccj", Role:"senior"}, application.Membership{Team:"bccj", Role:"senior"}, application.Membership{Team:"bccj", Role:"junior"}, application.Membership{Team:"bccj", Role:"senior"}}
+# 2026/09/30 10:23:32.918894 [TestNoGrantBypassesSeparationOfDuties] [rapid] draw version: 3
+# 2026/09/30 10:23:32.918895 [TestNoGrantBypassesSeparationOfDuties] [rapid] draw disputeTeam: "bccj"
+# 2026/09/30 10:23:32.918896 [TestNoGrantBypassesSeparationOfDuties] [rapid] draw amount: 124
+# 
+v0.4.8#11143357551937689799
+0x1245026cdfd1c8
+0x1b6e366a5ea77e
+0x0
+0xf98201ebf9a43
+0x1
+0xd784b6123219a
+0x0
+0x617a9b8cc2333
+0x2
+0xdef21e6c97ac7
+0x0
+0x4fa3a41049ca2
+0x2
+0x1e3be116ea7ebd
+0x0
+0xd5da76c449f6e
+0x9
+0x84fcd1d777ef9
+0x1c310b0ed16ec
+0x5c74d47cf1c4
+0x154bda37f05203
+0x141942efae2dca
+0x0
+0x1bd49b9da2262a
+0x1
+0xe1c205c1d3ff2
+0xdfebeb45400b7
+0x0
+0xd50dd97a27d32
+0x1
+0x1313c4e9fbbcc5
+0x1a6a5495603894
+0x0
+0x3391abd21b870
+0x0
+0x1f556845f173b3
+0x156a8aeb1cf81c
+0x0
+0x21199a79cae99
+0x1
+0x16f5cd32c59bbd
+0x51392ac6df4f6
+0x507f26bbd74ff
+0x3
+0xe5ddb294fa315
+0x0
+0x10562b39b1bba
+0x108b0f19d78b29
+0x7b

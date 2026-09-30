@@ -297,6 +297,37 @@ replayed response is never handed to someone the engine did not authorize, and t
 refuses to start if any operation in its contract has not been classified as public, internal,
 open to any caller of the tenant, or decided by the engine.
 
+% Distils ADR 0027.
+\subsection{Teams, grants and a second line}
+\label{sec:design-teams}
+
+A dispute belongs to one team, chosen when it opens by the first routing rule that matches its
+rail, reason and amount, and otherwise by the tenant's default team. Inside a team a person holds
+one rung of a fixed ladder, junior, senior or lead, and the ladder is expressed in Cedar's own
+hierarchy: a lead is a member of senior, which is a member of junior, so a grant to juniors reaches
+every rung above without any role logic in code. Teams, memberships, grants and routing are rows,
+and any change to them advances a version that invalidates the tenant's compiled policies on the
+next request. The rows are what a tenant administrator will one day edit, and the argument of the
+previous paragraphs is what makes that safe: grants compile only to permissions bounded by their
+team, while everything that must always hold is a prohibition in the binary. Generated sets of
+arbitrary grants confirm the three properties that matter, that no set lets an investigator pay
+out their own dispute, reaches a dispute outside the caller's teams, or administers the tenant;
+removing the separation-of-duties rule makes the first of them fail, which is the evidence the
+property can fail at all.
+
+Team scope is enforced twice. Beside the policy decision, row-level security narrows every read to
+the caller's teams, so a check forgotten in a handler still cannot show one team another's work,
+and a dispute outside those teams answers as if it did not exist. The policies are restrictive
+rather than permissive, a distinction with teeth: PostgreSQL combines permissive policies with
+\emph{or}, so a permissive team policy beside tenant isolation would have widened what a caller
+sees rather than narrowed it \cite{pgrls}. The two lines disagree in one place by design.
+Reassigning a dispute to a team the lead is not in cannot pass a row policy, because an update's
+new row must also be readable by the caller; that single move therefore runs as the owner,
+bounded to the caller's tenant, current membership and the version they read, after the policy
+engine has allowed it. The cost of all this is small beside a database round trip: a decision
+against a cached policy set takes about 25 microseconds on the development machine, and
+recompiling a tenant's policies after a change about 0.3 milliseconds.
+
 % Distils ADR 0017.
 \section{Communications}
 \label{sec:design-communications}

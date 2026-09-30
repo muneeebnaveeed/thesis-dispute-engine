@@ -73,7 +73,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # a cold Cedar CLI build takes several minutes; cached, it takes none
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: backend
@@ -104,6 +105,15 @@ jobs:
           install-mode: binary
           # The action would run the linter itself; the lint step does that.
           args: --help
+      - name: Cache Cedar CLI
+        id: cedar-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cargo/bin/cedar
+          key: cedar-cli-${{ runner.os }}-4.13.0
+      - name: Install Cedar CLI
+        if: steps.cedar-cache.outputs.cache-hit != 'true'
+        run: cargo install cedar-policy-cli --version 4.13.0 --locked
       - name: format
         run: golangci-lint fmt --diff
       - name: generate
@@ -121,6 +131,9 @@ jobs:
       - name: vuln
         if: ${{ !cancelled() }}
         run: go tool govulncheck ./...
+      - name: policies
+        if: ${{ !cancelled() }}
+        run: ../scripts/validate-policies
 
   backend-test:
     name: backend test

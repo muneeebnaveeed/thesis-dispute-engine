@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 
 	"github.com/cedar-policy/cedar-go"
@@ -89,6 +90,8 @@ func (e *Engine) Decide(tenantID uuid.UUID, p principal.Principal, a application
 	for _, r := range diag.Reasons {
 		out.Policies = append(out.Policies, string(r.PolicyID))
 	}
+	// Cedar reports reasons in map order; sorted, the 403 detail and the logged authorizedBy are stable
+	slices.Sort(out.Policies)
 	if len(diag.Errors) > 0 {
 		return application.Decision{Policies: out.Policies}, fmt.Errorf("authz: evaluation: %v", diag.Errors)
 	}

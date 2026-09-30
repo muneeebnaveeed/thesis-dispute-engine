@@ -1,0 +1,525 @@
+team=general rel=own role=none action=create amount=- -> deny 
+team=general rel=own role=none action=OPEN_INVESTIGATION amount=100.00 -> deny 
+team=general rel=own role=none action=OPEN_INVESTIGATION amount=900.00 -> deny 
+team=general rel=own role=none action=SEND_QUESTIONNAIRE amount=100.00 -> deny 
+team=general rel=own role=none action=SEND_QUESTIONNAIRE amount=900.00 -> deny 
+team=general rel=own role=none action=RECEIVE_QUESTIONNAIRE amount=100.00 -> deny 
+team=general rel=own role=none action=RECEIVE_QUESTIONNAIRE amount=900.00 -> deny 
+team=general rel=own role=none action=ISSUE_REFUND amount=100.00 -> deny 
+team=general rel=own role=none action=ISSUE_REFUND amount=900.00 -> deny 
+team=general rel=own role=none action=FILE_CHARGEBACK amount=100.00 -> deny 
+team=general rel=own role=none action=FILE_CHARGEBACK amount=900.00 -> deny 
+team=general rel=own role=none action=ACKNOWLEDGE_CHARGEBACK amount=100.00 -> deny 
+team=general rel=own role=none action=ACKNOWLEDGE_CHARGEBACK amount=900.00 -> deny 
+team=general rel=own role=none action=SUBMIT_EVIDENCE amount=100.00 -> deny 
+team=general rel=own role=none action=SUBMIT_EVIDENCE amount=900.00 -> deny 
+team=general rel=own role=none action=WIN_CHARGEBACK amount=100.00 -> deny 
+team=general rel=own role=none action=WIN_CHARGEBACK amount=900.00 -> deny 
+team=general rel=own role=none action=LOSE_CHARGEBACK amount=100.00 -> deny 
+team=general rel=own role=none action=LOSE_CHARGEBACK amount=900.00 -> deny 
+team=general rel=own role=none action=ISSUE_FINAL_CREDIT amount=100.00 -> deny 
+team=general rel=own role=none action=ISSUE_FINAL_CREDIT amount=900.00 -> deny 
+team=general rel=own role=none action=REVERSE_PROVISIONAL_CREDIT amount=100.00 -> deny 
+team=general rel=own role=none action=REVERSE_PROVISIONAL_CREDIT amount=900.00 -> deny 
+team=general rel=own role=none action=CLOSE amount=100.00 -> deny 
+team=general rel=own role=none action=CLOSE amount=900.00 -> deny 
+team=general rel=own role=none action=APPEAL amount=100.00 -> deny 
+team=general rel=own role=none action=APPEAL amount=900.00 -> deny 
+team=general rel=own role=none action=compose-email amount=100.00 -> deny 
+team=general rel=own role=none action=compose-email amount=900.00 -> deny 
+team=general rel=own role=none action=upload-attachment amount=100.00 -> deny 
+team=general rel=own role=none action=upload-attachment amount=900.00 -> deny 
+team=general rel=own role=none action=resend-notice amount=100.00 -> deny 
+team=general rel=own role=none action=resend-notice amount=900.00 -> deny 
+team=general rel=own role=none action=reassign amount=100.00 -> deny reassign-leads-only
+team=general rel=own role=none action=reassign amount=900.00 -> deny reassign-leads-only
+team=general rel=own role=junior action=create amount=- -> allow grant:general/junior/create
+team=general rel=own role=junior action=OPEN_INVESTIGATION amount=100.00 -> allow grant:general/junior/OPEN_INVESTIGATION
+team=general rel=own role=junior action=OPEN_INVESTIGATION amount=900.00 -> allow grant:general/junior/OPEN_INVESTIGATION
+team=general rel=own role=junior action=SEND_QUESTIONNAIRE amount=100.00 -> allow grant:general/junior/SEND_QUESTIONNAIRE
+team=general rel=own role=junior action=SEND_QUESTIONNAIRE amount=900.00 -> allow grant:general/junior/SEND_QUESTIONNAIRE
+team=general rel=own role=junior action=RECEIVE_QUESTIONNAIRE amount=100.00 -> allow grant:general/junior/RECEIVE_QUESTIONNAIRE
+team=general rel=own role=junior action=RECEIVE_QUESTIONNAIRE amount=900.00 -> allow grant:general/junior/RECEIVE_QUESTIONNAIRE
+team=general rel=own role=junior action=ISSUE_REFUND amount=100.00 -> allow grant:general/junior/ISSUE_REFUND
+team=general rel=own role=junior action=ISSUE_REFUND amount=900.00 -> allow grant:general/junior/ISSUE_REFUND
+team=general rel=own role=junior action=FILE_CHARGEBACK amount=100.00 -> allow grant:general/junior/FILE_CHARGEBACK
+team=general rel=own role=junior action=FILE_CHARGEBACK amount=900.00 -> allow grant:general/junior/FILE_CHARGEBACK
+team=general rel=own role=junior action=ACKNOWLEDGE_CHARGEBACK amount=100.00 -> allow grant:general/junior/ACKNOWLEDGE_CHARGEBACK
+team=general rel=own role=junior action=ACKNOWLEDGE_CHARGEBACK amount=900.00 -> allow grant:general/junior/ACKNOWLEDGE_CHARGEBACK
+team=general rel=own role=junior action=SUBMIT_EVIDENCE amount=100.00 -> allow grant:general/junior/SUBMIT_EVIDENCE
+team=general rel=own role=junior action=SUBMIT_EVIDENCE amount=900.00 -> allow grant:general/junior/SUBMIT_EVIDENCE
+team=general rel=own role=junior action=WIN_CHARGEBACK amount=100.00 -> allow grant:general/junior/WIN_CHARGEBACK
+team=general rel=own role=junior action=WIN_CHARGEBACK amount=900.00 -> allow grant:general/junior/WIN_CHARGEBACK
+team=general rel=own role=junior action=LOSE_CHARGEBACK amount=100.00 -> allow grant:general/junior/LOSE_CHARGEBACK
+team=general rel=own role=junior action=LOSE_CHARGEBACK amount=900.00 -> allow grant:general/junior/LOSE_CHARGEBACK
+team=general rel=own role=junior action=ISSUE_FINAL_CREDIT amount=100.00 -> allow grant:general/junior/ISSUE_FINAL_CREDIT
+team=general rel=own role=junior action=ISSUE_FINAL_CREDIT amount=900.00 -> allow grant:general/junior/ISSUE_FINAL_CREDIT
+team=general rel=own role=junior action=REVERSE_PROVISIONAL_CREDIT amount=100.00 -> allow grant:general/junior/REVERSE_PROVISIONAL_CREDIT
+team=general rel=own role=junior action=REVERSE_PROVISIONAL_CREDIT amount=900.00 -> allow grant:general/junior/REVERSE_PROVISIONAL_CREDIT
+team=general rel=own role=junior action=CLOSE amount=100.00 -> allow grant:general/junior/CLOSE
+team=general rel=own role=junior action=CLOSE amount=900.00 -> allow grant:general/junior/CLOSE
+team=general rel=own role=junior action=APPEAL amount=100.00 -> allow grant:general/junior/APPEAL
+team=general rel=own role=junior action=APPEAL amount=900.00 -> allow grant:general/junior/APPEAL
+team=general rel=own role=junior action=compose-email amount=100.00 -> allow grant:general/junior/compose-email
+team=general rel=own role=junior action=compose-email amount=900.00 -> allow grant:general/junior/compose-email
+team=general rel=own role=junior action=upload-attachment amount=100.00 -> allow grant:general/junior/upload-attachment
+team=general rel=own role=junior action=upload-attachment amount=900.00 -> allow grant:general/junior/upload-attachment
+team=general rel=own role=junior action=resend-notice amount=100.00 -> allow grant:general/junior/resend-notice
+team=general rel=own role=junior action=resend-notice amount=900.00 -> allow grant:general/junior/resend-notice
+team=general rel=own role=junior action=reassign amount=100.00 -> deny reassign-leads-only
+team=general rel=own role=junior action=reassign amount=900.00 -> deny reassign-leads-only
+team=general rel=own role=senior action=create amount=- -> allow grant:general/junior/create
+team=general rel=own role=senior action=OPEN_INVESTIGATION amount=100.00 -> allow grant:general/junior/OPEN_INVESTIGATION
+team=general rel=own role=senior action=OPEN_INVESTIGATION amount=900.00 -> allow grant:general/junior/OPEN_INVESTIGATION
+team=general rel=own role=senior action=SEND_QUESTIONNAIRE amount=100.00 -> allow grant:general/junior/SEND_QUESTIONNAIRE
+team=general rel=own role=senior action=SEND_QUESTIONNAIRE amount=900.00 -> allow grant:general/junior/SEND_QUESTIONNAIRE
+team=general rel=own role=senior action=RECEIVE_QUESTIONNAIRE amount=100.00 -> allow grant:general/junior/RECEIVE_QUESTIONNAIRE
+team=general rel=own role=senior action=RECEIVE_QUESTIONNAIRE amount=900.00 -> allow grant:general/junior/RECEIVE_QUESTIONNAIRE
+team=general rel=own role=senior action=ISSUE_REFUND amount=100.00 -> allow grant:general/junior/ISSUE_REFUND
+team=general rel=own role=senior action=ISSUE_REFUND amount=900.00 -> allow grant:general/junior/ISSUE_REFUND
+team=general rel=own role=senior action=FILE_CHARGEBACK amount=100.00 -> allow grant:general/junior/FILE_CHARGEBACK
+team=general rel=own role=senior action=FILE_CHARGEBACK amount=900.00 -> allow grant:general/junior/FILE_CHARGEBACK
+team=general rel=own role=senior action=ACKNOWLEDGE_CHARGEBACK amount=100.00 -> allow grant:general/junior/ACKNOWLEDGE_CHARGEBACK
+team=general rel=own role=senior action=ACKNOWLEDGE_CHARGEBACK amount=900.00 -> allow grant:general/junior/ACKNOWLEDGE_CHARGEBACK
+team=general rel=own role=senior action=SUBMIT_EVIDENCE amount=100.00 -> allow grant:general/junior/SUBMIT_EVIDENCE
+team=general rel=own role=senior action=SUBMIT_EVIDENCE amount=900.00 -> allow grant:general/junior/SUBMIT_EVIDENCE
+team=general rel=own role=senior action=WIN_CHARGEBACK amount=100.00 -> allow grant:general/junior/WIN_CHARGEBACK
+team=general rel=own role=senior action=WIN_CHARGEBACK amount=900.00 -> allow grant:general/junior/WIN_CHARGEBACK
+team=general rel=own role=senior action=LOSE_CHARGEBACK amount=100.00 -> allow grant:general/junior/LOSE_CHARGEBACK
+team=general rel=own role=senior action=LOSE_CHARGEBACK amount=900.00 -> allow grant:general/junior/LOSE_CHARGEBACK
+team=general rel=own role=senior action=ISSUE_FINAL_CREDIT amount=100.00 -> allow grant:general/junior/ISSUE_FINAL_CREDIT
+team=general rel=own role=senior action=ISSUE_FINAL_CREDIT amount=900.00 -> allow grant:general/junior/ISSUE_FINAL_CREDIT
+team=general rel=own role=senior action=REVERSE_PROVISIONAL_CREDIT amount=100.00 -> allow grant:general/junior/REVERSE_PROVISIONAL_CREDIT
+team=general rel=own role=senior action=REVERSE_PROVISIONAL_CREDIT amount=900.00 -> allow grant:general/junior/REVERSE_PROVISIONAL_CREDIT
+team=general rel=own role=senior action=CLOSE amount=100.00 -> allow grant:general/junior/CLOSE
+team=general rel=own role=senior action=CLOSE amount=900.00 -> allow grant:general/junior/CLOSE
+team=general rel=own role=senior action=APPEAL amount=100.00 -> allow grant:general/junior/APPEAL
+team=general rel=own role=senior action=APPEAL amount=900.00 -> allow grant:general/junior/APPEAL
+team=general rel=own role=senior action=compose-email amount=100.00 -> allow grant:general/junior/compose-email
+team=general rel=own role=senior action=compose-email amount=900.00 -> allow grant:general/junior/compose-email
+team=general rel=own role=senior action=upload-attachment amount=100.00 -> allow grant:general/junior/upload-attachment
+team=general rel=own role=senior action=upload-attachment amount=900.00 -> allow grant:general/junior/upload-attachment
+team=general rel=own role=senior action=resend-notice amount=100.00 -> allow grant:general/junior/resend-notice
+team=general rel=own role=senior action=resend-notice amount=900.00 -> allow grant:general/junior/resend-notice
+team=general rel=own role=senior action=reassign amount=100.00 -> deny reassign-leads-only
+team=general rel=own role=senior action=reassign amount=900.00 -> deny reassign-leads-only
+team=general rel=own role=lead action=create amount=- -> allow grant:general/junior/create
+team=general rel=own role=lead action=OPEN_INVESTIGATION amount=100.00 -> allow grant:general/junior/OPEN_INVESTIGATION
+team=general rel=own role=lead action=OPEN_INVESTIGATION amount=900.00 -> allow grant:general/junior/OPEN_INVESTIGATION
+team=general rel=own role=lead action=SEND_QUESTIONNAIRE amount=100.00 -> allow grant:general/junior/SEND_QUESTIONNAIRE
+team=general rel=own role=lead action=SEND_QUESTIONNAIRE amount=900.00 -> allow grant:general/junior/SEND_QUESTIONNAIRE
+team=general rel=own role=lead action=RECEIVE_QUESTIONNAIRE amount=100.00 -> allow grant:general/junior/RECEIVE_QUESTIONNAIRE
+team=general rel=own role=lead action=RECEIVE_QUESTIONNAIRE amount=900.00 -> allow grant:general/junior/RECEIVE_QUESTIONNAIRE
+team=general rel=own role=lead action=ISSUE_REFUND amount=100.00 -> allow grant:general/junior/ISSUE_REFUND
+team=general rel=own role=lead action=ISSUE_REFUND amount=900.00 -> allow grant:general/junior/ISSUE_REFUND
+team=general rel=own role=lead action=FILE_CHARGEBACK amount=100.00 -> allow grant:general/junior/FILE_CHARGEBACK
+team=general rel=own role=lead action=FILE_CHARGEBACK amount=900.00 -> allow grant:general/junior/FILE_CHARGEBACK
+team=general rel=own role=lead action=ACKNOWLEDGE_CHARGEBACK amount=100.00 -> allow grant:general/junior/ACKNOWLEDGE_CHARGEBACK
+team=general rel=own role=lead action=ACKNOWLEDGE_CHARGEBACK amount=900.00 -> allow grant:general/junior/ACKNOWLEDGE_CHARGEBACK
+team=general rel=own role=lead action=SUBMIT_EVIDENCE amount=100.00 -> allow grant:general/junior/SUBMIT_EVIDENCE
+team=general rel=own role=lead action=SUBMIT_EVIDENCE amount=900.00 -> allow grant:general/junior/SUBMIT_EVIDENCE
+team=general rel=own role=lead action=WIN_CHARGEBACK amount=100.00 -> allow grant:general/junior/WIN_CHARGEBACK
+team=general rel=own role=lead action=WIN_CHARGEBACK amount=900.00 -> allow grant:general/junior/WIN_CHARGEBACK
+team=general rel=own role=lead action=LOSE_CHARGEBACK amount=100.00 -> allow grant:general/junior/LOSE_CHARGEBACK
+team=general rel=own role=lead action=LOSE_CHARGEBACK amount=900.00 -> allow grant:general/junior/LOSE_CHARGEBACK
+team=general rel=own role=lead action=ISSUE_FINAL_CREDIT amount=100.00 -> allow grant:general/junior/ISSUE_FINAL_CREDIT
+team=general rel=own role=lead action=ISSUE_FINAL_CREDIT amount=900.00 -> allow grant:general/junior/ISSUE_FINAL_CREDIT
+team=general rel=own role=lead action=REVERSE_PROVISIONAL_CREDIT amount=100.00 -> allow grant:general/junior/REVERSE_PROVISIONAL_CREDIT
+team=general rel=own role=lead action=REVERSE_PROVISIONAL_CREDIT amount=900.00 -> allow grant:general/junior/REVERSE_PROVISIONAL_CREDIT
+team=general rel=own role=lead action=CLOSE amount=100.00 -> allow grant:general/junior/CLOSE
+team=general rel=own role=lead action=CLOSE amount=900.00 -> allow grant:general/junior/CLOSE
+team=general rel=own role=lead action=APPEAL amount=100.00 -> allow grant:general/junior/APPEAL
+team=general rel=own role=lead action=APPEAL amount=900.00 -> allow grant:general/junior/APPEAL
+team=general rel=own role=lead action=compose-email amount=100.00 -> allow grant:general/junior/compose-email
+team=general rel=own role=lead action=compose-email amount=900.00 -> allow grant:general/junior/compose-email
+team=general rel=own role=lead action=upload-attachment amount=100.00 -> allow grant:general/junior/upload-attachment
+team=general rel=own role=lead action=upload-attachment amount=900.00 -> allow grant:general/junior/upload-attachment
+team=general rel=own role=lead action=resend-notice amount=100.00 -> allow grant:general/junior/resend-notice
+team=general rel=own role=lead action=resend-notice amount=900.00 -> allow grant:general/junior/resend-notice
+team=general rel=own role=lead action=reassign amount=100.00 -> allow grant:general/lead/reassign
+team=general rel=own role=lead action=reassign amount=900.00 -> allow grant:general/lead/reassign
+team=general rel=other role=lead action=create amount=- -> deny 
+team=general rel=other role=lead action=OPEN_INVESTIGATION amount=100.00 -> deny 
+team=general rel=other role=lead action=OPEN_INVESTIGATION amount=900.00 -> deny 
+team=general rel=other role=lead action=SEND_QUESTIONNAIRE amount=100.00 -> deny 
+team=general rel=other role=lead action=SEND_QUESTIONNAIRE amount=900.00 -> deny 
+team=general rel=other role=lead action=RECEIVE_QUESTIONNAIRE amount=100.00 -> deny 
+team=general rel=other role=lead action=RECEIVE_QUESTIONNAIRE amount=900.00 -> deny 
+team=general rel=other role=lead action=ISSUE_REFUND amount=100.00 -> deny 
+team=general rel=other role=lead action=ISSUE_REFUND amount=900.00 -> deny 
+team=general rel=other role=lead action=FILE_CHARGEBACK amount=100.00 -> deny 
+team=general rel=other role=lead action=FILE_CHARGEBACK amount=900.00 -> deny 
+team=general rel=other role=lead action=ACKNOWLEDGE_CHARGEBACK amount=100.00 -> deny 
+team=general rel=other role=lead action=ACKNOWLEDGE_CHARGEBACK amount=900.00 -> deny 
+team=general rel=other role=lead action=SUBMIT_EVIDENCE amount=100.00 -> deny 
+team=general rel=other role=lead action=SUBMIT_EVIDENCE amount=900.00 -> deny 
+team=general rel=other role=lead action=WIN_CHARGEBACK amount=100.00 -> deny 
+team=general rel=other role=lead action=WIN_CHARGEBACK amount=900.00 -> deny 
+team=general rel=other role=lead action=LOSE_CHARGEBACK amount=100.00 -> deny 
+team=general rel=other role=lead action=LOSE_CHARGEBACK amount=900.00 -> deny 
+team=general rel=other role=lead action=ISSUE_FINAL_CREDIT amount=100.00 -> deny 
+team=general rel=other role=lead action=ISSUE_FINAL_CREDIT amount=900.00 -> deny 
+team=general rel=other role=lead action=REVERSE_PROVISIONAL_CREDIT amount=100.00 -> deny 
+team=general rel=other role=lead action=REVERSE_PROVISIONAL_CREDIT amount=900.00 -> deny 
+team=general rel=other role=lead action=CLOSE amount=100.00 -> deny 
+team=general rel=other role=lead action=CLOSE amount=900.00 -> deny 
+team=general rel=other role=lead action=APPEAL amount=100.00 -> deny 
+team=general rel=other role=lead action=APPEAL amount=900.00 -> deny 
+team=general rel=other role=lead action=compose-email amount=100.00 -> deny 
+team=general rel=other role=lead action=compose-email amount=900.00 -> deny 
+team=general rel=other role=lead action=upload-attachment amount=100.00 -> deny 
+team=general rel=other role=lead action=upload-attachment amount=900.00 -> deny 
+team=general rel=other role=lead action=resend-notice amount=100.00 -> deny 
+team=general rel=other role=lead action=resend-notice amount=900.00 -> deny 
+team=general rel=other role=lead action=reassign amount=100.00 -> deny reassign-leads-only
+team=general rel=other role=lead action=reassign amount=900.00 -> deny reassign-leads-only
+team=chargebacks rel=own role=none action=create amount=- -> deny 
+team=chargebacks rel=own role=none action=OPEN_INVESTIGATION amount=100.00 -> deny 
+team=chargebacks rel=own role=none action=OPEN_INVESTIGATION amount=900.00 -> deny 
+team=chargebacks rel=own role=none action=SEND_QUESTIONNAIRE amount=100.00 -> deny 
+team=chargebacks rel=own role=none action=SEND_QUESTIONNAIRE amount=900.00 -> deny 
+team=chargebacks rel=own role=none action=RECEIVE_QUESTIONNAIRE amount=100.00 -> deny 
+team=chargebacks rel=own role=none action=RECEIVE_QUESTIONNAIRE amount=900.00 -> deny 
+team=chargebacks rel=own role=none action=ISSUE_REFUND amount=100.00 -> deny 
+team=chargebacks rel=own role=none action=ISSUE_REFUND amount=900.00 -> deny 
+team=chargebacks rel=own role=none action=FILE_CHARGEBACK amount=100.00 -> deny 
+team=chargebacks rel=own role=none action=FILE_CHARGEBACK amount=900.00 -> deny 
+team=chargebacks rel=own role=none action=ACKNOWLEDGE_CHARGEBACK amount=100.00 -> deny 
+team=chargebacks rel=own role=none action=ACKNOWLEDGE_CHARGEBACK amount=900.00 -> deny 
+team=chargebacks rel=own role=none action=SUBMIT_EVIDENCE amount=100.00 -> deny 
+team=chargebacks rel=own role=none action=SUBMIT_EVIDENCE amount=900.00 -> deny 
+team=chargebacks rel=own role=none action=WIN_CHARGEBACK amount=100.00 -> deny 
+team=chargebacks rel=own role=none action=WIN_CHARGEBACK amount=900.00 -> deny 
+team=chargebacks rel=own role=none action=LOSE_CHARGEBACK amount=100.00 -> deny 
+team=chargebacks rel=own role=none action=LOSE_CHARGEBACK amount=900.00 -> deny 
+team=chargebacks rel=own role=none action=ISSUE_FINAL_CREDIT amount=100.00 -> deny 
+team=chargebacks rel=own role=none action=ISSUE_FINAL_CREDIT amount=900.00 -> deny 
+team=chargebacks rel=own role=none action=REVERSE_PROVISIONAL_CREDIT amount=100.00 -> deny 
+team=chargebacks rel=own role=none action=REVERSE_PROVISIONAL_CREDIT amount=900.00 -> deny 
+team=chargebacks rel=own role=none action=CLOSE amount=100.00 -> deny 
+team=chargebacks rel=own role=none action=CLOSE amount=900.00 -> deny 
+team=chargebacks rel=own role=none action=APPEAL amount=100.00 -> deny 
+team=chargebacks rel=own role=none action=APPEAL amount=900.00 -> deny 
+team=chargebacks rel=own role=none action=compose-email amount=100.00 -> deny 
+team=chargebacks rel=own role=none action=compose-email amount=900.00 -> deny 
+team=chargebacks rel=own role=none action=upload-attachment amount=100.00 -> deny 
+team=chargebacks rel=own role=none action=upload-attachment amount=900.00 -> deny 
+team=chargebacks rel=own role=none action=resend-notice amount=100.00 -> deny 
+team=chargebacks rel=own role=none action=resend-notice amount=900.00 -> deny 
+team=chargebacks rel=own role=none action=reassign amount=100.00 -> deny reassign-leads-only
+team=chargebacks rel=own role=none action=reassign amount=900.00 -> deny reassign-leads-only
+team=chargebacks rel=own role=junior action=create amount=- -> allow grant:chargebacks/junior/create
+team=chargebacks rel=own role=junior action=OPEN_INVESTIGATION amount=100.00 -> allow grant:chargebacks/junior/OPEN_INVESTIGATION
+team=chargebacks rel=own role=junior action=OPEN_INVESTIGATION amount=900.00 -> allow grant:chargebacks/junior/OPEN_INVESTIGATION
+team=chargebacks rel=own role=junior action=SEND_QUESTIONNAIRE amount=100.00 -> allow grant:chargebacks/junior/SEND_QUESTIONNAIRE
+team=chargebacks rel=own role=junior action=SEND_QUESTIONNAIRE amount=900.00 -> allow grant:chargebacks/junior/SEND_QUESTIONNAIRE
+team=chargebacks rel=own role=junior action=RECEIVE_QUESTIONNAIRE amount=100.00 -> allow grant:chargebacks/junior/RECEIVE_QUESTIONNAIRE
+team=chargebacks rel=own role=junior action=RECEIVE_QUESTIONNAIRE amount=900.00 -> allow grant:chargebacks/junior/RECEIVE_QUESTIONNAIRE
+team=chargebacks rel=own role=junior action=ISSUE_REFUND amount=100.00 -> allow grant:chargebacks/junior/ISSUE_REFUND
+team=chargebacks rel=own role=junior action=ISSUE_REFUND amount=900.00 -> deny 
+team=chargebacks rel=own role=junior action=FILE_CHARGEBACK amount=100.00 -> allow grant:chargebacks/junior/FILE_CHARGEBACK
+team=chargebacks rel=own role=junior action=FILE_CHARGEBACK amount=900.00 -> allow grant:chargebacks/junior/FILE_CHARGEBACK
+team=chargebacks rel=own role=junior action=ACKNOWLEDGE_CHARGEBACK amount=100.00 -> allow grant:chargebacks/junior/ACKNOWLEDGE_CHARGEBACK
+team=chargebacks rel=own role=junior action=ACKNOWLEDGE_CHARGEBACK amount=900.00 -> allow grant:chargebacks/junior/ACKNOWLEDGE_CHARGEBACK
+team=chargebacks rel=own role=junior action=SUBMIT_EVIDENCE amount=100.00 -> allow grant:chargebacks/junior/SUBMIT_EVIDENCE
+team=chargebacks rel=own role=junior action=SUBMIT_EVIDENCE amount=900.00 -> allow grant:chargebacks/junior/SUBMIT_EVIDENCE
+team=chargebacks rel=own role=junior action=WIN_CHARGEBACK amount=100.00 -> deny 
+team=chargebacks rel=own role=junior action=WIN_CHARGEBACK amount=900.00 -> deny 
+team=chargebacks rel=own role=junior action=LOSE_CHARGEBACK amount=100.00 -> deny 
+team=chargebacks rel=own role=junior action=LOSE_CHARGEBACK amount=900.00 -> deny 
+team=chargebacks rel=own role=junior action=ISSUE_FINAL_CREDIT amount=100.00 -> allow grant:chargebacks/junior/ISSUE_FINAL_CREDIT
+team=chargebacks rel=own role=junior action=ISSUE_FINAL_CREDIT amount=900.00 -> deny 
+team=chargebacks rel=own role=junior action=REVERSE_PROVISIONAL_CREDIT amount=100.00 -> deny 
+team=chargebacks rel=own role=junior action=REVERSE_PROVISIONAL_CREDIT amount=900.00 -> deny 
+team=chargebacks rel=own role=junior action=CLOSE amount=100.00 -> deny 
+team=chargebacks rel=own role=junior action=CLOSE amount=900.00 -> deny 
+team=chargebacks rel=own role=junior action=APPEAL amount=100.00 -> deny 
+team=chargebacks rel=own role=junior action=APPEAL amount=900.00 -> deny 
+team=chargebacks rel=own role=junior action=compose-email amount=100.00 -> allow grant:chargebacks/junior/compose-email
+team=chargebacks rel=own role=junior action=compose-email amount=900.00 -> allow grant:chargebacks/junior/compose-email
+team=chargebacks rel=own role=junior action=upload-attachment amount=100.00 -> allow grant:chargebacks/junior/upload-attachment
+team=chargebacks rel=own role=junior action=upload-attachment amount=900.00 -> allow grant:chargebacks/junior/upload-attachment
+team=chargebacks rel=own role=junior action=resend-notice amount=100.00 -> allow grant:chargebacks/junior/resend-notice
+team=chargebacks rel=own role=junior action=resend-notice amount=900.00 -> allow grant:chargebacks/junior/resend-notice
+team=chargebacks rel=own role=junior action=reassign amount=100.00 -> deny reassign-leads-only
+team=chargebacks rel=own role=junior action=reassign amount=900.00 -> deny reassign-leads-only
+team=chargebacks rel=own role=senior action=create amount=- -> allow grant:chargebacks/junior/create
+team=chargebacks rel=own role=senior action=OPEN_INVESTIGATION amount=100.00 -> allow grant:chargebacks/junior/OPEN_INVESTIGATION
+team=chargebacks rel=own role=senior action=OPEN_INVESTIGATION amount=900.00 -> allow grant:chargebacks/junior/OPEN_INVESTIGATION
+team=chargebacks rel=own role=senior action=SEND_QUESTIONNAIRE amount=100.00 -> allow grant:chargebacks/junior/SEND_QUESTIONNAIRE
+team=chargebacks rel=own role=senior action=SEND_QUESTIONNAIRE amount=900.00 -> allow grant:chargebacks/junior/SEND_QUESTIONNAIRE
+team=chargebacks rel=own role=senior action=RECEIVE_QUESTIONNAIRE amount=100.00 -> allow grant:chargebacks/junior/RECEIVE_QUESTIONNAIRE
+team=chargebacks rel=own role=senior action=RECEIVE_QUESTIONNAIRE amount=900.00 -> allow grant:chargebacks/junior/RECEIVE_QUESTIONNAIRE
+team=chargebacks rel=own role=senior action=ISSUE_REFUND amount=100.00 -> allow grant:chargebacks/junior/ISSUE_REFUND,grant:chargebacks/senior/ISSUE_REFUND
+team=chargebacks rel=own role=senior action=ISSUE_REFUND amount=900.00 -> allow grant:chargebacks/senior/ISSUE_REFUND
+team=chargebacks rel=own role=senior action=FILE_CHARGEBACK amount=100.00 -> allow grant:chargebacks/junior/FILE_CHARGEBACK
+team=chargebacks rel=own role=senior action=FILE_CHARGEBACK amount=900.00 -> allow grant:chargebacks/junior/FILE_CHARGEBACK
+team=chargebacks rel=own role=senior action=ACKNOWLEDGE_CHARGEBACK amount=100.00 -> allow grant:chargebacks/junior/ACKNOWLEDGE_CHARGEBACK
+team=chargebacks rel=own role=senior action=ACKNOWLEDGE_CHARGEBACK amount=900.00 -> allow grant:chargebacks/junior/ACKNOWLEDGE_CHARGEBACK
+team=chargebacks rel=own role=senior action=SUBMIT_EVIDENCE amount=100.00 -> allow grant:chargebacks/junior/SUBMIT_EVIDENCE
+team=chargebacks rel=own role=senior action=SUBMIT_EVIDENCE amount=900.00 -> allow grant:chargebacks/junior/SUBMIT_EVIDENCE
+team=chargebacks rel=own role=senior action=WIN_CHARGEBACK amount=100.00 -> allow grant:chargebacks/senior/WIN_CHARGEBACK
+team=chargebacks rel=own role=senior action=WIN_CHARGEBACK amount=900.00 -> allow grant:chargebacks/senior/WIN_CHARGEBACK
+team=chargebacks rel=own role=senior action=LOSE_CHARGEBACK amount=100.00 -> allow grant:chargebacks/senior/LOSE_CHARGEBACK
+team=chargebacks rel=own role=senior action=LOSE_CHARGEBACK amount=900.00 -> allow grant:chargebacks/senior/LOSE_CHARGEBACK
+team=chargebacks rel=own role=senior action=ISSUE_FINAL_CREDIT amount=100.00 -> allow grant:chargebacks/junior/ISSUE_FINAL_CREDIT,grant:chargebacks/senior/ISSUE_FINAL_CREDIT
+team=chargebacks rel=own role=senior action=ISSUE_FINAL_CREDIT amount=900.00 -> allow grant:chargebacks/senior/ISSUE_FINAL_CREDIT
+team=chargebacks rel=own role=senior action=REVERSE_PROVISIONAL_CREDIT amount=100.00 -> allow grant:chargebacks/senior/REVERSE_PROVISIONAL_CREDIT
+team=chargebacks rel=own role=senior action=REVERSE_PROVISIONAL_CREDIT amount=900.00 -> allow grant:chargebacks/senior/REVERSE_PROVISIONAL_CREDIT
+team=chargebacks rel=own role=senior action=CLOSE amount=100.00 -> allow grant:chargebacks/senior/CLOSE
+team=chargebacks rel=own role=senior action=CLOSE amount=900.00 -> allow grant:chargebacks/senior/CLOSE
+team=chargebacks rel=own role=senior action=APPEAL amount=100.00 -> allow grant:chargebacks/senior/APPEAL
+team=chargebacks rel=own role=senior action=APPEAL amount=900.00 -> allow grant:chargebacks/senior/APPEAL
+team=chargebacks rel=own role=senior action=compose-email amount=100.00 -> allow grant:chargebacks/junior/compose-email
+team=chargebacks rel=own role=senior action=compose-email amount=900.00 -> allow grant:chargebacks/junior/compose-email
+team=chargebacks rel=own role=senior action=upload-attachment amount=100.00 -> allow grant:chargebacks/junior/upload-attachment
+team=chargebacks rel=own role=senior action=upload-attachment amount=900.00 -> allow grant:chargebacks/junior/upload-attachment
+team=chargebacks rel=own role=senior action=resend-notice amount=100.00 -> allow grant:chargebacks/junior/resend-notice
+team=chargebacks rel=own role=senior action=resend-notice amount=900.00 -> allow grant:chargebacks/junior/resend-notice
+team=chargebacks rel=own role=senior action=reassign amount=100.00 -> deny reassign-leads-only
+team=chargebacks rel=own role=senior action=reassign amount=900.00 -> deny reassign-leads-only
+team=chargebacks rel=own role=lead action=create amount=- -> allow grant:chargebacks/junior/create
+team=chargebacks rel=own role=lead action=OPEN_INVESTIGATION amount=100.00 -> allow grant:chargebacks/junior/OPEN_INVESTIGATION
+team=chargebacks rel=own role=lead action=OPEN_INVESTIGATION amount=900.00 -> allow grant:chargebacks/junior/OPEN_INVESTIGATION
+team=chargebacks rel=own role=lead action=SEND_QUESTIONNAIRE amount=100.00 -> allow grant:chargebacks/junior/SEND_QUESTIONNAIRE
+team=chargebacks rel=own role=lead action=SEND_QUESTIONNAIRE amount=900.00 -> allow grant:chargebacks/junior/SEND_QUESTIONNAIRE
+team=chargebacks rel=own role=lead action=RECEIVE_QUESTIONNAIRE amount=100.00 -> allow grant:chargebacks/junior/RECEIVE_QUESTIONNAIRE
+team=chargebacks rel=own role=lead action=RECEIVE_QUESTIONNAIRE amount=900.00 -> allow grant:chargebacks/junior/RECEIVE_QUESTIONNAIRE
+team=chargebacks rel=own role=lead action=ISSUE_REFUND amount=100.00 -> allow grant:chargebacks/junior/ISSUE_REFUND,grant:chargebacks/senior/ISSUE_REFUND
+team=chargebacks rel=own role=lead action=ISSUE_REFUND amount=900.00 -> allow grant:chargebacks/senior/ISSUE_REFUND
+team=chargebacks rel=own role=lead action=FILE_CHARGEBACK amount=100.00 -> allow grant:chargebacks/junior/FILE_CHARGEBACK
+team=chargebacks rel=own role=lead action=FILE_CHARGEBACK amount=900.00 -> allow grant:chargebacks/junior/FILE_CHARGEBACK
+team=chargebacks rel=own role=lead action=ACKNOWLEDGE_CHARGEBACK amount=100.00 -> allow grant:chargebacks/junior/ACKNOWLEDGE_CHARGEBACK
+team=chargebacks rel=own role=lead action=ACKNOWLEDGE_CHARGEBACK amount=900.00 -> allow grant:chargebacks/junior/ACKNOWLEDGE_CHARGEBACK
+team=chargebacks rel=own role=lead action=SUBMIT_EVIDENCE amount=100.00 -> allow grant:chargebacks/junior/SUBMIT_EVIDENCE
+team=chargebacks rel=own role=lead action=SUBMIT_EVIDENCE amount=900.00 -> allow grant:chargebacks/junior/SUBMIT_EVIDENCE
+team=chargebacks rel=own role=lead action=WIN_CHARGEBACK amount=100.00 -> allow grant:chargebacks/senior/WIN_CHARGEBACK
+team=chargebacks rel=own role=lead action=WIN_CHARGEBACK amount=900.00 -> allow grant:chargebacks/senior/WIN_CHARGEBACK
+team=chargebacks rel=own role=lead action=LOSE_CHARGEBACK amount=100.00 -> allow grant:chargebacks/senior/LOSE_CHARGEBACK
+team=chargebacks rel=own role=lead action=LOSE_CHARGEBACK amount=900.00 -> allow grant:chargebacks/senior/LOSE_CHARGEBACK
+team=chargebacks rel=own role=lead action=ISSUE_FINAL_CREDIT amount=100.00 -> allow grant:chargebacks/junior/ISSUE_FINAL_CREDIT,grant:chargebacks/senior/ISSUE_FINAL_CREDIT
+team=chargebacks rel=own role=lead action=ISSUE_FINAL_CREDIT amount=900.00 -> allow grant:chargebacks/senior/ISSUE_FINAL_CREDIT
+team=chargebacks rel=own role=lead action=REVERSE_PROVISIONAL_CREDIT amount=100.00 -> allow grant:chargebacks/senior/REVERSE_PROVISIONAL_CREDIT
+team=chargebacks rel=own role=lead action=REVERSE_PROVISIONAL_CREDIT amount=900.00 -> allow grant:chargebacks/senior/REVERSE_PROVISIONAL_CREDIT
+team=chargebacks rel=own role=lead action=CLOSE amount=100.00 -> allow grant:chargebacks/senior/CLOSE
+team=chargebacks rel=own role=lead action=CLOSE amount=900.00 -> allow grant:chargebacks/senior/CLOSE
+team=chargebacks rel=own role=lead action=APPEAL amount=100.00 -> allow grant:chargebacks/senior/APPEAL
+team=chargebacks rel=own role=lead action=APPEAL amount=900.00 -> allow grant:chargebacks/senior/APPEAL
+team=chargebacks rel=own role=lead action=compose-email amount=100.00 -> allow grant:chargebacks/junior/compose-email
+team=chargebacks rel=own role=lead action=compose-email amount=900.00 -> allow grant:chargebacks/junior/compose-email
+team=chargebacks rel=own role=lead action=upload-attachment amount=100.00 -> allow grant:chargebacks/junior/upload-attachment
+team=chargebacks rel=own role=lead action=upload-attachment amount=900.00 -> allow grant:chargebacks/junior/upload-attachment
+team=chargebacks rel=own role=lead action=resend-notice amount=100.00 -> allow grant:chargebacks/junior/resend-notice
+team=chargebacks rel=own role=lead action=resend-notice amount=900.00 -> allow grant:chargebacks/junior/resend-notice
+team=chargebacks rel=own role=lead action=reassign amount=100.00 -> allow grant:chargebacks/lead/reassign
+team=chargebacks rel=own role=lead action=reassign amount=900.00 -> allow grant:chargebacks/lead/reassign
+team=chargebacks rel=other role=lead action=create amount=- -> deny 
+team=chargebacks rel=other role=lead action=OPEN_INVESTIGATION amount=100.00 -> deny 
+team=chargebacks rel=other role=lead action=OPEN_INVESTIGATION amount=900.00 -> deny 
+team=chargebacks rel=other role=lead action=SEND_QUESTIONNAIRE amount=100.00 -> deny 
+team=chargebacks rel=other role=lead action=SEND_QUESTIONNAIRE amount=900.00 -> deny 
+team=chargebacks rel=other role=lead action=RECEIVE_QUESTIONNAIRE amount=100.00 -> deny 
+team=chargebacks rel=other role=lead action=RECEIVE_QUESTIONNAIRE amount=900.00 -> deny 
+team=chargebacks rel=other role=lead action=ISSUE_REFUND amount=100.00 -> deny 
+team=chargebacks rel=other role=lead action=ISSUE_REFUND amount=900.00 -> deny 
+team=chargebacks rel=other role=lead action=FILE_CHARGEBACK amount=100.00 -> deny 
+team=chargebacks rel=other role=lead action=FILE_CHARGEBACK amount=900.00 -> deny 
+team=chargebacks rel=other role=lead action=ACKNOWLEDGE_CHARGEBACK amount=100.00 -> deny 
+team=chargebacks rel=other role=lead action=ACKNOWLEDGE_CHARGEBACK amount=900.00 -> deny 
+team=chargebacks rel=other role=lead action=SUBMIT_EVIDENCE amount=100.00 -> deny 
+team=chargebacks rel=other role=lead action=SUBMIT_EVIDENCE amount=900.00 -> deny 
+team=chargebacks rel=other role=lead action=WIN_CHARGEBACK amount=100.00 -> deny 
+team=chargebacks rel=other role=lead action=WIN_CHARGEBACK amount=900.00 -> deny 
+team=chargebacks rel=other role=lead action=LOSE_CHARGEBACK amount=100.00 -> deny 
+team=chargebacks rel=other role=lead action=LOSE_CHARGEBACK amount=900.00 -> deny 
+team=chargebacks rel=other role=lead action=ISSUE_FINAL_CREDIT amount=100.00 -> deny 
+team=chargebacks rel=other role=lead action=ISSUE_FINAL_CREDIT amount=900.00 -> deny 
+team=chargebacks rel=other role=lead action=REVERSE_PROVISIONAL_CREDIT amount=100.00 -> deny 
+team=chargebacks rel=other role=lead action=REVERSE_PROVISIONAL_CREDIT amount=900.00 -> deny 
+team=chargebacks rel=other role=lead action=CLOSE amount=100.00 -> deny 
+team=chargebacks rel=other role=lead action=CLOSE amount=900.00 -> deny 
+team=chargebacks rel=other role=lead action=APPEAL amount=100.00 -> deny 
+team=chargebacks rel=other role=lead action=APPEAL amount=900.00 -> deny 
+team=chargebacks rel=other role=lead action=compose-email amount=100.00 -> deny 
+team=chargebacks rel=other role=lead action=compose-email amount=900.00 -> deny 
+team=chargebacks rel=other role=lead action=upload-attachment amount=100.00 -> deny 
+team=chargebacks rel=other role=lead action=upload-attachment amount=900.00 -> deny 
+team=chargebacks rel=other role=lead action=resend-notice amount=100.00 -> deny 
+team=chargebacks rel=other role=lead action=resend-notice amount=900.00 -> deny 
+team=chargebacks rel=other role=lead action=reassign amount=100.00 -> deny reassign-leads-only
+team=chargebacks rel=other role=lead action=reassign amount=900.00 -> deny reassign-leads-only
+team=fraud rel=own role=none action=create amount=- -> deny 
+team=fraud rel=own role=none action=OPEN_INVESTIGATION amount=100.00 -> deny 
+team=fraud rel=own role=none action=OPEN_INVESTIGATION amount=900.00 -> deny 
+team=fraud rel=own role=none action=SEND_QUESTIONNAIRE amount=100.00 -> deny 
+team=fraud rel=own role=none action=SEND_QUESTIONNAIRE amount=900.00 -> deny 
+team=fraud rel=own role=none action=RECEIVE_QUESTIONNAIRE amount=100.00 -> deny 
+team=fraud rel=own role=none action=RECEIVE_QUESTIONNAIRE amount=900.00 -> deny 
+team=fraud rel=own role=none action=ISSUE_REFUND amount=100.00 -> deny 
+team=fraud rel=own role=none action=ISSUE_REFUND amount=900.00 -> deny 
+team=fraud rel=own role=none action=FILE_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=own role=none action=FILE_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=own role=none action=ACKNOWLEDGE_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=own role=none action=ACKNOWLEDGE_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=own role=none action=SUBMIT_EVIDENCE amount=100.00 -> deny 
+team=fraud rel=own role=none action=SUBMIT_EVIDENCE amount=900.00 -> deny 
+team=fraud rel=own role=none action=WIN_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=own role=none action=WIN_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=own role=none action=LOSE_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=own role=none action=LOSE_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=own role=none action=ISSUE_FINAL_CREDIT amount=100.00 -> deny 
+team=fraud rel=own role=none action=ISSUE_FINAL_CREDIT amount=900.00 -> deny 
+team=fraud rel=own role=none action=REVERSE_PROVISIONAL_CREDIT amount=100.00 -> deny 
+team=fraud rel=own role=none action=REVERSE_PROVISIONAL_CREDIT amount=900.00 -> deny 
+team=fraud rel=own role=none action=CLOSE amount=100.00 -> deny 
+team=fraud rel=own role=none action=CLOSE amount=900.00 -> deny 
+team=fraud rel=own role=none action=APPEAL amount=100.00 -> deny 
+team=fraud rel=own role=none action=APPEAL amount=900.00 -> deny 
+team=fraud rel=own role=none action=compose-email amount=100.00 -> deny 
+team=fraud rel=own role=none action=compose-email amount=900.00 -> deny 
+team=fraud rel=own role=none action=upload-attachment amount=100.00 -> deny 
+team=fraud rel=own role=none action=upload-attachment amount=900.00 -> deny 
+team=fraud rel=own role=none action=resend-notice amount=100.00 -> deny 
+team=fraud rel=own role=none action=resend-notice amount=900.00 -> deny 
+team=fraud rel=own role=none action=reassign amount=100.00 -> deny reassign-leads-only
+team=fraud rel=own role=none action=reassign amount=900.00 -> deny reassign-leads-only
+team=fraud rel=own role=junior action=create amount=- -> allow grant:fraud/junior/create
+team=fraud rel=own role=junior action=OPEN_INVESTIGATION amount=100.00 -> allow grant:fraud/junior/OPEN_INVESTIGATION
+team=fraud rel=own role=junior action=OPEN_INVESTIGATION amount=900.00 -> allow grant:fraud/junior/OPEN_INVESTIGATION
+team=fraud rel=own role=junior action=SEND_QUESTIONNAIRE amount=100.00 -> allow grant:fraud/junior/SEND_QUESTIONNAIRE
+team=fraud rel=own role=junior action=SEND_QUESTIONNAIRE amount=900.00 -> allow grant:fraud/junior/SEND_QUESTIONNAIRE
+team=fraud rel=own role=junior action=RECEIVE_QUESTIONNAIRE amount=100.00 -> allow grant:fraud/junior/RECEIVE_QUESTIONNAIRE
+team=fraud rel=own role=junior action=RECEIVE_QUESTIONNAIRE amount=900.00 -> allow grant:fraud/junior/RECEIVE_QUESTIONNAIRE
+team=fraud rel=own role=junior action=ISSUE_REFUND amount=100.00 -> deny 
+team=fraud rel=own role=junior action=ISSUE_REFUND amount=900.00 -> deny 
+team=fraud rel=own role=junior action=FILE_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=own role=junior action=FILE_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=own role=junior action=ACKNOWLEDGE_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=own role=junior action=ACKNOWLEDGE_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=own role=junior action=SUBMIT_EVIDENCE amount=100.00 -> deny 
+team=fraud rel=own role=junior action=SUBMIT_EVIDENCE amount=900.00 -> deny 
+team=fraud rel=own role=junior action=WIN_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=own role=junior action=WIN_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=own role=junior action=LOSE_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=own role=junior action=LOSE_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=own role=junior action=ISSUE_FINAL_CREDIT amount=100.00 -> deny 
+team=fraud rel=own role=junior action=ISSUE_FINAL_CREDIT amount=900.00 -> deny 
+team=fraud rel=own role=junior action=REVERSE_PROVISIONAL_CREDIT amount=100.00 -> deny 
+team=fraud rel=own role=junior action=REVERSE_PROVISIONAL_CREDIT amount=900.00 -> deny 
+team=fraud rel=own role=junior action=CLOSE amount=100.00 -> deny 
+team=fraud rel=own role=junior action=CLOSE amount=900.00 -> deny 
+team=fraud rel=own role=junior action=APPEAL amount=100.00 -> deny 
+team=fraud rel=own role=junior action=APPEAL amount=900.00 -> deny 
+team=fraud rel=own role=junior action=compose-email amount=100.00 -> allow grant:fraud/junior/compose-email
+team=fraud rel=own role=junior action=compose-email amount=900.00 -> allow grant:fraud/junior/compose-email
+team=fraud rel=own role=junior action=upload-attachment amount=100.00 -> allow grant:fraud/junior/upload-attachment
+team=fraud rel=own role=junior action=upload-attachment amount=900.00 -> allow grant:fraud/junior/upload-attachment
+team=fraud rel=own role=junior action=resend-notice amount=100.00 -> allow grant:fraud/junior/resend-notice
+team=fraud rel=own role=junior action=resend-notice amount=900.00 -> allow grant:fraud/junior/resend-notice
+team=fraud rel=own role=junior action=reassign amount=100.00 -> deny reassign-leads-only
+team=fraud rel=own role=junior action=reassign amount=900.00 -> deny reassign-leads-only
+team=fraud rel=own role=senior action=create amount=- -> allow grant:fraud/junior/create
+team=fraud rel=own role=senior action=OPEN_INVESTIGATION amount=100.00 -> allow grant:fraud/junior/OPEN_INVESTIGATION
+team=fraud rel=own role=senior action=OPEN_INVESTIGATION amount=900.00 -> allow grant:fraud/junior/OPEN_INVESTIGATION
+team=fraud rel=own role=senior action=SEND_QUESTIONNAIRE amount=100.00 -> allow grant:fraud/junior/SEND_QUESTIONNAIRE
+team=fraud rel=own role=senior action=SEND_QUESTIONNAIRE amount=900.00 -> allow grant:fraud/junior/SEND_QUESTIONNAIRE
+team=fraud rel=own role=senior action=RECEIVE_QUESTIONNAIRE amount=100.00 -> allow grant:fraud/junior/RECEIVE_QUESTIONNAIRE
+team=fraud rel=own role=senior action=RECEIVE_QUESTIONNAIRE amount=900.00 -> allow grant:fraud/junior/RECEIVE_QUESTIONNAIRE
+team=fraud rel=own role=senior action=ISSUE_REFUND amount=100.00 -> allow grant:fraud/senior/ISSUE_REFUND
+team=fraud rel=own role=senior action=ISSUE_REFUND amount=900.00 -> allow grant:fraud/senior/ISSUE_REFUND
+team=fraud rel=own role=senior action=FILE_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=own role=senior action=FILE_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=own role=senior action=ACKNOWLEDGE_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=own role=senior action=ACKNOWLEDGE_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=own role=senior action=SUBMIT_EVIDENCE amount=100.00 -> deny 
+team=fraud rel=own role=senior action=SUBMIT_EVIDENCE amount=900.00 -> deny 
+team=fraud rel=own role=senior action=WIN_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=own role=senior action=WIN_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=own role=senior action=LOSE_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=own role=senior action=LOSE_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=own role=senior action=ISSUE_FINAL_CREDIT amount=100.00 -> deny 
+team=fraud rel=own role=senior action=ISSUE_FINAL_CREDIT amount=900.00 -> deny 
+team=fraud rel=own role=senior action=REVERSE_PROVISIONAL_CREDIT amount=100.00 -> allow grant:fraud/senior/REVERSE_PROVISIONAL_CREDIT
+team=fraud rel=own role=senior action=REVERSE_PROVISIONAL_CREDIT amount=900.00 -> allow grant:fraud/senior/REVERSE_PROVISIONAL_CREDIT
+team=fraud rel=own role=senior action=CLOSE amount=100.00 -> allow grant:fraud/senior/CLOSE
+team=fraud rel=own role=senior action=CLOSE amount=900.00 -> allow grant:fraud/senior/CLOSE
+team=fraud rel=own role=senior action=APPEAL amount=100.00 -> deny 
+team=fraud rel=own role=senior action=APPEAL amount=900.00 -> deny 
+team=fraud rel=own role=senior action=compose-email amount=100.00 -> allow grant:fraud/junior/compose-email
+team=fraud rel=own role=senior action=compose-email amount=900.00 -> allow grant:fraud/junior/compose-email
+team=fraud rel=own role=senior action=upload-attachment amount=100.00 -> allow grant:fraud/junior/upload-attachment
+team=fraud rel=own role=senior action=upload-attachment amount=900.00 -> allow grant:fraud/junior/upload-attachment
+team=fraud rel=own role=senior action=resend-notice amount=100.00 -> allow grant:fraud/junior/resend-notice
+team=fraud rel=own role=senior action=resend-notice amount=900.00 -> allow grant:fraud/junior/resend-notice
+team=fraud rel=own role=senior action=reassign amount=100.00 -> deny reassign-leads-only
+team=fraud rel=own role=senior action=reassign amount=900.00 -> deny reassign-leads-only
+team=fraud rel=own role=lead action=create amount=- -> allow grant:fraud/junior/create
+team=fraud rel=own role=lead action=OPEN_INVESTIGATION amount=100.00 -> allow grant:fraud/junior/OPEN_INVESTIGATION
+team=fraud rel=own role=lead action=OPEN_INVESTIGATION amount=900.00 -> allow grant:fraud/junior/OPEN_INVESTIGATION
+team=fraud rel=own role=lead action=SEND_QUESTIONNAIRE amount=100.00 -> allow grant:fraud/junior/SEND_QUESTIONNAIRE
+team=fraud rel=own role=lead action=SEND_QUESTIONNAIRE amount=900.00 -> allow grant:fraud/junior/SEND_QUESTIONNAIRE
+team=fraud rel=own role=lead action=RECEIVE_QUESTIONNAIRE amount=100.00 -> allow grant:fraud/junior/RECEIVE_QUESTIONNAIRE
+team=fraud rel=own role=lead action=RECEIVE_QUESTIONNAIRE amount=900.00 -> allow grant:fraud/junior/RECEIVE_QUESTIONNAIRE
+team=fraud rel=own role=lead action=ISSUE_REFUND amount=100.00 -> allow grant:fraud/senior/ISSUE_REFUND
+team=fraud rel=own role=lead action=ISSUE_REFUND amount=900.00 -> allow grant:fraud/senior/ISSUE_REFUND
+team=fraud rel=own role=lead action=FILE_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=own role=lead action=FILE_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=own role=lead action=ACKNOWLEDGE_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=own role=lead action=ACKNOWLEDGE_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=own role=lead action=SUBMIT_EVIDENCE amount=100.00 -> deny 
+team=fraud rel=own role=lead action=SUBMIT_EVIDENCE amount=900.00 -> deny 
+team=fraud rel=own role=lead action=WIN_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=own role=lead action=WIN_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=own role=lead action=LOSE_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=own role=lead action=LOSE_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=own role=lead action=ISSUE_FINAL_CREDIT amount=100.00 -> deny 
+team=fraud rel=own role=lead action=ISSUE_FINAL_CREDIT amount=900.00 -> deny 
+team=fraud rel=own role=lead action=REVERSE_PROVISIONAL_CREDIT amount=100.00 -> allow grant:fraud/senior/REVERSE_PROVISIONAL_CREDIT
+team=fraud rel=own role=lead action=REVERSE_PROVISIONAL_CREDIT amount=900.00 -> allow grant:fraud/senior/REVERSE_PROVISIONAL_CREDIT
+team=fraud rel=own role=lead action=CLOSE amount=100.00 -> allow grant:fraud/senior/CLOSE
+team=fraud rel=own role=lead action=CLOSE amount=900.00 -> allow grant:fraud/senior/CLOSE
+team=fraud rel=own role=lead action=APPEAL amount=100.00 -> deny 
+team=fraud rel=own role=lead action=APPEAL amount=900.00 -> deny 
+team=fraud rel=own role=lead action=compose-email amount=100.00 -> allow grant:fraud/junior/compose-email
+team=fraud rel=own role=lead action=compose-email amount=900.00 -> allow grant:fraud/junior/compose-email
+team=fraud rel=own role=lead action=upload-attachment amount=100.00 -> allow grant:fraud/junior/upload-attachment
+team=fraud rel=own role=lead action=upload-attachment amount=900.00 -> allow grant:fraud/junior/upload-attachment
+team=fraud rel=own role=lead action=resend-notice amount=100.00 -> allow grant:fraud/junior/resend-notice
+team=fraud rel=own role=lead action=resend-notice amount=900.00 -> allow grant:fraud/junior/resend-notice
+team=fraud rel=own role=lead action=reassign amount=100.00 -> allow grant:fraud/lead/reassign
+team=fraud rel=own role=lead action=reassign amount=900.00 -> allow grant:fraud/lead/reassign
+team=fraud rel=other role=lead action=create amount=- -> deny 
+team=fraud rel=other role=lead action=OPEN_INVESTIGATION amount=100.00 -> deny 
+team=fraud rel=other role=lead action=OPEN_INVESTIGATION amount=900.00 -> deny 
+team=fraud rel=other role=lead action=SEND_QUESTIONNAIRE amount=100.00 -> deny 
+team=fraud rel=other role=lead action=SEND_QUESTIONNAIRE amount=900.00 -> deny 
+team=fraud rel=other role=lead action=RECEIVE_QUESTIONNAIRE amount=100.00 -> deny 
+team=fraud rel=other role=lead action=RECEIVE_QUESTIONNAIRE amount=900.00 -> deny 
+team=fraud rel=other role=lead action=ISSUE_REFUND amount=100.00 -> deny 
+team=fraud rel=other role=lead action=ISSUE_REFUND amount=900.00 -> deny 
+team=fraud rel=other role=lead action=FILE_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=other role=lead action=FILE_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=other role=lead action=ACKNOWLEDGE_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=other role=lead action=ACKNOWLEDGE_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=other role=lead action=SUBMIT_EVIDENCE amount=100.00 -> deny 
+team=fraud rel=other role=lead action=SUBMIT_EVIDENCE amount=900.00 -> deny 
+team=fraud rel=other role=lead action=WIN_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=other role=lead action=WIN_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=other role=lead action=LOSE_CHARGEBACK amount=100.00 -> deny 
+team=fraud rel=other role=lead action=LOSE_CHARGEBACK amount=900.00 -> deny 
+team=fraud rel=other role=lead action=ISSUE_FINAL_CREDIT amount=100.00 -> deny 
+team=fraud rel=other role=lead action=ISSUE_FINAL_CREDIT amount=900.00 -> deny 
+team=fraud rel=other role=lead action=REVERSE_PROVISIONAL_CREDIT amount=100.00 -> deny 
+team=fraud rel=other role=lead action=REVERSE_PROVISIONAL_CREDIT amount=900.00 -> deny 
+team=fraud rel=other role=lead action=CLOSE amount=100.00 -> deny 
+team=fraud rel=other role=lead action=CLOSE amount=900.00 -> deny 
+team=fraud rel=other role=lead action=APPEAL amount=100.00 -> deny 
+team=fraud rel=other role=lead action=APPEAL amount=900.00 -> deny 
+team=fraud rel=other role=lead action=compose-email amount=100.00 -> deny 
+team=fraud rel=other role=lead action=compose-email amount=900.00 -> deny 
+team=fraud rel=other role=lead action=upload-attachment amount=100.00 -> deny 
+team=fraud rel=other role=lead action=upload-attachment amount=900.00 -> deny 
+team=fraud rel=other role=lead action=resend-notice amount=100.00 -> deny 
+team=fraud rel=other role=lead action=resend-notice amount=900.00 -> deny 
+team=fraud rel=other role=lead action=reassign amount=100.00 -> deny reassign-leads-only
+team=fraud rel=other role=lead action=reassign amount=900.00 -> deny reassign-leads-only
