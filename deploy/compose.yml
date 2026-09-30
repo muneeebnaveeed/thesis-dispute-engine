@@ -13,7 +13,7 @@
 #   make otel:up   the above plus otel-lgtm; the API exports traces, metrics and logs to it
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     network_mode: host
     environment:
       POSTGRES_USER: dispute
