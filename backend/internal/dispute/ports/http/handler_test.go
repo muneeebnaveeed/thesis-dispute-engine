@@ -916,3 +916,23 @@ func TestSearchFilterSuggestionWithoutAModel(t *testing.T) {
 		t.Errorf("suggestion without a model = %v, want nothing", body)
 	}
 }
+
+func TestReassignDispute(t *testing.T) {
+	a := newAPI(t, nil)
+	txn := a.store.AddTransaction(domain.RailCard, "EUR", "EUR", "42.10")
+	rec, created := a.do(http.MethodPost, "/disputes", map[string]any{"transactionId": txn.String()}, nil)
+	if rec.Code != 201 {
+		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
+	}
+	path := "/disputes/" + created["id"].(string) + "/team"
+	if rec, _ := a.do(http.MethodPost, path, map[string]any{"team": "general"}, nil); rec.Code != 403 {
+		t.Errorf("tenant key reassign: %d %s", rec.Code, rec.Body.String())
+	}
+	lead := map[string]string{"Authorization": "", "X-Test-Analyst": "a:analyst"}
+	if rec, body := a.do(http.MethodPost, path, map[string]any{"team": "nope"}, lead); rec.Code != 422 || body["code"] != "unknown-team" {
+		t.Errorf("unknown team: %d %v", rec.Code, body)
+	}
+	if rec, _ := a.do(http.MethodPost, path, map[string]any{"team": "general"}, lead); rec.Code != 204 {
+		t.Errorf("lead reassign: %d %s", rec.Code, rec.Body.String())
+	}
+}

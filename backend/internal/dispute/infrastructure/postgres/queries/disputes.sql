@@ -39,11 +39,11 @@ JOIN accounts a ON a.id = t.account_id
 WHERE t.id = $1;
 
 -- name: InsertDispute :exec
-INSERT INTO disputes (id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at, reason)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10, $11);
+INSERT INTO disputes (id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at, reason, team)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10, $11, $12);
 
 -- name: GetDispute :one
-SELECT id, tenant_id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at, reason
+SELECT id, tenant_id, regime, state, appeals, version, transaction_id, account_id, disputed_amount, currency, opened_at, updated_at, reason, team
 FROM disputes
 WHERE id = $1;
 
@@ -51,6 +51,9 @@ WHERE id = $1;
 UPDATE disputes
 SET state = $2, appeals = $3, version = version + 1, updated_at = $4
 WHERE id = $1 AND version = $5;
+
+-- name: UpdateDisputeTeam :one
+SELECT reassign_dispute(sqlc.arg(id), sqlc.arg(expected), sqlc.arg(team), sqlc.arg(at))::bigint AS moved;
 
 -- name: InsertDisputeEvent :one
 INSERT INTO dispute_events (dispute_id, seq, event, from_state, to_state, actor, payload, idempotency_key, trace_id, occurred_at, actor_id)
@@ -162,7 +165,7 @@ UPDATE tenant_keys SET revoked_at = now() WHERE id = $1 AND tenant_id = $2 AND r
 SELECT id, prefix, label, created_at, last_used_at, expires_at, revoked_at FROM tenant_keys WHERE id = $1 AND tenant_id = $2;
 -- name: ListDisputes :many
 -- Keyset pagination on (opened_at, id) descending; row-level security scopes the tenant.
-SELECT id, regime, state, transaction_id, disputed_amount, currency, opened_at, updated_at, reason
+SELECT id, regime, state, transaction_id, disputed_amount, currency, opened_at, updated_at, reason, team
 FROM disputes
 WHERE (sqlc.narg(state)::text IS NULL OR state = sqlc.narg(state)::text)
   AND (sqlc.narg(reason)::text IS NULL OR reason = sqlc.narg(reason)::text)

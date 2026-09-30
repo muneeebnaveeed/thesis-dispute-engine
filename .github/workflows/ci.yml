@@ -30,6 +30,7 @@ jobs:
       sqlc: ${{ steps.versions.outputs.sqlc }}
       node: ${{ steps.versions.outputs.node }}
       pnpm: ${{ steps.versions.outputs.pnpm }}
+      cedar: ${{ steps.versions.outputs.cedar }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -56,6 +57,7 @@ jobs:
           echo "golangci=$(sed -n 's/^golangci-lint = "\(.*\)"$/\1/p' mise.toml)" >> "$GITHUB_OUTPUT"
           echo "sqlc=$(sed -n 's/^sqlc = "\(.*\)"$/\1/p' mise.toml)" >> "$GITHUB_OUTPUT"
           echo "node=$(sed -n 's/^node = "\(.*\)"$/\1/p' mise.toml)" >> "$GITHUB_OUTPUT"
+          echo "cedar=$(sed -n 's/^CEDAR_CLI_VERSION = "\(.*\)"$/\1/p' mise.toml)" >> "$GITHUB_OUTPUT"
           echo "pnpm=$(sed -n 's/^pnpm = "\(.*\)"$/\1/p' mise.toml)" >> "$GITHUB_OUTPUT"
 
   runtime-versions:
@@ -73,7 +75,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # a cold Cedar CLI build takes several minutes; cached, it takes none
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: backend
@@ -104,6 +107,15 @@ jobs:
           install-mode: binary
           # The action would run the linter itself; the lint step does that.
           args: --help
+      - name: Cache Cedar CLI
+        id: cedar-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cargo/bin/cedar
+          key: cedar-cli-${{ runner.os }}-${{ needs.changes.outputs.cedar }}
+      - name: Install Cedar CLI
+        if: steps.cedar-cache.outputs.cache-hit != 'true'
+        run: cargo install cedar-policy-cli --version ${{ needs.changes.outputs.cedar }} --locked
       - name: format
         run: golangci-lint fmt --diff
       - name: generate
@@ -121,6 +133,9 @@ jobs:
       - name: vuln
         if: ${{ !cancelled() }}
         run: go tool govulncheck ./...
+      - name: policies
+        if: ${{ !cancelled() }}
+        run: ../scripts/validate-policies
 
   backend-test:
     name: backend test

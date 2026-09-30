@@ -69,6 +69,10 @@ func (s *Service) permitted(ctx context.Context, tx Tx, events []domain.Event, f
 	return out, nil
 }
 
+// UnrecordedInvestigator stands for an investigation opened before actor ids were recorded; the guardrails refuse
+// its final credit to every analyst, since nobody can be shown not to be the investigator.
+const UnrecordedInvestigator = "?unrecorded"
+
 // facts is what policies may read about a dispute, including who opened its investigation.
 func facts(ctx context.Context, tx Tx, rec DisputeRecord) (DisputeFacts, error) {
 	events, err := tx.ListEvents(ctx, rec.ID)
@@ -79,6 +83,9 @@ func facts(ctx context.Context, tx Tx, rec DisputeRecord) (DisputeFacts, error) 
 	for _, e := range events {
 		if e.Event == domain.EventOpenInvestigation {
 			opener = e.ActorID
+			if opener == "" {
+				opener = UnrecordedInvestigator
+			}
 		}
 	}
 	txn, err := tx.GetTransaction(ctx, rec.TransactionID)

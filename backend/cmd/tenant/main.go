@@ -5,6 +5,9 @@
 //	tenant disable --slug <slug>       credentials stop resolving on the next request; data is kept
 //	tenant enable  --slug <slug>
 //	tenant list
+//	tenant member add    --slug <slug> --subject <sub> --team <team> --role junior|senior|lead
+//	tenant member remove --slug <slug> --subject <sub> --team <team>
+//	tenant member list   --slug <slug>
 package main
 
 import (
@@ -32,7 +35,7 @@ func main() {
 
 func run(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: tenant upsert|disable|enable|list")
+		return fmt.Errorf("usage: tenant upsert|disable|enable|list|member")
 	}
 	cfg, err := config.Load()
 	if err != nil {
@@ -126,6 +129,8 @@ func run(args []string) error {
 			}
 			fmt.Printf("%s  %-10s %-20s %-45s %s\n", r.ID, r.Slug, r.Name, iss, state)
 		}
+	case "member":
+		return member(ctx, pool, q, args[1:])
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}

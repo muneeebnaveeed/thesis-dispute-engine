@@ -163,6 +163,26 @@ export type paths = {
     patch?: never
     trace?: never
   }
+  '/disputes/{disputeId}/team': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Move a dispute to another team
+     * @description Moves the dispute to another team of the tenant, recorded as a REASSIGNED entry in its log. Only a lead of the dispute's current team may do it; afterwards the caller may no longer see the dispute. Analysts only.
+     */
+    post: operations['reassignDispute']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/disputes/{disputeId}/notices/{noticeId}/resend': {
     parameters: {
       query?: never
@@ -501,6 +521,7 @@ export type components = {
       | 'idempotency-key-reuse'
       | 'image-refused'
       | 'no-regime'
+      | 'unknown-team'
       | 'unknown-regime'
       | 'unavailable'
       | 'internal'
@@ -744,7 +765,7 @@ export type components = {
     }
     LoggedEvent: {
       seq: number
-      /** @description A DisputeEvent, or OPENED for entry 1. */
+      /** @description A DisputeEvent, OPENED for entry 1, or REASSIGNED when a lead moved it to another team. */
       event: string
       fromState: string
       toState: components['schemas']['DisputeState']
@@ -1418,6 +1439,37 @@ export interface operations {
       401: components['responses']['Unauthorized']
       404: components['responses']['NotFound']
       429: components['responses']['TooManyRequests']
+    }
+  }
+  reassignDispute: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        disputeId: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': {
+          team: string
+        }
+      }
+    }
+    responses: {
+      /** @description Moved. */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      400: components['responses']['BadRequest']
+      401: components['responses']['Unauthorized']
+      403: components['responses']['Forbidden']
+      404: components['responses']['NotFound']
+      422: components['responses']['Unprocessable']
     }
   }
   resendNotice: {

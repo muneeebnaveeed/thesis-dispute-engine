@@ -1,0 +1,24 @@
+[
+    {
+      "id": "__USER_A2__",
+      "username": "junior",
+      "email": "junior@__SLUG__.example",
+      "firstName": "Junior",
+      "lastName": "Analyst",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "junior", "temporary": false }],
+      "realmRoles": ["analyst"]
+    },
+    {
+      "id": "__USER_A3__",
+      "username": "fraud",
+      "email": "fraud@__SLUG__.example",
+      "firstName": "Fraud",
+      "lastName": "Analyst",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "fraud", "temporary": false }],
+      "realmRoles": ["analyst"]
+    }
+]

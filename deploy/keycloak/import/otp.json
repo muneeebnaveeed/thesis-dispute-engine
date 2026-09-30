@@ -18,13 +18,28 @@
   "minimumQuickLoginWaitSeconds": 60,
   "eventsEnabled": true,
   "eventsExpiration": 2592000,
-  "enabledEventTypes": ["LOGIN", "LOGIN_ERROR", "LOGOUT", "REFRESH_TOKEN_ERROR", "CODE_TO_TOKEN", "CODE_TO_TOKEN_ERROR", "UPDATE_PASSWORD", "RESET_PASSWORD"],
+  "enabledEventTypes": [
+    "LOGIN",
+    "LOGIN_ERROR",
+    "LOGOUT",
+    "REFRESH_TOKEN_ERROR",
+    "CODE_TO_TOKEN",
+    "CODE_TO_TOKEN_ERROR",
+    "UPDATE_PASSWORD",
+    "RESET_PASSWORD"
+  ],
   "adminEventsEnabled": true,
   "adminEventsDetailsEnabled": true,
   "roles": {
     "realm": [
-      { "name": "analyst", "description": "Works disputes" },
-      { "name": "tenant-admin", "description": "Manages tenant keys and users" }
+      {
+        "name": "analyst",
+        "description": "Works disputes"
+      },
+      {
+        "name": "tenant-admin",
+        "description": "Manages tenant keys and users"
+      }
     ]
   },
   "clientScopes": [
@@ -32,14 +47,21 @@
       "name": "dispute-api",
       "description": "Audience and tenant claim for the dispute engine API",
       "protocol": "openid-connect",
-      "attributes": { "include.in.token.scope": "true", "display.on.consent.screen": "false" },
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
       "protocolMappers": [
         {
           "name": "api audience",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
-          "config": { "included.custom.audience": "dispute-api", "access.token.claim": "true", "id.token.claim": "false" }
+          "config": {
+            "included.custom.audience": "dispute-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
         },
         {
           "name": "tenant id",
@@ -60,47 +82,81 @@
           "protocol": "openid-connect",
           "protocolMapper": "oidc-sub-mapper",
           "consentRequired": false,
-          "config": { "access.token.claim": "true", "introspection.token.claim": "true" }
+          "config": {
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
         },
         {
           "name": "username",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usermodel-attribute-mapper",
           "consentRequired": false,
-          "config": { "user.attribute": "username", "claim.name": "preferred_username", "jsonType.label": "String", "access.token.claim": "true", "id.token.claim": "true" }
+          "config": {
+            "user.attribute": "username",
+            "claim.name": "preferred_username",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true"
+          }
         },
         {
           "name": "given name",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usermodel-property-mapper",
           "consentRequired": false,
-          "config": { "user.attribute": "firstName", "claim.name": "given_name", "jsonType.label": "String", "access.token.claim": "true", "id.token.claim": "true" }
+          "config": {
+            "user.attribute": "firstName",
+            "claim.name": "given_name",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true"
+          }
         },
         {
           "name": "family name",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usermodel-property-mapper",
           "consentRequired": false,
-          "config": { "user.attribute": "lastName", "claim.name": "family_name", "jsonType.label": "String", "access.token.claim": "true", "id.token.claim": "true" }
+          "config": {
+            "user.attribute": "lastName",
+            "claim.name": "family_name",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true"
+          }
         },
         {
           "name": "email",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usermodel-attribute-mapper",
           "consentRequired": false,
-          "config": { "user.attribute": "email", "claim.name": "email", "jsonType.label": "String", "access.token.claim": "true", "id.token.claim": "true" }
+          "config": {
+            "user.attribute": "email",
+            "claim.name": "email",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true"
+          }
         },
         {
           "name": "realm roles",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usermodel-realm-role-mapper",
           "consentRequired": false,
-          "config": { "claim.name": "roles", "multivalued": "true", "access.token.claim": "true", "id.token.claim": "true" }
+          "config": {
+            "claim.name": "roles",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "true"
+          }
         }
       ]
     }
   ],
-  "defaultDefaultClientScopes": ["dispute-api"],
+  "defaultDefaultClientScopes": [
+    "dispute-api"
+  ],
   "clients": [
     {
       "clientId": "frontend",
@@ -112,9 +168,15 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
-      "redirectUris": ["http://localhost:3002/*"],
-      "webOrigins": ["http://localhost:3002"],
-      "defaultClientScopes": ["dispute-api"],
+      "redirectUris": [
+        "http://localhost:3002/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3002"
+      ],
+      "defaultClientScopes": [
+        "dispute-api"
+      ],
       "attributes": {
         "post.logout.redirect.uris": "http://localhost:3002/*",
         "pkce.code.challenge.method": "S256",
@@ -126,14 +188,62 @@
   ],
   "users": [
     {
+      "id": "a1000000-0000-8000-8000-00000000a001",
       "username": "analyst",
       "email": "analyst@otp.example",
       "firstName": "Eszter",
       "lastName": "Varga",
       "enabled": true,
       "emailVerified": true,
-      "credentials": [{ "type": "password", "value": "analyst", "temporary": false }],
-      "realmRoles": ["analyst", "tenant-admin"]
+      "credentials": [
+        {
+          "type": "password",
+          "value": "analyst",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "analyst",
+        "tenant-admin"
+      ]
+    },
+    {
+      "id": "a2000000-0000-8000-8000-00000000a001",
+      "username": "junior",
+      "email": "junior@otp.example",
+      "firstName": "Junior",
+      "lastName": "Analyst",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "junior",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "analyst"
+      ]
+    },
+    {
+      "id": "a3000000-0000-8000-8000-00000000a001",
+      "username": "fraud",
+      "email": "fraud@otp.example",
+      "firstName": "Fraud",
+      "lastName": "Analyst",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "fraud",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "analyst"
+      ]
     }
   ]
 }

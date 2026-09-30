@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/shopspring/decimal"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/application"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/dispute/domain"
@@ -34,15 +35,18 @@ type Store struct {
 // NewStore wraps a pool.
 func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 
-// WithTx implements application.Store. The tenant is bound to the transaction with a LOCAL setting, which the
-// row-level policies and the tenant_id column defaults read; a pooled connection never carries it past commit.
+// WithTx implements application.Store. The tenant and the principal are bound to the transaction with LOCAL settings,
+// which the row-level policies and the tenant_id column defaults read; a pooled connection never carries them past commit.
 func (s *Store) WithTx(ctx context.Context, fn func(application.Tx) error) error {
 	id, ok := tenant.IDFrom(ctx)
 	if !ok {
 		return tenant.ErrMissing
 	}
+	p, _ := principal.From(ctx)
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, id.String()); err != nil {
+		// an absent principal binds empty settings, which the team-scope policies treat as no teams
+		if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true), set_config('app.subject', $2, true), set_config('app.principal_kind', $3, true)`,
+			id.String(), p.ID, string(p.Kind)); err != nil {
 			return mapErr(err)
 		}
 		return fn(&txn{q: sqlcgen.New(tx)})
@@ -160,7 +164,8 @@ func (s *Store) PurgeIdempotencyKeys(ctx context.Context, before time.Time) (int
 }
 
 type txn struct {
-	q *sqlcgen.Queries
+	q      *sqlcgen.Queries
+	access map[string]application.Access // by analyst subject; "" for a tenant key
 }
 
 func (t *txn) GetTransaction(ctx context.Context, id uuid.UUID) (application.TransactionRecord, error) {
@@ -194,7 +199,7 @@ func (t *txn) InsertDispute(ctx context.Context, d application.DisputeRecord) er
 	return mapErr(t.q.InsertDispute(ctx, sqlcgen.InsertDisputeParams{
 		ID: d.ID, Regime: string(d.Regime), State: string(d.State), Appeals: int32Of(d.Appeals), Version: d.Version,
 		TransactionID: d.TransactionID, AccountID: d.AccountID, DisputedAmount: d.DisputedAmount,
-		Currency: d.Currency, OpenedAt: d.OpenedAt, Reason: string(d.Reason),
+		Currency: d.Currency, OpenedAt: d.OpenedAt, Reason: string(d.Reason), Team: d.Team,
 	}))
 }
 
@@ -207,7 +212,7 @@ func (t *txn) GetDispute(ctx context.Context, id uuid.UUID) (application.Dispute
 		ID: row.ID, TenantID: row.TenantID, Regime: domain.Regime(row.Regime), State: domain.State(row.State), Appeals: int(row.Appeals),
 		Version: row.Version, TransactionID: row.TransactionID, AccountID: row.AccountID,
 		DisputedAmount: row.DisputedAmount, Currency: row.Currency, OpenedAt: row.OpenedAt, UpdatedAt: row.UpdatedAt,
-		Reason: domain.Reason(row.Reason), Team: application.DefaultTeam,
+		Reason: domain.Reason(row.Reason), Team: row.Team,
 	}, nil
 }
 
@@ -224,9 +229,104 @@ func (t *txn) UpdateDisputeState(ctx context.Context, id uuid.UUID, expectedVers
 	return nil
 }
 
-// Access implements application.Tx; every tenant has the default access until its teams are stored.
-func (t *txn) Access(_ context.Context, p principal.Principal) (application.Access, error) {
-	return application.DefaultAccess(p), nil
+// UpdateDisputeTeam implements application.Tx with the same version check as a state change.
+func (t *txn) UpdateDisputeTeam(ctx context.Context, id uuid.UUID, expectedVersion int64, team string, at time.Time) error {
+	n, err := t.q.UpdateDisputeTeam(ctx, sqlcgen.UpdateDisputeTeamParams{ID: id, Expected: expectedVersion, Team: team, At: at})
+	if err != nil {
+		return mapErr(err)
+	}
+	if n == 0 {
+		return application.ErrConflict
+	}
+	return nil
+}
+
+// Access implements application.Tx: one query, read once per transaction however many decisions it makes.
+func (t *txn) Access(ctx context.Context, p principal.Principal) (application.Access, error) {
+	subject := ""
+	if p.Kind == principal.Analyst {
+		subject = p.ID
+	}
+	if a, ok := t.access[subject]; ok {
+		return a, nil
+	}
+	row, err := t.q.GetAccess(ctx, subject)
+	if err != nil {
+		return application.Access{}, mapErr(err)
+	}
+	var doc struct {
+		Teams []struct {
+			Slug    string `json:"slug"`
+			Default bool   `json:"default"`
+		}
+		Grants []struct {
+			Team, Role, Action string
+			Limit              *string
+		}
+		Routing []struct {
+			Rail, Reason, Tier, Min *string
+			Team                    string
+		}
+		Members []struct{ Team, Role string }
+	}
+	for _, part := range []struct {
+		raw  []byte
+		into any
+	}{{row.Teams, &doc.Teams}, {row.Grants, &doc.Grants}, {row.Routing, &doc.Routing}, {row.Members, &doc.Members}} {
+		if err := json.Unmarshal(part.raw, part.into); err != nil {
+			return application.Access{}, fmt.Errorf("postgres: access: %w", err)
+		}
+	}
+	a := application.Access{Version: row.Version}
+	for _, tm := range doc.Teams {
+		a.Teams = append(a.Teams, tm.Slug)
+		if tm.Default {
+			a.DefaultTeam = tm.Slug
+		}
+	}
+	for _, g := range doc.Grants {
+		limit, err := decimalOf(g.Limit)
+		if err != nil {
+			return application.Access{}, err
+		}
+		a.Grants = append(a.Grants, application.Grant{Team: g.Team, Role: application.Role(g.Role), Action: application.Action(g.Action), AmountLimit: limit})
+	}
+	for _, r := range doc.Routing {
+		min, err := decimalOf(r.Min)
+		if err != nil {
+			return application.Access{}, err
+		}
+		rule := application.RoutingRule{RiskTier: r.Tier, MinAmount: min, Team: r.Team}
+		if r.Rail != nil {
+			rail := domain.Rail(*r.Rail)
+			rule.Rail = &rail
+		}
+		if r.Reason != nil {
+			reason := domain.Reason(*r.Reason)
+			rule.Reason = &reason
+		}
+		a.Routing = append(a.Routing, rule)
+	}
+	for _, m := range doc.Members {
+		a.Members = append(a.Members, application.Membership{Team: m.Team, Role: application.Role(m.Role)})
+	}
+	if t.access == nil {
+		t.access = map[string]application.Access{}
+	}
+	t.access[subject] = a
+	return a, nil
+}
+
+// decimalOf reads a nullable numeric that arrived as text.
+func decimalOf(s *string) (*decimal.Decimal, error) {
+	if s == nil {
+		return nil, nil
+	}
+	d, err := decimal.NewFromString(*s)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: access: %w", err)
+	}
+	return &d, nil
 }
 
 func (t *txn) AppendEvent(ctx context.Context, disputeID uuid.UUID, e application.EventRecord) error {
@@ -328,7 +428,7 @@ func (t *txn) ListDisputes(ctx context.Context, q application.ListQuery) ([]appl
 	for _, r := range rows {
 		out = append(out, application.DisputeRecord{ID: r.ID, Regime: domain.Regime(r.Regime), State: domain.State(r.State),
 			TransactionID: r.TransactionID, DisputedAmount: r.DisputedAmount, Currency: r.Currency, OpenedAt: r.OpenedAt, UpdatedAt: r.UpdatedAt,
-			Reason: domain.Reason(r.Reason)})
+			Reason: domain.Reason(r.Reason), Team: r.Team})
 	}
 	return out, nil
 }

@@ -347,11 +347,21 @@ func (s *Service) CreateDispute(ctx context.Context, in CreateDisputeInput) (Res
 		if err != nil {
 			return DisputeView{}, err
 		}
-		if _, err := s.authorize(ctx, tx, ActionCreate, &DisputeFacts{Team: DefaultTeam}); err != nil {
+		// risk is assessed after the insert, so a new dispute routes without a tier
+		p, ok := principal.From(ctx)
+		if !ok {
+			return DisputeView{}, ErrForbidden
+		}
+		access, err := tx.Access(ctx, p)
+		if err != nil {
+			return DisputeView{}, err
+		}
+		team := Route(access, txn.Rail, reason, "", txn.Amount)
+		if _, err := s.authorize(ctx, tx, ActionCreate, &DisputeFacts{Team: team}); err != nil {
 			return DisputeView{}, err
 		}
 		rec := DisputeRecord{
-			ID: id, Team: DefaultTeam, Regime: regime, State: domain.StateInitiated, Version: 1,
+			ID: id, Team: team, Regime: regime, State: domain.StateInitiated, Version: 1,
 			TransactionID: txn.ID, AccountID: txn.AccountID,
 			DisputedAmount: txn.Amount, Currency: txn.Currency,
 			OpenedAt: now, UpdatedAt: now, Reason: reason,
@@ -480,7 +490,12 @@ func (s *Service) ApplyEvent(ctx context.Context, in ApplyEventInput) (Result, e
 			attribute.String("regime", string(rec.Regime)), attribute.String("state", string(rec.State))))
 
 		rec.State, rec.Appeals, rec.Version, rec.UpdatedAt = next.State, next.Appeals, rec.Version+1, now
-		return s.view(ctx, tx, rec)
+		// the facts as they now stand, without reading the log and the transaction a second time
+		f.State = next.State
+		if in.Event == domain.EventOpenInvestigation {
+			f.InvestigationOpenedBy = actorID
+		}
+		return s.viewWith(ctx, tx, rec, &f)
 	})
 }
 
@@ -918,9 +933,11 @@ func (s *Service) GetDispute(ctx context.Context, id uuid.UUID) (DisputeView, er
 
 // idempotent wraps a write so a repeated key returns the first response and a mismatched body is refused.
 func (s *Service) idempotent(ctx context.Context, scope string, idem Idempotency, fn func(Tx) (DisputeView, error)) (Result, error) {
-	// keys are the caller's own, so a replay never hands one principal a response only another was authorized for
+	// keys are the caller's own, so a replay never hands one principal a response only another was authorized for;
+	// the metric keeps the bare scope so it carries no identities
+	storeScope := scope
 	if p, ok := principal.From(ctx); ok {
-		scope += "@" + string(p.Kind) + ":" + p.ID
+		storeScope += "@" + string(p.Kind) + ":" + p.ID
 	}
 	var out Result
 	err := s.store.WithTx(ctx, func(tx Tx) error {
@@ -928,7 +945,7 @@ func (s *Service) idempotent(ctx context.Context, scope string, idem Idempotency
 		if idem.Key != "" {
 			sum := sha256.Sum256(idem.RequestBody)
 			hash = sum[:]
-			stored, err := tx.GetIdempotent(ctx, scope, idem.Key)
+			stored, err := tx.GetIdempotent(ctx, storeScope, idem.Key)
 			switch {
 			case err == nil:
 				if !bytes.Equal(stored.RequestHash, hash) {
@@ -943,6 +960,14 @@ func (s *Service) idempotent(ctx context.Context, scope string, idem Idempotency
 			case !errors.Is(err, ErrNotFound):
 				return err
 			}
+			// stored before keys belonged to their caller, so its owner is unknown: refuse rather than replay or repeat
+			if storeScope != scope {
+				if _, err := tx.GetIdempotent(ctx, scope, idem.Key); err == nil {
+					return ErrIdempotencyReuse
+				} else if !errors.Is(err, ErrNotFound) {
+					return err
+				}
+			}
 		}
 		view, err := fn(tx)
 		if err != nil {
@@ -953,7 +978,7 @@ func (s *Service) idempotent(ctx context.Context, scope string, idem Idempotency
 			if err != nil {
 				return err
 			}
-			if err := tx.PutIdempotent(ctx, scope, idem.Key, StoredResponse{RequestHash: hash, StatusCode: 0, Body: body}); err != nil {
+			if err := tx.PutIdempotent(ctx, storeScope, idem.Key, StoredResponse{RequestHash: hash, StatusCode: 0, Body: body}); err != nil {
 				return err
 			}
 		}
@@ -967,6 +992,11 @@ func (s *Service) idempotent(ctx context.Context, scope string, idem Idempotency
 }
 
 func (s *Service) view(ctx context.Context, tx Tx, rec DisputeRecord) (DisputeView, error) {
+	return s.viewWith(ctx, tx, rec, nil)
+}
+
+// viewWith builds the view; f, when the caller already holds the dispute's current facts, spares reading them again.
+func (s *Service) viewWith(ctx context.Context, tx Tx, rec DisputeRecord, f *DisputeFacts) (DisputeView, error) {
 	events, err := tx.ListEvents(ctx, rec.ID)
 	if err != nil {
 		return DisputeView{}, err
@@ -976,11 +1006,14 @@ func (s *Service) view(ctx context.Context, tx Tx, rec DisputeRecord) (DisputeVi
 		views = append(views, EventView{Seq: e.Seq, Event: e.Event, FromState: e.FromState, ToState: e.ToState,
 			Actor: e.Actor, Payload: json.RawMessage(e.Payload), TraceID: e.TraceID, OccurredAt: e.OccurredAt})
 	}
-	f, err := facts(ctx, tx, rec)
-	if err != nil {
-		return DisputeView{}, err
+	if f == nil {
+		loaded, err := facts(ctx, tx, rec)
+		if err != nil {
+			return DisputeView{}, err
+		}
+		f = &loaded
 	}
-	allowed, err := s.permitted(ctx, tx, rec.Lifecycle().Allowed(), f)
+	allowed, err := s.permitted(ctx, tx, rec.Lifecycle().Allowed(), *f)
 	if err != nil {
 		return DisputeView{}, err
 	}

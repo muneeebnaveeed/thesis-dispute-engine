@@ -133,6 +133,12 @@ func run() error {
 			return err
 		}
 	}
+	// Teams, grants and routing for the seeded realms' users (access/*.yaml, ADR 0027).
+	for _, t := range []struct{ id, slug string }{{tenantA, "otp"}, {tenantB, "erste"}} {
+		if err := seedAccess(ctx, pool, uuid.MustParse(t.id), t.slug); err != nil {
+			return err
+		}
+	}
 	// Fixed dev keys so the probe, docs and curl examples can use them; production keys come from cmd/tenantkey.
 	for _, k := range []struct{ id, tenant, secret string }{
 		{"00000000-0000-8000-8000-00000000c001", tenantA, devKeyA},

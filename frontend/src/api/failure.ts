@@ -47,6 +47,7 @@ const FAILURE_KIND_BY_CODE = {
   'no-regime': 'validation',
   'unknown-regime': 'validation',
   'unknown-reason': 'validation',
+  'unknown-team': 'validation',
   'invalid-answers': 'validation',
   'invalid-fields': 'validation',
   'unknown-template': 'validation',

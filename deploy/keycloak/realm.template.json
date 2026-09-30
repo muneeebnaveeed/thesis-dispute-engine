@@ -126,6 +126,7 @@
   ],
   "users": [
     {
+      "id": "__USER_A1__",
       "username": "analyst",
       "email": "analyst@__SLUG__.example",
       "firstName": "__ANALYST_FIRST__",

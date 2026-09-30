@@ -8,6 +8,9 @@
 #   scripts/tenant user add    --slug <slug> --username <u> --email <e> [--name "First Last"] [--roles analyst,tenant-admin]
 #   scripts/tenant user remove --slug <slug> --username <u>
 #   scripts/tenant user list   --slug <slug>
+#   scripts/tenant member add    --slug <slug> --username <u> --team <team> --role junior|senior|lead
+#   scripts/tenant member remove --slug <slug> --username <u> --team <team>
+#   scripts/tenant member list   --slug <slug>
 #
 # Environment: DISPUTE_MIGRATE_DATABASE_URL (schema owner, for cmd/*), KEYCLOAK_URL, KEYCLOAK_ADMIN_USER,
 # KEYCLOAK_ADMIN_PASSWORD, DISPUTE_API_URL, DISPUTE_SERVICE_KEY, APP_URL, KEYCLOAK_FRONTEND_SECRET.
@@ -74,8 +77,10 @@ cmd_onboard() {
   cat <<SUMMARY
   tenant:     $name ($slug, $id)
   front door: $APP_URL/$slug
-  next steps: add analysts with 'scripts/tenant user add --slug $slug ...', deliver the keys over the customer's
-              secret channel, and have them bookmark the front door.
+  next steps: add analysts with 'scripts/tenant user add --slug $slug ...' and put each in a team with
+              'scripts/tenant member add --slug $slug --username <u> --team general --role junior|senior|lead'
+              (an analyst in no team sees no disputes), deliver the keys over the customer's secret channel, and
+              have them bookmark the front door.
 SUMMARY
 }
 
@@ -188,10 +193,41 @@ for u in json.load(sys.stdin):
   esac
 }
 
+# Team memberships live in the API's database, keyed by the Keycloak user id; this resolves the username to it.
+cmd_member() {
+  local sub=${1:-}; shift || true
+  local slug="" username="" team="" role=""
+  while (($#)); do
+    case "$1" in
+      --slug) slug=$2; shift 2 ;;
+      --username) username=$2; shift 2 ;;
+      --team) team=$2; shift 2 ;;
+      --role) role=$2; shift 2 ;;
+      *) die "unknown flag $1" ;;
+    esac
+  done
+  [[ -n "$slug" ]] || die "member needs --slug"
+  case "$sub" in
+    add|remove)
+      [[ -n "$username" && -n "$team" ]] || die "member $sub needs --username and --team"
+      KC_TOKEN=$(kc_token); export KC_TOKEN
+      local uid; uid=$(user_id_for "$slug" "$username")
+      [[ -n "$uid" ]] || die "no user $username in realm $slug"
+      if [[ "$sub" == add ]]; then
+        gocmd tenant member add --slug "$slug" --subject "$uid" --team "$team" --role "$role"
+      else
+        gocmd tenant member remove --slug "$slug" --subject "$uid" --team "$team"
+      fi ;;
+    list) gocmd tenant member list --slug "$slug" ;;
+    *) die "member add|remove|list" ;;
+  esac
+}
+
 case "${1:-}" in
   onboard) shift; cmd_onboard "$@" ;;
   offboard) shift; cmd_offboard "$@" ;;
   user) shift; cmd_user "$@" ;;
-  -h|--help|"") sed -n '2,12p' "$0" ;;
+  member) shift; cmd_member "$@" ;;
+  -h|--help|"") sed -n '2,15p' "$0" ;;
   *) die "unknown command $1" ;;
 esac

@@ -29,7 +29,9 @@ that stands for either kind of credential.
   to an amount) are rows compiled to `permit` policies, each bounded to its team. A row that cannot be expressed
   safely is skipped, never escaped, so a bad row can only take a permission away. Until ADR 0027 stores grants per
   tenant, every analyst is a lead of one default team holding every grant, so the only change in behaviour is the
-  guardrails.
+  guardrails. Events written before this change have no actor id, so an investigation opened then names nobody; its
+  final credit is refused to every analyst (`sod-unrecorded-investigator`) rather than allowed to all of them, and a
+  tenant key can still issue it.
 - **Where it runs.** The service decides inside the request's transaction, after loading the dispute, so policies
   see what was committed. A denial is 403 `forbidden` naming the policy that decided it. The allowed events on a
   dispute are the ones the state machine accepts *and* the caller may apply. An allowed event records the policies

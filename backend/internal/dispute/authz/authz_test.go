@@ -87,3 +87,31 @@ func TestDecide(t *testing.T) {
 		})
 	}
 }
+
+// Cedar decimals stop at 922337203685477.5807; a limit beyond that must not turn one row into a denial for everyone,
+// and an amount beyond it must still be decided.
+func TestAmountsBeyondCedarRange(t *testing.T) {
+	e, err := authz.New(slog.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	huge := decimal.RequireFromString("999999999999999.9999")
+	a := access([]application.Membership{{Team: "cb", Role: application.RoleLead}}...)
+	a.Grants = append(a.Grants, application.Grant{Team: "cb", Role: application.RoleJunior, Action: application.EventAction(domain.EventIssueRefund), AmountLimit: &huge})
+	if _, skipped := authz.Compile(tenantID, a); len(skipped) != 1 {
+		t.Fatalf("out-of-range limit compiled: skipped %v", skipped)
+	}
+	credit := application.EventAction(domain.EventIssueFinalCredit)
+	if dec, err := e.Decide(tenantID, analyst("l"), a, credit, dispute("900.00", "other")); err != nil || !dec.Allowed {
+		t.Fatalf("lead with an unconditional grant: %+v %v", dec, err)
+	}
+	big := dispute("1.00", "other")
+	big.Amount = huge
+	if dec, err := e.Decide(tenantID, analyst("l"), a, credit, big); err != nil || !dec.Allowed {
+		t.Fatalf("huge dispute, unconditional grant: %+v %v", dec, err)
+	}
+	a.Members = []application.Membership{{Team: "cb", Role: application.RoleJunior}}
+	if dec, err := e.Decide(tenantID, analyst("j"), a, credit, big); err != nil || dec.Allowed {
+		t.Fatalf("huge dispute, limited grant: %+v %v", dec, err)
+	}
+}

@@ -1,0 +1,149 @@
+@id("grant:general/junior/create")
+permit (principal in TeamRole::"general/junior", action == Action::"create", resource in Team::"general");
+
+@id("grant:general/junior/compose-email")
+permit (principal in TeamRole::"general/junior", action == Action::"compose-email", resource in Team::"general");
+
+@id("grant:general/junior/upload-attachment")
+permit (principal in TeamRole::"general/junior", action == Action::"upload-attachment", resource in Team::"general");
+
+@id("grant:general/junior/resend-notice")
+permit (principal in TeamRole::"general/junior", action == Action::"resend-notice", resource in Team::"general");
+
+@id("grant:general/junior/OPEN_INVESTIGATION")
+permit (principal in TeamRole::"general/junior", action == Action::"OPEN_INVESTIGATION", resource in Team::"general");
+
+@id("grant:general/junior/SEND_QUESTIONNAIRE")
+permit (principal in TeamRole::"general/junior", action == Action::"SEND_QUESTIONNAIRE", resource in Team::"general");
+
+@id("grant:general/junior/RECEIVE_QUESTIONNAIRE")
+permit (principal in TeamRole::"general/junior", action == Action::"RECEIVE_QUESTIONNAIRE", resource in Team::"general");
+
+@id("grant:general/junior/ISSUE_REFUND")
+permit (principal in TeamRole::"general/junior", action == Action::"ISSUE_REFUND", resource in Team::"general");
+
+@id("grant:general/junior/FILE_CHARGEBACK")
+permit (principal in TeamRole::"general/junior", action == Action::"FILE_CHARGEBACK", resource in Team::"general");
+
+@id("grant:general/junior/ACKNOWLEDGE_CHARGEBACK")
+permit (principal in TeamRole::"general/junior", action == Action::"ACKNOWLEDGE_CHARGEBACK", resource in Team::"general");
+
+@id("grant:general/junior/SUBMIT_EVIDENCE")
+permit (principal in TeamRole::"general/junior", action == Action::"SUBMIT_EVIDENCE", resource in Team::"general");
+
+@id("grant:general/junior/WIN_CHARGEBACK")
+permit (principal in TeamRole::"general/junior", action == Action::"WIN_CHARGEBACK", resource in Team::"general");
+
+@id("grant:general/junior/LOSE_CHARGEBACK")
+permit (principal in TeamRole::"general/junior", action == Action::"LOSE_CHARGEBACK", resource in Team::"general");
+
+@id("grant:general/junior/ISSUE_FINAL_CREDIT")
+permit (principal in TeamRole::"general/junior", action == Action::"ISSUE_FINAL_CREDIT", resource in Team::"general");
+
+@id("grant:general/junior/REVERSE_PROVISIONAL_CREDIT")
+permit (principal in TeamRole::"general/junior", action == Action::"REVERSE_PROVISIONAL_CREDIT", resource in Team::"general");
+
+@id("grant:general/junior/CLOSE")
+permit (principal in TeamRole::"general/junior", action == Action::"CLOSE", resource in Team::"general");
+
+@id("grant:general/junior/APPEAL")
+permit (principal in TeamRole::"general/junior", action == Action::"APPEAL", resource in Team::"general");
+
+@id("grant:general/lead/reassign")
+permit (principal in TeamRole::"general/lead", action == Action::"reassign", resource in Team::"general");
+
+@id("grant:chargebacks/junior/create")
+permit (principal in TeamRole::"chargebacks/junior", action == Action::"create", resource in Team::"chargebacks");
+
+@id("grant:chargebacks/junior/compose-email")
+permit (principal in TeamRole::"chargebacks/junior", action == Action::"compose-email", resource in Team::"chargebacks");
+
+@id("grant:chargebacks/junior/upload-attachment")
+permit (principal in TeamRole::"chargebacks/junior", action == Action::"upload-attachment", resource in Team::"chargebacks");
+
+@id("grant:chargebacks/junior/resend-notice")
+permit (principal in TeamRole::"chargebacks/junior", action == Action::"resend-notice", resource in Team::"chargebacks");
+
+@id("grant:chargebacks/junior/OPEN_INVESTIGATION")
+permit (principal in TeamRole::"chargebacks/junior", action == Action::"OPEN_INVESTIGATION", resource in Team::"chargebacks");
+
+@id("grant:chargebacks/junior/SEND_QUESTIONNAIRE")
+permit (principal in TeamRole::"chargebacks/junior", action == Action::"SEND_QUESTIONNAIRE", resource in Team::"chargebacks");
+
+@id("grant:chargebacks/junior/RECEIVE_QUESTIONNAIRE")
+permit (principal in TeamRole::"chargebacks/junior", action == Action::"RECEIVE_QUESTIONNAIRE", resource in Team::"chargebacks");
+
+@id("grant:chargebacks/junior/FILE_CHARGEBACK")
+permit (principal in TeamRole::"chargebacks/junior", action == Action::"FILE_CHARGEBACK", resource in Team::"chargebacks");
+
+@id("grant:chargebacks/junior/ACKNOWLEDGE_CHARGEBACK")
+permit (principal in TeamRole::"chargebacks/junior", action == Action::"ACKNOWLEDGE_CHARGEBACK", resource in Team::"chargebacks");
+
+@id("grant:chargebacks/junior/SUBMIT_EVIDENCE")
+permit (principal in TeamRole::"chargebacks/junior", action == Action::"SUBMIT_EVIDENCE", resource in Team::"chargebacks");
+
+@id("grant:chargebacks/junior/ISSUE_FINAL_CREDIT")
+permit (principal in TeamRole::"chargebacks/junior", action == Action::"ISSUE_FINAL_CREDIT", resource in Team::"chargebacks")
+when { resource.amount.lessThanOrEqual(decimal("500.0000")) };
+
+@id("grant:chargebacks/junior/ISSUE_REFUND")
+permit (principal in TeamRole::"chargebacks/junior", action == Action::"ISSUE_REFUND", resource in Team::"chargebacks")
+when { resource.amount.lessThanOrEqual(decimal("500.0000")) };
+
+@id("grant:chargebacks/senior/ISSUE_FINAL_CREDIT")
+permit (principal in TeamRole::"chargebacks/senior", action == Action::"ISSUE_FINAL_CREDIT", resource in Team::"chargebacks");
+
+@id("grant:chargebacks/senior/ISSUE_REFUND")
+permit (principal in TeamRole::"chargebacks/senior", action == Action::"ISSUE_REFUND", resource in Team::"chargebacks");
+
+@id("grant:chargebacks/senior/WIN_CHARGEBACK")
+permit (principal in TeamRole::"chargebacks/senior", action == Action::"WIN_CHARGEBACK", resource in Team::"chargebacks");
+
+@id("grant:chargebacks/senior/LOSE_CHARGEBACK")
+permit (principal in TeamRole::"chargebacks/senior", action == Action::"LOSE_CHARGEBACK", resource in Team::"chargebacks");
+
+@id("grant:chargebacks/senior/REVERSE_PROVISIONAL_CREDIT")
+permit (principal in TeamRole::"chargebacks/senior", action == Action::"REVERSE_PROVISIONAL_CREDIT", resource in Team::"chargebacks");
+
+@id("grant:chargebacks/senior/CLOSE")
+permit (principal in TeamRole::"chargebacks/senior", action == Action::"CLOSE", resource in Team::"chargebacks");
+
+@id("grant:chargebacks/senior/APPEAL")
+permit (principal in TeamRole::"chargebacks/senior", action == Action::"APPEAL", resource in Team::"chargebacks");
+
+@id("grant:chargebacks/lead/reassign")
+permit (principal in TeamRole::"chargebacks/lead", action == Action::"reassign", resource in Team::"chargebacks");
+
+@id("grant:fraud/junior/create")
+permit (principal in TeamRole::"fraud/junior", action == Action::"create", resource in Team::"fraud");
+
+@id("grant:fraud/junior/compose-email")
+permit (principal in TeamRole::"fraud/junior", action == Action::"compose-email", resource in Team::"fraud");
+
+@id("grant:fraud/junior/upload-attachment")
+permit (principal in TeamRole::"fraud/junior", action == Action::"upload-attachment", resource in Team::"fraud");
+
+@id("grant:fraud/junior/resend-notice")
+permit (principal in TeamRole::"fraud/junior", action == Action::"resend-notice", resource in Team::"fraud");
+
+@id("grant:fraud/junior/OPEN_INVESTIGATION")
+permit (principal in TeamRole::"fraud/junior", action == Action::"OPEN_INVESTIGATION", resource in Team::"fraud");
+
+@id("grant:fraud/junior/SEND_QUESTIONNAIRE")
+permit (principal in TeamRole::"fraud/junior", action == Action::"SEND_QUESTIONNAIRE", resource in Team::"fraud");
+
+@id("grant:fraud/junior/RECEIVE_QUESTIONNAIRE")
+permit (principal in TeamRole::"fraud/junior", action == Action::"RECEIVE_QUESTIONNAIRE", resource in Team::"fraud");
+
+@id("grant:fraud/senior/ISSUE_REFUND")
+permit (principal in TeamRole::"fraud/senior", action == Action::"ISSUE_REFUND", resource in Team::"fraud");
+
+@id("grant:fraud/senior/CLOSE")
+permit (principal in TeamRole::"fraud/senior", action == Action::"CLOSE", resource in Team::"fraud");
+
+@id("grant:fraud/senior/REVERSE_PROVISIONAL_CREDIT")
+permit (principal in TeamRole::"fraud/senior", action == Action::"REVERSE_PROVISIONAL_CREDIT", resource in Team::"fraud");
+
+@id("grant:fraud/lead/reassign")
+permit (principal in TeamRole::"fraud/lead", action == Action::"reassign", resource in Team::"fraud");
+

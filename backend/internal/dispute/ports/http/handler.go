@@ -734,6 +734,14 @@ func decodeCursor(raw string) (application.Cursor, error) {
 	return application.Cursor{OpenedAt: t, ID: u}, nil
 }
 
+// ReassignDispute moves a dispute to another team; the service decides whether the caller may.
+func (h *Handler) ReassignDispute(ctx context.Context, req oapi.ReassignDisputeRequestObject) (oapi.ReassignDisputeResponseObject, error) {
+	if err := h.svc.Reassign(ctx, req.DisputeId, req.Body.Team); err != nil {
+		return nil, err
+	}
+	return oapi.ReassignDispute204Response{}, nil
+}
+
 // ApplyDisputeEvent runs the state machine.
 func (h *Handler) ApplyDisputeEvent(ctx context.Context, req oapi.ApplyDisputeEventRequestObject) (oapi.ApplyDisputeEventResponseObject, error) {
 	body, _ := json.Marshal(req.Body)

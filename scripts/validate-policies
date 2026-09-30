@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Validates the guardrails plus every seed fixture's compiled grants against the Cedar schema with the reference CLI
+# (cedar-go's validator is experimental). The compiled grants are the authz golden files, so what is validated is
+# exactly what the tests pin.
+#
+#   scripts/validate-policies        needs `cedar` at mise.toml's CEDAR_CLI_VERSION on PATH
+set -euo pipefail
+source "$(dirname "$0")/lib/common.sh"
+dir=$(repo_root)/backend/internal/dispute/authz
+want=$(sed -n 's/^CEDAR_CLI_VERSION = "\(.*\)"$/\1/p' "$(repo_root)/mise.toml")
+command -v cedar >/dev/null || die "cedar is not on PATH (cargo install cedar-policy-cli --version $want --locked)"
+[[ "$(cedar --version)" == "cedar-policy-cli $want" ]] || die "cedar is $(cedar --version), mise.toml pins $want"
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+cat "$dir/policy/guardrails.cedar" > "$tmp/guardrails.cedar"
+cedar validate --schema "$dir/policy/schema.cedarschema" --policies "$tmp/guardrails.cedar"
+for grants in "$dir"/testdata/*.cedar.golden; do
+  cat "$dir/policy/guardrails.cedar" "$grants" > "$tmp/set.cedar"
+  echo "$(basename "$grants" .cedar.golden):"
+  cedar validate --schema "$dir/policy/schema.cedarschema" --policies "$tmp/set.cedar"
+done

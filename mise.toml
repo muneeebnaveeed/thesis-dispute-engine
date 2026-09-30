@@ -5,3 +5,8 @@ golangci-lint = "2.13.2"
 node = "24.21.0"
 pnpm = "12.5.1"
 sqlc = "1.31.1"
+
+[env]
+# the reference Cedar CLI that validates policies (scripts/validate-policies); an env pin rather than a tool, since
+# installing it builds from source with cargo
+CEDAR_CLI_VERSION = "4.13.0"

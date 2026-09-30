@@ -60,6 +60,19 @@ tenant are decided by Cedar policies in `backend/internal/dispute/authz` (ADR 00
 `forbidden` naming the deciding policy. New operations must be classified in
 `backend/internal/dispute/ports/http/operations.go`, or the API refuses to start.
 
+Teams own disputes (ADR 0027). An analyst sees and acts on the disputes of the teams they belong to, at their role
+there (`junior`, `senior`, `lead`); a tenant key sees the whole tenant. Membership is keyed by the Keycloak user id,
+so a new analyst needs one, added by an operator until tenant admins can manage teams themselves:
+
+```bash
+scripts/tenant member add --slug otp --username muneeb --team general --role lead
+```
+
+`scripts/tenant member list --slug otp` shows who is where. The seeded realms' users (`analyst`, `junior`,
+`fraud`, passwords equal to the usernames) get fixed ids when the realm is first imported, and `make db:seed` places
+them in teams from `backend/cmd/seed/access/<slug>.yaml`. A Keycloak database created before those ids existed keeps
+its old ones; add those users with the command above, or recreate the realm.
+
 ## Configuration
 
 API: `DISPUTE_SERVICE_KEY`, `DISPUTE_INTERNAL_CIDRS`, `DISPUTE_CORS_ORIGINS`, `DISPUTE_RATE_PER_MINUTE`,

@@ -35,6 +35,7 @@ func seedFor(t *testing.T, pool *pgxpool.Pool, tenantID uuid.UUID, rail domain.R
 	if err := q.UpsertTenant(ctx, sqlcgen.UpsertTenantParams{ID: tenantID, Name: "test", Slug: strings.ReplaceAll(tenantID.String(), "-", "")}); err != nil {
 		t.Fatal(err)
 	}
+	leadGeneral(t, pool, tenantID)
 	account := uuid.New()
 	email, address := "holder@example.com", "1 Test Street"
 	if err := q.InsertAccount(ctx, sqlcgen.InsertAccountParams{ID: account, TenantID: tenantID, HolderName: "Test Holder", Currency: currency, Email: &email, PostalAddress: &address}); err != nil {
@@ -287,5 +288,14 @@ func TestListDisputesKeysetOrderUnderRLS(t *testing.T) {
 	pageB, _ := svc.ListDisputes(ctxB, application.ListQuery{Limit: 10})
 	if len(pageB.Items) != 1 {
 		t.Errorf("tenant B sees %d, want 1", len(pageB.Items))
+	}
+}
+
+// leadGeneral makes apptest.Lead, the analyst test contexts act as, a lead of the tenant's default team.
+func leadGeneral(t *testing.T, owner *pgxpool.Pool, tenantID uuid.UUID) {
+	t.Helper()
+	if _, err := owner.Exec(context.Background(), `INSERT INTO team_members (tenant_id, team, subject, role) VALUES ($1, 'general', $2, 'lead')
+		ON CONFLICT DO NOTHING`, tenantID, apptest.Lead.ID); err != nil {
+		t.Fatal(err)
 	}
 }
