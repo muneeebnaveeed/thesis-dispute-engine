@@ -82,7 +82,7 @@ SELECT tenant_id, regime, state, n FROM disputes_by_state;
 INSERT INTO tenant_keys (id, tenant_id, key_hash, prefix, label, expires_at) VALUES ($1, $2, $3, $4, $5, $6);
 
 -- name: GetTenantByTenantKeyHash :one
-SELECT k.id, k.tenant_id FROM tenant_keys k
+SELECT k.id, k.tenant_id, k.prefix FROM tenant_keys k
 JOIN tenants t ON t.id = k.tenant_id AND t.disabled_at IS NULL
 WHERE k.key_hash = $1 AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at > now());
 

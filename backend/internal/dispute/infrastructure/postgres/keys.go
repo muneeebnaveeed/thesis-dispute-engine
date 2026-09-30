@@ -26,14 +26,14 @@ type KeyStore struct {
 // NewKeyStore wraps a pool.
 func NewKeyStore(pool *pgxpool.Pool) *KeyStore { return &KeyStore{pool: pool} }
 
-// TenantForKeyHash returns the tenant owning a live key; unknown, revoked and expired keys are all ErrNotFound.
-func (k *KeyStore) TenantForKeyHash(ctx context.Context, hash []byte) (uuid.UUID, error) {
+// KeyForHash returns a live key; unknown, revoked and expired keys are all ErrNotFound.
+func (k *KeyStore) KeyForHash(ctx context.Context, hash []byte) (auth.KeyIdentity, error) {
 	row, err := sqlcgen.New(k.pool).GetTenantByTenantKeyHash(ctx, hash)
 	if err != nil {
-		return uuid.Nil, mapErr(err)
+		return auth.KeyIdentity{}, mapErr(err)
 	}
 	k.touch(ctx, row.ID)
-	return row.TenantID, nil
+	return auth.KeyIdentity{Tenant: row.TenantID, ID: row.ID, Prefix: row.Prefix}, nil
 }
 
 // touch records use off the request path; a failed write is invisible to the caller.

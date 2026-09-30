@@ -20,6 +20,7 @@ import (
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/httpserver"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/principal"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
@@ -41,9 +42,16 @@ func RequireRole(ctx context.Context, role string) error {
 	return nil
 }
 
-// Resolver maps a key hash to its tenant; application.ErrNotFound for unknown or revoked keys.
+// KeyIdentity is a live tenant key.
+type KeyIdentity struct {
+	Tenant uuid.UUID
+	ID     uuid.UUID
+	Prefix string
+}
+
+// Resolver maps a key hash to its key; application.ErrNotFound for unknown or revoked keys.
 type Resolver interface {
-	TenantForKeyHash(ctx context.Context, hash []byte) (uuid.UUID, error)
+	KeyForHash(ctx context.Context, hash []byte) (KeyIdentity, error)
 }
 
 // NewSecret returns a 32-byte random key with a recognisable prefix so leaked keys can be grepped for.
@@ -92,6 +100,11 @@ type principalKey struct{}
 
 // WithPrincipal returns ctx carrying an analyst and their tenant; Bearer uses it, and so do tests that need one.
 func WithPrincipal(ctx context.Context, p Principal) context.Context {
+	display := p.Email
+	if display == "" {
+		display = p.Subject
+	}
+	ctx = principal.With(ctx, principal.Principal{Kind: principal.Analyst, ID: p.Subject, Display: display, TenantAdmin: p.HasRole(RoleTenantAdmin)})
 	return tenant.WithID(context.WithValue(ctx, principalKey{}, p), p.Tenant)
 }
 
@@ -131,7 +144,11 @@ func Bearer(keys Resolver, oidc *OIDC) httpserver.Middleware {
 					httpserver.Annotate(ctx, "user", p.Subject)
 				}
 			} else {
-				id, err = keys.TenantForKeyHash(authCtx, HashKey(cred))
+				var k KeyIdentity
+				if k, err = keys.KeyForHash(authCtx, HashKey(cred)); err == nil {
+					id = k.Tenant
+					ctx = principal.With(ctx, principal.Principal{Kind: principal.Key, ID: k.ID.String(), Display: "key:" + k.Prefix})
+				}
 			}
 			span.SetAttributes(attribute.String("auth.kind", kind), attribute.Bool("auth.accepted", err == nil))
 			span.End()

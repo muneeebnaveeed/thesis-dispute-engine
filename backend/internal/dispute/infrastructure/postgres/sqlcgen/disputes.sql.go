@@ -602,7 +602,7 @@ func (q *Queries) GetTenantByIssuer(ctx context.Context, oidcIssuer *string) (Ge
 }
 
 const getTenantByTenantKeyHash = `-- name: GetTenantByTenantKeyHash :one
-SELECT k.id, k.tenant_id FROM tenant_keys k
+SELECT k.id, k.tenant_id, k.prefix FROM tenant_keys k
 JOIN tenants t ON t.id = k.tenant_id AND t.disabled_at IS NULL
 WHERE k.key_hash = $1 AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at > now())
 `
@@ -610,12 +610,13 @@ WHERE k.key_hash = $1 AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.ex
 type GetTenantByTenantKeyHashRow struct {
 	ID       uuid.UUID
 	TenantID uuid.UUID
+	Prefix   string
 }
 
 func (q *Queries) GetTenantByTenantKeyHash(ctx context.Context, keyHash []byte) (GetTenantByTenantKeyHashRow, error) {
 	row := q.db.QueryRow(ctx, getTenantByTenantKeyHash, keyHash)
 	var i GetTenantByTenantKeyHashRow
-	err := row.Scan(&i.ID, &i.TenantID)
+	err := row.Scan(&i.ID, &i.TenantID, &i.Prefix)
 	return i, err
 }
 

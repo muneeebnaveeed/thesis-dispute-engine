@@ -42,11 +42,11 @@ func TestKeyStoreLifecycle(t *testing.T) {
 	}
 
 	store := disputepg.NewKeyStore(app)
-	if got, err := store.TenantForKeyHash(ctx, auth.HashKey("tk_live_key_0001")); err != nil || got != apptest.TenantA {
+	if got, err := store.KeyForHash(ctx, auth.HashKey("tk_live_key_0001")); err != nil || got.Tenant != apptest.TenantA || got.Prefix != auth.Prefix("tk_live_key_0001") {
 		t.Fatalf("live key: %v %v", got, err)
 	}
 	for _, secret := range []string{"tk_expired_key_1", "tk_revoked_key_1", "tk_never_issued"} {
-		if _, err := store.TenantForKeyHash(ctx, auth.HashKey(secret)); !errors.Is(err, application.ErrNotFound) {
+		if _, err := store.KeyForHash(ctx, auth.HashKey(secret)); !errors.Is(err, application.ErrNotFound) {
 			t.Errorf("%s: err = %v, want ErrNotFound", secret, err)
 		}
 	}
@@ -67,7 +67,7 @@ func TestKeyStoreLifecycle(t *testing.T) {
 	if _, err := owner.Exec(ctx, `UPDATE tenant_keys SET last_used_at = NULL WHERE id = $1`, live); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.TenantForKeyHash(ctx, auth.HashKey("tk_live_key_0001")); err != nil {
+	if _, err := store.KeyForHash(ctx, auth.HashKey("tk_live_key_0001")); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(200 * time.Millisecond)
@@ -98,7 +98,7 @@ func TestKeyStoreSelfServiceAsAPIRole(t *testing.T) {
 		t.Fatalf("issue: %+v %q %v", rec, secret, err)
 	}
 	// The issued secret authenticates immediately, as the same role.
-	if got, err := store.TenantForKeyHash(ctx, auth.HashKey(secret)); err != nil || got != apptest.TenantA {
+	if got, err := store.KeyForHash(ctx, auth.HashKey(secret)); err != nil || got.Tenant != apptest.TenantA {
 		t.Fatalf("issued key resolves: %v %v", got, err)
 	}
 	list, err := store.ListForTenant(ctx, apptest.TenantA)
@@ -114,7 +114,7 @@ func TestKeyStoreSelfServiceAsAPIRole(t *testing.T) {
 	if err := store.Revoke(ctx, apptest.TenantA, rec.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.TenantForKeyHash(ctx, auth.HashKey(secret)); !errors.Is(err, application.ErrNotFound) {
+	if _, err := store.KeyForHash(ctx, auth.HashKey(secret)); !errors.Is(err, application.ErrNotFound) {
 		t.Errorf("revoked key still resolves: %v", err)
 	}
 	// The role can revoke but not relabel: the column grant is revoked_at only.

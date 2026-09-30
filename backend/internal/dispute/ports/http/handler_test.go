@@ -69,13 +69,13 @@ func analystHeader(next http.Handler) http.Handler {
 // keyResolver stands in for the tenant_keys table; the handler tests care about the contract, not the lookup.
 type keyResolver map[string]uuid.UUID
 
-func (k keyResolver) TenantForKeyHash(_ context.Context, hash []byte) (uuid.UUID, error) {
+func (k keyResolver) KeyForHash(_ context.Context, hash []byte) (auth.KeyIdentity, error) {
 	for key, id := range k {
 		if bytes.Equal(auth.HashKey(key), hash) {
-			return id, nil
+			return auth.KeyIdentity{Tenant: id, ID: uuid.NewSHA1(uuid.Nil, []byte(key)), Prefix: auth.Prefix(key)}, nil
 		}
 	}
-	return uuid.Nil, application.ErrNotFound
+	return auth.KeyIdentity{}, application.ErrNotFound
 }
 
 func (a api) do(method, path string, body any, headers map[string]string) (*httptest.ResponseRecorder, map[string]any) {

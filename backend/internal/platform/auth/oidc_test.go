@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/errs"
+	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/principal"
 	"github.com/muneeebnaveeed/thesis-dispute-engine/backend/internal/platform/tenant"
 )
 
@@ -120,8 +121,10 @@ func TestBearerAcceptsBothCredentialKinds(t *testing.T) {
 	o := NewOIDC(issuers{realm.srv.URL: tenantA})
 	var gotTenant uuid.UUID
 	var gotPrincipal *Principal
+	var gotGeneric principal.Principal
 	h := Bearer(fakeResolver{"tk_key_b": tenantB}, o)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		gotTenant, _ = tenant.IDFrom(r.Context())
+		gotGeneric, _ = principal.From(r.Context())
 		if p, ok := PrincipalFrom(r.Context()); ok {
 			gotPrincipal = &p
 		}
@@ -139,6 +142,10 @@ func TestBearerAcceptsBothCredentialKinds(t *testing.T) {
 	call("Bearer " + realm.token(t, map[string]any{"sub": "analyst-1"}))
 	if gotTenant != tenantA || gotPrincipal == nil || gotPrincipal.Subject != "analyst-1" {
 		t.Errorf("oidc token: tenant %v principal %+v", gotTenant, gotPrincipal)
+	}
+	call("Bearer " + realm.token(t, map[string]any{"sub": "admin-1", "email": "admin@bank.example", "roles": []string{"analyst", RoleTenantAdmin}}))
+	if want := (principal.Principal{Kind: principal.Analyst, ID: "admin-1", Display: "admin@bank.example", TenantAdmin: true}); gotGeneric != want {
+		t.Errorf("platform principal = %+v, want %+v", gotGeneric, want)
 	}
 	call("Bearer " + realm.token(t, map[string]any{"aud": "nope"}))
 	if gotTenant != uuid.Nil {
