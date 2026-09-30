@@ -210,6 +210,7 @@ cmd_member() {
   case "$sub" in
     add|remove)
       [[ -n "$username" && -n "$team" ]] || die "member $sub needs --username and --team"
+      KC_TOKEN=$(kc_token); export KC_TOKEN
       local uid; uid=$(user_id_for "$slug" "$username")
       [[ -n "$uid" ]] || die "no user $username in realm $slug"
       if [[ "$sub" == add ]]; then
