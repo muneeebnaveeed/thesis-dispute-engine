@@ -24,6 +24,8 @@ type DisputeEvent = Dispute['allowedEvents'][number]
 
 type ActionFacts = { liability: string; riskOverride: string; settlement: string }
 const NO_FACTS: ActionFacts = { liability: '', riskOverride: '', settlement: '' }
+// typed so the submit meta infers the event union, not string
+const NO_META: { event: DisputeEvent; payload: Record<string, unknown> } = { event: 'CLOSE', payload: {} }
 
 const DisputePage = () => {
   const { tenant, disputeId } = Route.useParams()
@@ -44,7 +46,7 @@ const DisputePage = () => {
   // the facts an action may carry; which ones travel depends on the button pressed, so the event is submit meta
   const actionForm = useAppForm({
     defaultValues: NO_FACTS,
-    onSubmitMeta: { event: 'CLOSE' as DisputeEvent, payload: {} as Record<string, unknown> },
+    onSubmitMeta: NO_META,
     onSubmit: async ({ value, meta: { event, payload }, formApi }) => {
       const facts: Record<string, unknown> = { ...payload }
       if (event === 'ISSUE_REFUND' && value.liability.trim()) facts.liability = value.liability.trim()

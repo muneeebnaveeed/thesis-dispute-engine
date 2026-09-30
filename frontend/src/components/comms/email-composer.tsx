@@ -42,7 +42,7 @@ export const EmailComposer = ({
 }) => {
   const composer = useAppForm({
     defaultValues: {
-      template: templates[0]?.kind ?? ('CUSTOM' as EmailTemplate['kind']),
+      template: templates[0]?.kind ?? 'CUSTOM',
       fields: blankInputs(templates[0]),
     },
     onSubmit: ({ value, formApi }) =>

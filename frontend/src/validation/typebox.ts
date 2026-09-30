@@ -43,7 +43,7 @@ const adapters = new WeakMap<TSchema, StandardSchemaV1>()
 // TypeBox 0.34 predates Standard Schema; unknown fields are dropped and defaults applied before the check
 export const fromTypeBox = <T extends TSchema>(schema: T): StandardSchemaV1<Static<T>, Static<T>> => {
   const cached = adapters.get(schema)
-  if (cached) return cached as StandardSchemaV1<Static<T>, Static<T>>
+  if (cached) return cached
   const adapter: StandardSchemaV1<Static<T>, Static<T>> = {
     '~standard': {
       version: 1,
