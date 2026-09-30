@@ -25,7 +25,8 @@ lint and format fixes. `make workbench:dev` for the dev server on :3002. Inside 
 - Layout by role, then by domain: `src/api/` (generated contract, failures, views), `src/queries/`
   and `src/server/functions/` (one file per domain: `disputes`, `notices`, `tenant-keys`,
   `tenant-templates`, plus `session` and `discovery`; a new domain gets a new file in each, never a
-  line in a shared one), `src/forms/` (form validation and input schemas), `src/lib/` (pure helpers:
+  line in a shared one), `src/forms/` (form validation and input schemas), `src/validation/` (the one
+  validation interface and its TypeBox adapter, ADR 0025), `src/lib/` (pure helpers:
   `cn` in `utils.ts`, money, email rendering), `src/components/shadcn/` (vendored registry
   components, see below), `src/components/ui/` (our own primitives on top of them),
   `src/components/{layout,disputes,comms}/`, and `src/server/{runtime,auth}/`. Components are
@@ -36,7 +37,7 @@ lint and format fixes. `make workbench:dev` for the dev server on :3002. Inside 
 - The browser never calls the API and never holds a token (ADR 0020). Every call is a server
   function in `src/server/functions/<domain>.ts`, built from `authenticatedGet` or `authenticatedPost`
   (`src/server/runtime/fn.ts`): the `authed` middleware resolves the session once and provides
-  `context.api`; `.validator(parse(schema))` checks the input with a TypeBox schema (the generated
+  `context.api`; `.validator(parse(schema))` checks the input with a schema (the generated TypeBox
   one where the contract has it) before the handler runs; the handler returns the openapi-fetch
   result as it is (`({ data, context: { api } }) => api.GET(...)`), never a throw for problem+json.
   The `Response` inside it crosses the RPC boundary as its status line through the serialization
@@ -48,6 +49,9 @@ lint and format fixes. `make workbench:dev` for the dev server on :3002. Inside 
   and `useServerMutation` follows it for actions, so never call a server function imperatively
   outside that hook.
   Never use `inputValidator`; never call `createServerFn` directly for an analyst endpoint.
+- Validation goes through `#/validation/validate` only (ADR 0025): `validate`, `is`, and the `Input`/`Output`
+  types instead of `Static`. It accepts any Standard Schema and adapts TypeBox itself; never import
+  `@sinclair/typebox/value` outside `src/validation/`. Schemas must validate synchronously.
 - Reads are `queryOptions` in `src/queries/<domain>.ts`, one per server function, and they are the
   only source of key truth: `disputeQuery(id).queryKey` is `['disputes', id]`, and the null form
   `disputeQuery(null).queryKey` is the `['disputes']` prefix for invalidation. Do not keep a

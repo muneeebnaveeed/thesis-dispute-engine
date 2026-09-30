@@ -38,7 +38,9 @@ exception. Writing follows the same route in reverse. Forms are built from the T
 that the contract already generates, so the structural rules the service enforces are the rules
 the form applies before it submits, and a validation refusal that names a field is placed back on
 that field, indistinguishable to the analyst from one the browser found itself. Every other kind
-of failure stays in the mutation and is rendered once, as a banner.
+of failure stays in the mutation and is rendered once, as a banner. Validation itself is reached
+through one library-neutral interface, Standard Schema, with TypeBox adapted behind it, so the
+schema library can be exchanged without touching the code that validates.
 
 What the analyst sees is a grid and a small number of panels (figure~\ref{fig:workbench}). The
 dispute list carries the actions and the filter on a toolbar above it and its paging controls

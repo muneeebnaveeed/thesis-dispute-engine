@@ -1,7 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate, useRouteContext } from '@tanstack/react-router'
 import { useState } from 'react'
-import { Value } from '@sinclair/typebox/value'
 
 import { DisputeReason as DisputeReasonSchema, DisputeState as DisputeStateSchema } from '#/api/schemas.gen'
 import type { components } from '#/api/schema.gen'
@@ -15,6 +14,7 @@ import { TenantMismatch } from '#/components/layout/tenant-mismatch'
 import { submitting, useAppForm } from '#/forms/app-form'
 import { disputeQuery, disputesQuery, type DisputeListSearch } from '#/queries/disputes'
 import { useSearchFilterSuggestion } from '#/queries/suggestions'
+import { is } from '#/validation/validate'
 
 type DisputeState = components['schemas']['DisputeState']
 type DisputeReason = components['schemas']['DisputeReason']
@@ -24,9 +24,8 @@ const STATES = [ANY, ...DisputeStateSchema.anyOf.map((l) => ({ value: l.const, l
 const REASONS = [ANY, ...DisputeReasonSchema.anyOf.map((l) => ({ value: l.const, label: l.const }))]
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-const isState = (v: unknown): v is DisputeState => typeof v === 'string' && Value.Check(DisputeStateSchema, v)
-const isReason = (v: unknown): v is DisputeReason =>
-  typeof v === 'string' && Value.Check(DisputeReasonSchema, v)
+const isState = (v: unknown): v is DisputeState => is(DisputeStateSchema, v)
+const isReason = (v: unknown): v is DisputeReason => is(DisputeReasonSchema, v)
 
 const SearchPage = () => {
   const { tenant } = Route.useParams()

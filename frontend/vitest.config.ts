@@ -14,7 +14,7 @@ export default defineConfig({
       provider: 'v8',
       // Only the layers that hold logic. Routes and components are composition, covered by e2e;
       // src/api and routeTree.gen.ts are generated.
-      include: ['src/server/**', 'src/lib/**'],
+      include: ['src/server/**', 'src/lib/**', 'src/validation/**'],
       reporter: ['text', 'json-summary'],
       reportsDirectory: './coverage',
     },
