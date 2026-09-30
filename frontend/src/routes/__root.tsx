@@ -1,12 +1,14 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router'
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 
 import { RouteError } from '#/components/layout/route-error'
+import { installStaleBuildGuards } from '#/lib/stale-build'
 import { getViewer } from '#/server/functions/session'
 import appCss from '../styles.css?url'
 
 const RootDocument = ({ children }: { children: ReactNode }) => {
+  useEffect(() => installStaleBuildGuards(), [])
   return (
     <html lang="en">
       <head>

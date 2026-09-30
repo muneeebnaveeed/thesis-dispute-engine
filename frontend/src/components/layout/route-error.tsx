@@ -1,10 +1,16 @@
 import type { ErrorComponentProps } from '@tanstack/react-router'
+import { useEffect } from 'react'
 
 import { AppShell } from '#/components/layout/app-shell'
 import { Button } from '#/components/ui/button'
+import { staleBuildGuard } from '#/lib/stale-build'
 
 export const RouteError = ({ error, reset }: ErrorComponentProps) => {
   const errorMessage = error instanceof Error ? error.message : 'unexpected error'
+  // a page from an older build can fail only because the server moved on; if so the tab reloads instead
+  useEffect(() => {
+    void staleBuildGuard().check()
+  }, [])
   return (
     <AppShell title="Something went wrong">
       <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-900">

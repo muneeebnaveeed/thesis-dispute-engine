@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 import { fromProblem, isFailure, unreachable, type Failure } from '#/api/failure'
 import type { ApiResult } from '#/api/views'
+import { staleBuildGuard } from '#/lib/stale-build'
 
 export const useServerMutation = <TVariables, TData>(
   run: (variables: TVariables) => Promise<ApiResult<TData>>,
@@ -27,6 +28,8 @@ export const useServerMutation = <TVariables, TData>(
           await router.navigate(router.resolveRedirect(thrown).options)
           throw thrown
         }
+        // a server function this tab's build knows may be gone from the server's; if so the tab reloads
+        void staleBuildGuard().check()
         const failed = unreachable(thrown)
         setFailure(failed)
         throw failed
