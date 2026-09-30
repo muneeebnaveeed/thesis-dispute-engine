@@ -126,6 +126,7 @@
   ],
   "users": [
     {
+      "id": "a1000000-0000-8000-8000-00000000a002",
       "username": "analyst",
       "email": "analyst@erste.example",
       "firstName": "Gabor",
@@ -134,6 +135,28 @@
       "emailVerified": true,
       "credentials": [{ "type": "password", "value": "analyst", "temporary": false }],
       "realmRoles": ["analyst", "tenant-admin"]
+    },
+    {
+      "id": "a2000000-0000-8000-8000-00000000a002",
+      "username": "junior",
+      "email": "junior@erste.example",
+      "firstName": "Junior",
+      "lastName": "Analyst",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "junior", "temporary": false }],
+      "realmRoles": ["analyst"]
+    },
+    {
+      "id": "a3000000-0000-8000-8000-00000000a002",
+      "username": "fraud",
+      "email": "fraud@erste.example",
+      "firstName": "Fraud",
+      "lastName": "Analyst",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "fraud", "temporary": false }],
+      "realmRoles": ["analyst"]
     }
   ]
 }

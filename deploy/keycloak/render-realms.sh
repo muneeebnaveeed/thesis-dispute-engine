@@ -12,8 +12,11 @@ mkdir -p import
 render() {
   local slug=$1 name=$2 tenant_id=$3 first=${4:-Test} last=${5:-Analyst}
   [[ "$slug" =~ ^[a-z0-9][a-z0-9-]{1,62}$ ]] || { echo "bad slug: $slug" >&2; exit 1; }
+  # seeded users get ids fixed per realm (Keycloak ids are unique across realms), which cmd/seed/access names
+  [[ "$tenant_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] || { echo "bad tenant id: $tenant_id" >&2; exit 1; }
   sed -e "s/__SLUG__/$slug/g" -e "s/__NAME__/$name/g" -e "s/__TENANT_ID__/$tenant_id/g" -e "s/__FRONTEND_SECRET__/$secret/g" \
     -e "s/__ANALYST_FIRST__/$first/g" -e "s/__ANALYST_LAST__/$last/g" \
+    -e "s/__USER_A1__/a1000000${tenant_id:8}/g" -e "s/__USER_A2__/a2000000${tenant_id:8}/g" -e "s/__USER_A3__/a3000000${tenant_id:8}/g" \
     -e "s#__APP_URL__#$app_url#g" realm.template.json > "import/$slug.json"
   echo "rendered import/$slug.json"
 }

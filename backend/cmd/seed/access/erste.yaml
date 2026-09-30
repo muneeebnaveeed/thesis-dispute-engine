@@ -1,0 +1,37 @@
+# Dev access for the erste realm. Subjects are the fixed Keycloak user ids render-realms.sh gives the seeded
+# users: a1 analyst (lead everywhere, tenant admin), a2 junior (chargebacks), a3 fraud (fraud senior).
+teams:
+  - { slug: general, name: General, default: true }
+  - { slug: chargebacks, name: Chargebacks }
+  - { slug: fraud, name: Fraud }
+members:
+  - { subject: a1000000-0000-8000-8000-00000000a002, team: general, role: lead }
+  - { subject: a1000000-0000-8000-8000-00000000a002, team: chargebacks, role: lead }
+  - { subject: a1000000-0000-8000-8000-00000000a002, team: fraud, role: lead }
+  - { subject: a2000000-0000-8000-8000-00000000a002, team: chargebacks, role: junior }
+  - { subject: a3000000-0000-8000-8000-00000000a002, team: fraud, role: senior }
+grants:
+  - team: general
+    role: junior
+    actions: [create, compose-email, upload-attachment, resend-notice, OPEN_INVESTIGATION, SEND_QUESTIONNAIRE,
+      RECEIVE_QUESTIONNAIRE, ISSUE_REFUND, FILE_CHARGEBACK, ACKNOWLEDGE_CHARGEBACK, SUBMIT_EVIDENCE, WIN_CHARGEBACK,
+      LOSE_CHARGEBACK, ISSUE_FINAL_CREDIT, REVERSE_PROVISIONAL_CREDIT, CLOSE, APPEAL]
+  - { team: general, role: lead, actions: [reassign] }
+  - team: chargebacks
+    role: junior
+    actions: [create, compose-email, upload-attachment, resend-notice, OPEN_INVESTIGATION, SEND_QUESTIONNAIRE,
+      RECEIVE_QUESTIONNAIRE, FILE_CHARGEBACK, ACKNOWLEDGE_CHARGEBACK, SUBMIT_EVIDENCE]
+  - { team: chargebacks, role: junior, actions: [ISSUE_FINAL_CREDIT, ISSUE_REFUND], amount_limit: "500.00" }
+  - team: chargebacks
+    role: senior
+    actions: [ISSUE_FINAL_CREDIT, ISSUE_REFUND, WIN_CHARGEBACK, LOSE_CHARGEBACK, REVERSE_PROVISIONAL_CREDIT, CLOSE, APPEAL]
+  - { team: chargebacks, role: lead, actions: [reassign] }
+  - team: fraud
+    role: junior
+    actions: [create, compose-email, upload-attachment, resend-notice, OPEN_INVESTIGATION, SEND_QUESTIONNAIRE,
+      RECEIVE_QUESTIONNAIRE]
+  - { team: fraud, role: senior, actions: [ISSUE_REFUND, CLOSE, REVERSE_PROVISIONAL_CREDIT] }
+  - { team: fraud, role: lead, actions: [reassign] }
+routing:
+  - { reason: UNAUTHORISED, rail: CARD, min_amount: "1000.00", team: fraud }
+  - { rail: CARD, min_amount: "1000.00", team: chargebacks }
