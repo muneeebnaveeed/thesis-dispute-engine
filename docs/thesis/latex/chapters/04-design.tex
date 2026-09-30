@@ -250,6 +250,53 @@ and in section~\ref{sec:design-fraud} they become one of the signals a risk scor
 \label{sec:design-tenancy}
 % To write: ADR 0008 and 0009. Stub so the communications and workbench sections resolve.
 
+% Distils ADR 0026.
+\section{Authorization}
+\label{sec:design-authorization}
+
+Row-level security answers which tenant a row belongs to; it says nothing about who inside a
+tenant may do what. Until this point the answer was everyone: any analyst or tenant key could
+apply any event, including the ones that move money, and the actor written on each event was
+whatever the request claimed. An issuer's own operations run on the opposite assumptions. Work
+belongs to teams, seniority bounds the amounts a person may settle alone, and the person who
+investigated a claim does not also pay it out. The engine therefore decides every operation that
+changes a dispute or the tenant with one policy engine, over one notion of the caller.
+
+The caller is a \emph{principal}, the same shape for both credentials of section~\ref{sec:design-tenancy}:
+an analyst, named by the subject of their token and carrying whether their realm made them a
+tenant administrator, or a tenant key, named by its identifier. The event actor is always this
+principal and never a field of the request, so the audit trail records who acted rather than who
+claimed to. That change is what makes the rest of the model meaningful, since a rule about who
+opened an investigation is only as good as the record of who did.
+
+Policies are written in Cedar \cite{cedar2024}, evaluated inside the service. Cedar was chosen over
+a general-purpose policy language and over a purpose-built one for three properties the argument
+depends on. It denies by default. It resolves conflicts in one fixed way: any policy that forbids
+an action overrides every policy that permits it. And its semantics are specified formally, with
+a reference implementation that can check a policy set against a schema before it is ever
+evaluated. The engine splits its policies along that first property. \emph{Guardrails} are Cedar
+in the binary that no tenant can change, written as prohibitions: whoever opened the
+investigation never issues its final credit, only a lead of a dispute's team may move it
+elsewhere, tenant administration follows the realm role and nothing else, and a tenant key never
+writes to a customer. \emph{Grants} are data, one row per team, role and action, optionally bounded
+by an amount, compiled into permissions that can reach only their own team's disputes. A grant
+that cannot be expressed safely is dropped rather than escaped, so a malformed row can only take a
+permission away. Because a prohibition always wins, no combination of grants can open what a
+guardrail closes; that is the property that later lets tenants edit their own grants without the
+engine trusting what they write.
+
+The decision is made where the facts are committed: inside the request's transaction, after the
+dispute is loaded and before the state machine runs. What the policies see is the dispute's team,
+amount, rail and state, and who opened its investigation, taken from the event log rather than
+from the request. A refusal names the policy that decided it, and an allowed event records the
+policies that allowed it, so the log answers why a credit was permitted as well as who issued it.
+The actions a dispute offers are the ones the state machine would accept and the caller may take,
+so the workbench never shows a button that would be refused. Two smaller decisions close gaps the
+model would otherwise leave: an idempotency key belongs to the principal that used it, so a
+replayed response is never handed to someone the engine did not authorize, and the service
+refuses to start if any operation in its contract has not been classified as public, internal,
+open to any caller of the tenant, or decided by the engine.
+
 % Distils ADR 0017.
 \section{Communications}
 \label{sec:design-communications}
