@@ -54,6 +54,8 @@ export const TemplateEditor = ({
 }) => {
   const { base, effective, override } = setting
   const [editing, setEditing] = useState(false)
+  // the sample's date is fixed at mount so the preview does not change between renders
+  const [sampleDate] = useState(() => new Date())
   const initialOptionTexts: Record<string, string> = {}
   for (const field of effective.fields) {
     for (const option of field.options ?? [])
@@ -102,7 +104,7 @@ export const TemplateEditor = ({
       return options ? { ...field, options } : field
     }),
   }
-  const renderedSample = renderEmailPreview(draftWording, sampleInputsFor(draftWording), new Date())
+  const renderedSample = renderEmailPreview(draftWording, sampleInputsFor(draftWording), sampleDate)
   const placeholderNames = [...base.fields.map((field) => field.id), ...FACT_PLACEHOLDERS]
   const refusal = failure?.kind === 'validation' ? failure.problem.detail : undefined
 

@@ -42,13 +42,14 @@ const inputs: Record<string, Record<string, string>> = {
   },
 }
 
+const substituteFacts = (line: string) =>
+  line.replace(
+    /\{\{(customer|bank|amount|merchant|dispute|today)\}\}/g,
+    (match, factName: string) => facts[factName] ?? match,
+  )
+
 // the server substitutes facts before the browser sees a template
 const withFactsSubstituted = (template: EmailTemplate): EmailTemplate => {
-  const substituteFacts = (line: string) =>
-    line.replace(
-      /\{\{(customer|bank|amount|merchant|dispute|today)\}\}/g,
-      (match, factName: string) => facts[factName] ?? match,
-    )
   return {
     ...template,
     subject: substituteFacts(template.subject),
