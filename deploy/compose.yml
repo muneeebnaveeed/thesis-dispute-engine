@@ -165,7 +165,7 @@ services:
 
   # Grafana + Loki + Tempo + Mimir + an OTel Collector in one image; OTLP on 4317/4318, UI on 3001 (admin/admin).
   lgtm:
-    image: grafana/otel-lgtm:0.33.1
+    image: grafana/otel-lgtm:0.34.0
     network_mode: host
     profiles: [otel]
     environment:
