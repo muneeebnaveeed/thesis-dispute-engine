@@ -138,7 +138,7 @@ services:
       MP_UI_BIND_ADDR: 127.0.0.1:8025
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.7.4
+    image: quay.io/keycloak/keycloak:26.8.0-1
     network_mode: host
     profiles: [auth]
     depends_on:
