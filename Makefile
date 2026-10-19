@@ -23,7 +23,7 @@ GENERATED       := $(BACKEND)/internal/dispute/infrastructure/postgres/sqlcgen $
 	workbench\:install workbench\:dev workbench\:check workbench\:fix workbench\:generate workbench\:cover \
 	workbench\:build workbench\:image workbench\:e2e \
 	stack\:up stack\:dev stack\:down auth\:up auth\:down otel\:up otel\:down otel\:reset \
-	thesis\:build thesis\:eval pr\:open pr\:ci-logs pr\:comments pr\:stack
+	thesis\:build thesis\:figures thesis\:eval pr\:open pr\:ci-logs pr\:comments pr\:stack
 
 ##@ Everyday
 
@@ -199,6 +199,9 @@ otel\:reset: ## Stop the otel stack and drop its data volume
 
 thesis\:build: ## Build docs/thesis/latex/main.tex to docs/thesis/latex/build/main.pdf (TeX Live in Docker; Overleaf builds the same sources)
 	docker run --rm --network host -v "$(CURDIR)/docs/thesis/latex:/work" -w /work texlive/texlive:latest latexmk -pdf -interaction=nonstopmode main.tex >/dev/null && echo "docs/thesis/latex/build/main.pdf"
+
+thesis\:figures: ## Render generated figures into docs/thesis/latex/figures (the lifecycle diagram comes from the transition table's golden file)
+	docker run --rm --network host -v "$(CURDIR):/work" -w /work alpine:3 sh -c 'apk add --no-cache -q graphviz font-liberation >/dev/null && dot -Tpdf -o docs/thesis/latex/figures/state-machine.pdf backend/internal/dispute/domain/testdata/state-machine.dot && chown $(shell id -u):$(shell id -g) docs/thesis/latex/figures/state-machine.pdf'
 
 thesis\:eval: ## Evaluation run into docs/thesis/data/<date>/ (needs make otel:up); EVAL_RPS, EVAL_SECONDS, EVAL_KEY
 	scripts/eval

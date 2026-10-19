@@ -1,0 +1,72 @@
+digraph lifecycle {
+  rankdir=TB; splines=ortho; nodesep=0.45; ranksep=0.5; newrank=true;
+  node [shape=box, style="rounded,filled", fillcolor=white, color="gray35", fontname="Times", fontsize=15];
+  edge [color="gray35", fontname="Times", fontsize=14, penwidth=1.8, arrowsize=1.2];
+  INITIATED [label="Initiated"];
+  subgraph cluster_investigation {
+    label="Investigation"; labelloc=t; labeljust=l; fontname="Times"; fontsize=13;
+    style=solid; penwidth=1.4; bgcolor="#e8f1fb"; pencolor="#3f73a8"; fontcolor="#3f73a8";
+    INVESTIGATING [label="Investigating"];
+    QUESTIONNAIRE_SENT [label="Questionnaire Sent"];
+    QUESTIONNAIRE_RECEIVED [label="Questionnaire Received"];
+    investigation_exit [shape=point, width=0.09, color="#3f73a8", fillcolor="#3f73a8"];
+    QUESTIONNAIRE_RECEIVED -> investigation_exit [style=invis, weight=10];
+  }
+  subgraph cluster_money {
+    label="Money to the Customer"; labelloc=t; labeljust=r; fontname="Times"; fontsize=13;
+    style=solid; penwidth=1.4; bgcolor="#e7f5ea"; pencolor="#3b8a50"; fontcolor="#3b8a50";
+    PROVISIONAL_CREDIT_ISSUED [label="Provisional Credit Issued (Reg E)"];
+    FAST_REFUND_ISSUED [label="Fast Refund Issued (PSD2)"];
+    SEPA_NQA_REFUND_ISSUED [label="SEPA NQA Refund Issued"];
+    money_exit [shape=point, width=0.09, color="#3b8a50", fillcolor="#3b8a50"];
+    SEPA_NQA_REFUND_ISSUED -> money_exit [style=invis, weight=10];
+  }
+  subgraph cluster_chargeback {
+    label="Chargeback\n(PSD2, Reg E, Reg Z)"; labelloc=t; labeljust=r; fontname="Times"; fontsize=13;
+    style=solid; penwidth=1.4; bgcolor="#fdefe1"; pencolor="#b8691f"; fontcolor="#b8691f";
+    CHARGEBACK_FILED [label="Chargeback Filed"];
+    CHARGEBACK_ACKNOWLEDGED [label="Chargeback Acknowledged"];
+    EVIDENCE_SUBMITTED [label="Evidence Submitted"];
+    CHARGEBACK_LOST [label="Chargeback Lost", group=lost];
+    CHARGEBACK_WON [label="Chargeback Won", group=won];
+    chargeback_exit [shape=point, width=0.09, color="#b8691f", fillcolor="#b8691f"];
+    { rank=same; CHARGEBACK_WON; chargeback_exit; }
+  }
+  subgraph cluster_settlement {
+    label="Settlement\n(Reg E)"; labelloc=b; labeljust=r; fontname="Times"; fontsize=13;
+    style=solid; penwidth=1.4; bgcolor="#f2eaf8"; pencolor="#7a4ea3"; fontcolor="#7a4ea3";
+    PROVISIONAL_CREDIT_REVERSED [label="Provisional Credit Reversed", group=lost];
+    FINAL_CREDIT_ISSUED [label="Final Credit Issued", group=won];
+    settlement_exit [shape=point, width=0.09, color="#7a4ea3", fillcolor="#7a4ea3"];
+    { rank=same; FINAL_CREDIT_ISSUED; settlement_exit; }
+  }
+  INITIATED -> INVESTIGATING [xlabel=""];
+  INITIATED -> SEPA_NQA_REFUND_ISSUED [xlabel=""];
+  INVESTIGATING -> QUESTIONNAIRE_SENT [xlabel=""];
+  QUESTIONNAIRE_SENT -> QUESTIONNAIRE_RECEIVED [xlabel=""];
+  investigation_exit -> PROVISIONAL_CREDIT_ISSUED [xlabel="", color="#3f73a8", fontcolor="#3f73a8"];
+  investigation_exit -> FAST_REFUND_ISSUED [xlabel="", color="#3f73a8", fontcolor="#3f73a8"];
+  investigation_exit -> SEPA_NQA_REFUND_ISSUED [xlabel="", color="#3f73a8", fontcolor="#3f73a8"];
+  investigation_exit -> CHARGEBACK_FILED [xlabel="Reg Z", color="#3f73a8", fontcolor="#3f73a8"];
+  closed_investigation [label="Closed", shape=box, style="rounded,filled", fillcolor="gray25", fontcolor=white, color="gray25", fontsize=13];
+  { rank=same; investigation_exit; closed_investigation; }
+  investigation_exit -> closed_investigation [xlabel="", color="#3f73a8", fontcolor="#3f73a8"];
+  money_exit -> CHARGEBACK_FILED [xlabel="PSD2, Reg E", color="#3b8a50", fontcolor="#3b8a50"];
+  closed_money [label="Closed", shape=box, style="rounded,filled", fillcolor="gray25", fontcolor=white, color="gray25", fontsize=13];
+  { rank=same; money_exit; closed_money; }
+  money_exit -> closed_money [xlabel="", color="#3b8a50", fontcolor="#3b8a50"];
+  CHARGEBACK_FILED -> CHARGEBACK_ACKNOWLEDGED [xlabel=""];
+  CHARGEBACK_ACKNOWLEDGED -> EVIDENCE_SUBMITTED [xlabel=""];
+  CHARGEBACK_ACKNOWLEDGED -> CHARGEBACK_WON [xlabel=""];
+  CHARGEBACK_ACKNOWLEDGED -> CHARGEBACK_LOST [xlabel=""];
+  EVIDENCE_SUBMITTED -> CHARGEBACK_WON [xlabel=""];
+  EVIDENCE_SUBMITTED -> CHARGEBACK_LOST [xlabel=""];
+  CHARGEBACK_WON -> FINAL_CREDIT_ISSUED [xlabel="", weight=20];
+  closed_chargeback [label="Closed (PSD2, Reg Z)", shape=box, style="rounded,filled", fillcolor="gray25", fontcolor=white, color="gray25", fontsize=13];
+  { rank=same; chargeback_exit; closed_chargeback; }
+  chargeback_exit -> closed_chargeback [xlabel="", color="#b8691f", fontcolor="#b8691f"];
+  CHARGEBACK_LOST -> PROVISIONAL_CREDIT_REVERSED [xlabel="", weight=20];
+  closed_settlement [label="Closed", shape=box, style="rounded,filled", fillcolor="gray25", fontcolor=white, color="gray25", fontsize=13];
+  { rank=same; settlement_exit; closed_settlement; }
+  settlement_exit -> closed_settlement [xlabel="", color="#7a4ea3", fontcolor="#7a4ea3"];
+}

@@ -12,7 +12,7 @@ on screen and printed small. JPEG rather than the smaller WebP because pdflatex 
 | --- | --- | --- | --- | --- |
 | 4.1 | 4 | Bounded contexts and layers of the service | `CLAUDE.md` layout, `backend/internal/` | todo (diagram) |
 | 4.2 | 4 | Regime configuration table | `backend/internal/dispute/domain/regime.go` rules table | source |
-| 4.3 | 4 | Dispute lifecycle state machine, all regimes | `backend/internal/dispute/domain/state.go` transition table | todo (generate diagram from the table so it cannot drift) |
+| 4.3 | 4 | Dispute lifecycle state machine, all regimes | `domain/diagram_test.go` golden `testdata/state-machine.dot`, rendered by `make thesis:figures` | done (`04-design.tex`) |
 | 4.4 | 4 | State row plus append-only event log (schema) | `backend/migrations/0001_dispute_schema.sql` | source |
 | 4.5 | 4 | A problem response (listing) | `docs/api/openapi.yaml` Problem, a captured 409 body | source |
 | 4.6 | 4 | Row-level security policy and the tenant binding (listing) | `backend/migrations/0003_tenants.sql`, `store.go WithTx` | source |
