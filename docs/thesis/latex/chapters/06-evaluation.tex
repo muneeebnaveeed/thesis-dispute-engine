@@ -4,6 +4,141 @@
 % Budget and sources: docs/thesis/outline.md. Every claim about behaviour points at a test, a figure or a number in data/.
 
 
+Every number in this chapter comes from run \code{2026-10-19\_1200} in \code{docs/thesis/data}, produced by
+\code{make thesis:eval} on a single laptop (Intel i9-14900HX, 32 cores, 30~GB; Go~1.27.1, PostgreSQL~18.6) with
+the whole stack running locally. The run has two parts. The first executes the service's test suites, unit and
+database-backed together, and records what they assert; the second drives the running service with a paced load
+and reads its own metrics back for exactly that window. Section~\ref{sec:eval-decisions} reports a separate,
+earlier measurement of the decision model.
+
+\section{Correctness across regimes}
+\label{sec:eval-correctness}
+
+The run's suites pass in full: 189 tests across 19 packages, none failing. The ones that bear on the central claim
+of chapter~\ref{ch:design}, that one state machine carries four regimes, are summarised in
+figure~\ref{fig:eval-coverage}. For each regime the test explores every state reachable from \emph{initiated},
+tries every event in each, and records which pairs are accepted and which refused. It then fails unless each
+accepted transition is walked by at least one named scenario, a dispute taken from \emph{initiated} to
+\emph{closed} along a path a reader can follow, such as ``Regulation~E: chargeback lost without evidence, credit
+reversed''.
+
+\begin{figure}[htbp]
+\centering
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+Regime & States & Accepted & Walked & Scenarios & Refused pairs \\
+\midrule
+SEPA direct debit & 6 & 10 & 10 & 6 & 62 \\
+PSD2 card & 11 & 18 & 18 & 8 & 114 \\
+Regulation~E & 13 & 20 & 20 & 8 & 136 \\
+Regulation~Z & 10 & 16 & 16 & 7 & 104 \\
+\midrule
+Total & & 64 & 64 & 29 & 416 \\
+\bottomrule
+\end{tabular}
+\caption{Transition coverage per regime in run \code{2026-10-19\_1200} (\code{correctness.json},
+\code{TestTransitionCoverage}). States are those reachable from \emph{initiated}; accepted and refused count the
+pairs of reachable state and event; walked counts the accepted transitions some named scenario takes.}
+\label{fig:eval-coverage}
+\end{figure}
+
+Three other tests close the remaining gaps in the argument. The set of reachable states of each regime is pinned,
+so that adding or removing a state is a deliberate change with its own diff rather than an accident. Every
+reachable state must be able to reach \emph{closed}, so no regime can strand a dispute. And the events the
+engine offers in each reachable state must be exactly the events it would accept, which is what lets the
+workbench show only the actions that will succeed. The refusals that carry the regulation, such as a SEPA claim
+that tries to file a chargeback or a Regulation~Z dispute that tries to issue a refund, are named tests of their
+own. Before the coverage test existed, the named scenarios walked only 28 of the 64 accepted transitions; the
+other 36 were covered only by the consistency check, which shows that the engine agrees with itself but not that
+a path makes sense. The 23 scenarios added to close that gap are now part of the suite, and removing a scenario
+that is the only one to walk some transition makes the build fail, naming that transition.
+
+\section{The log, concurrency and retries}
+\label{sec:eval-log}
+
+Section~\ref{sec:design-state-machine} relies on the dispute's history being trustworthy, and
+section~\ref{sec:design-core} relies on retries being safe. Four tests against a real PostgreSQL database
+establish both. The first tries to rewrite history directly in the database, with an update of an event's actor,
+a delete and a truncate of the event table, and each is refused by the database itself; the dispute still has
+exactly the one event it started with. The second starts eight writers at the same instant, each applying the
+same event to the same dispute: exactly one succeeds, the other seven receive a conflict, and the dispute ends at
+version two with two events, so the race neither lost a write nor applied one twice. The third repeats a request
+with the same idempotency key on a different connection and receives the stored response rather than a second
+dispute, while the same key with a different body is refused. The fourth applies a transition the regime forbids
+and checks that nothing at all was written, neither an event nor a version.
+
+The load run exercises the same mechanisms under traffic. In two minutes at about twenty requests a second it
+opened 479 disputes and applied 958 transitions, replayed one creation in ten with its original key, and
+deliberately attempted one forbidden event per dispute. The response counts account for every request: 526
+creations answered \code{201} (479 new and 47 replays), 1,437 reads and transitions answered \code{200}, and
+the 479 forbidden events each answered \code{409}, with no server errors. The load generator checks only that a
+replay is answered like the original; that a replay never creates a second dispute is the database test above.
+
+\section{Isolation between tenants and teams}
+\label{sec:eval-isolation}
+
+The isolation claim of section~\ref{sec:design-tenancy} is that a tenant's data is invisible to every other
+tenant even if the application code is wrong. It is therefore tested below the application, against the
+database role the service actually runs as. Under that role, a second tenant cannot read the first tenant's
+dispute, cannot apply an event to it, and cannot open a dispute on its transaction; in all three cases the answer
+is ``not found'', so the attempt does not even learn that the dispute exists. The same idempotency key used by two
+tenants is two separate requests, not a replay of the other's response. A query on a connection that has not
+been bound to a tenant sees no rows at all, so a forgotten binding fails closed. And an attempt to insert a row
+carrying another tenant's identifier is rejected by the policy with PostgreSQL's insufficient-privilege error,
+so a row cannot be written into another tenant either.
+
+Team scope, the second line of section~\ref{sec:design-teams}, is tested the same way. An analyst who belongs
+only to another team cannot read, list or advance a dispute, and a raw query in that analyst's context sees none
+of its events. The test also checks the property that made the policies restrictive rather than permissive: a team
+lead of another tenant still sees nothing, so team scope can only narrow what tenant isolation allows. The authorization
+policies on top are checked separately, over generated sets of grants, for the three properties that matter:
+no set lets an investigator pay out their own dispute, reach a dispute outside their teams, or administer the
+tenant.
+
+\section{Latency under load}
+\label{sec:eval-latency}
+
+The load run measures what a single instance costs per request, not what a deployment could carry, since the
+whole stack shared one machine. It paced four lifecycle iterations a second, about twenty requests, for two
+minutes against one tenant, and read the server's own latency histograms back from Prometheus for that window
+(figure~\ref{fig:eval-latency}).
+
+\begin{figure}[htbp]
+\centering
+\small
+\begin{tabular}{lrrr}
+\toprule
+Route & p50 & p95 & p99 \\
+\midrule
+Read a dispute (\code{GET /disputes/\{id\}}) & 3.3 & 7.2 & 9.5 \\
+Apply an event (\code{POST /disputes/\{id\}/events}) & 5.1 & 9.6 & 16.8 \\
+Open a dispute (\code{POST /disputes}) & 13.7 & 24.5 & 42.7 \\
+\midrule
+All requests, as the client saw them & 5.1 & 15.6 & 20.9 \\
+\bottomrule
+\end{tabular}
+\caption{Latency in milliseconds per route, server side, in run \code{2026-10-19\_1200} (\code{load.json}),
+at about 20 requests a second for 120 seconds.}
+\label{fig:eval-latency}
+\end{figure}
+
+The numbers have the shape the design predicts. A read is a handful of queries under row-level security and stays
+under ten milliseconds at the 99th percentile. An event costs more because it does more inside one transaction:
+the authorization decision, the state machine, the clocks, the ledger postings, the notices it owes and, where
+money moves, the call to the simulated core. Opening a dispute costs most, because it also starts the clocks, scores the dispute and
+writes the first notice. PostgreSQL itself was never the bottleneck: its 95th percentile per query stayed under
+one millisecond (0.97~ms), and the service never ran more than 61 goroutines or held more than 25~MB of heap.
+
+Two comparisons put these numbers in context. Measured the same way on the same machine before authorization
+existed, the median read took 2.1 milliseconds and the median event 3.0; adding a policy decision per operation
+and team scope in the database raised them to 4.2 and 5.0 milliseconds (runs \code{2026-09-30\_1050} and
+\code{2026-09-30\_1057}). The difference is round trips rather than policy evaluation, which costs about 25
+microseconds a decision. Against that later run, this one's reads and events are no slower, while
+the 99th percentile of opening a dispute rose from 25 to 43 milliseconds although the service's code is the same.
+This run is the first whose database-backed suites ran against the same database immediately before the load,
+which is the likely cause; it has not been isolated, and the figure is reported as measured.
+
 \section{Are the model's proposals good enough to show?}
 \label{sec:eval-decisions}
 
@@ -57,4 +192,20 @@ the question properly, and it is recorded from the first dispute opened this way
 
 \section{Limitations}
 \label{sec:limitations}
-% To write: what the evaluation cannot show and what the model leaves out (statutory extensions, MFA, real banking cores).
+
+The evaluation shows the shape of the system's behaviour, not its capacity. The load ran on one machine, with the
+service, the database, the identity provider and the telemetry stack sharing it and talking over loopback, from
+one tenant, with synthetic disputes whose mix was chosen rather than observed. A deployment would add network
+latency between the parts and contention between tenants that this run cannot show, and the numbers say nothing
+about how many disputes a bank of a given size would produce.
+
+The correctness results are tests, not proofs. Coverage is measured over transitions, not over paths, so a fault
+that appears only after a particular sequence of steps would not be caught merely because each step is walked
+somewhere. The regimes themselves are modelled as chapter~\ref{ch:requirements} describes and no further: the
+statutory extensions of the deadlines are not modelled, and every dispute runs the standard clocks; the
+contested rounds of a chargeback after the merchant's first answer are folded into one evidence step; and the
+banking core and the card network are simulated, so the behaviour of a real core under failure is assumed from
+its interface rather than observed. The analysts' identity is delegated to the identity provider, whose own
+protections, such as multi-factor authentication, are configured rather than evaluated here. Finally, the decision
+model was measured on a synthetic, self-labelled set (section~\ref{sec:eval-decisions}); the share of its proposals
+analysts actually keep is recorded by the running system and is the measurement that will settle its value.
