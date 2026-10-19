@@ -309,13 +309,130 @@ a customer who recognises the merchant, held the card, and shared it with nobody
 unauthorised payment that the answers do not support. These are sentences an analyst can act on,
 and in section~\ref{sec:design-fraud} they become one of the signals a risk score is built from.
 
+% Distils ADR 0006 and ADR 0012.
 \section{The contract and its error taxonomy}
 \label{sec:design-failures}
-% To write: ADR 0006 and 0012. Stub so the implementation chapter's references resolve.
 
+The engine is written in Go and the workbench in TypeScript, and the two share no code at runtime. What they must
+share is an agreement: which requests exist, what their bodies look like, which rules a field obeys, and what each
+failure means. An agreement kept in two languages by hand drifts, so the design keeps it in one place. A single
+OpenAPI document is the contract, and nothing about the HTTP surface is decided anywhere else. The server's
+interface is generated from it, so a route that is not in the document does not compile, and every request is
+validated against the document before any handler sees it. The client's types, its request functions and the
+schemas its forms validate with are generated from the same document. The generated code is committed, and the
+build fails if regenerating it would change anything, so the document and both sides cannot disagree for longer
+than one failed check. Only structural rules travel this way, such as a required field or the format of an
+identifier; whether a transaction exists or a transition is allowed remains the server's to decide.
+
+Failures get the same treatment, because a client that has to read error messages to decide what to do will
+eventually get it wrong. Every failure the engine produces is created with a \emph{kind} and a \emph{code}. The kind
+is one of nine classes, from an invalid request to an unavailable dependency, and decides the HTTP status, whether
+the failure is logged and whether repeating the request can help. The code is a stable, machine-readable name such
+as \code{invalid-transition}, one of 28 the contract lists. A handler never chooses a status: one table maps kind to
+status for the whole service. The response is a problem document in the standard format for HTTP APIs
+\cite{rfc9457}, extended with the code, whether the request is worth retrying and after how long, a reference to
+the request, and, for a validation failure, one entry per field pointing at the field in the body
+(figure~\ref{fig:problem}). Two codes carry what a client needs to recover: a refused transition lists the events
+the dispute does allow, and a rate limit says when to come back.
+
+\begin{figure}[htbp]
+\begin{lstlisting}
+HTTP/1.1 409 Conflict
+Content-Type: application/problem+json
+
+{"type": "urn:dispute-engine:error:invalid-transition",
+ "title": "The request conflicts with the current state",
+ "status": 409,
+ "detail": "this action is not allowed in the dispute's current state",
+ "instance": "/disputes/01a15551-c90d-7c55-bfe5-368b97457880/events",
+ "code": "invalid-transition",
+ "retryable": false,
+ "requestId": "ab1de00df2f8ba20",
+ "allowedEvents": ["OPEN_INVESTIGATION"]}
+\end{lstlisting}
+\caption{The response to an analyst who tries to win the chargeback of a PSD2 dispute that has only just opened,
+captured from the service's handler.}
+\label{fig:problem}
+\end{figure}
+
+Everything in a problem document is written to be shown to the person who caused it. The diagnostic context that
+an engineer needs, such as the regime and the state the dispute was in, is attached to the error for the logs and
+the trace and never reaches the body; a test checks that it does not leak. A failure nobody classified becomes a
+generic internal error whose only detail is the request reference, under which the logs and the trace hold the
+cause. The list of codes is kept in two places, the contract and the Go code that emits them, and a test fails if
+the two ever differ.
+
+The workbench turns the same contract into one closed vocabulary of ten failure kinds. Nine follow from the
+server's codes, among them a payment the bank's core declined, which an analyst must be able to tell apart from a
+dispute in the wrong state; the tenth, a server that could not be reached at all, is one only the client can
+observe. The table from code to kind must name every code in the contract, which the compiler checks, and a code
+from a newer server that the table does not yet know is treated as an internal failure, so the analyst still sees
+the request reference rather than a blank. Every response is classified once, where it is read, so a page decides
+what to show from the kind and never from a message. Forms validate against the contract's own schemas before
+anything is sent, so a structural mistake is shown under its field without a round trip, and a field error from
+the server, should one still arrive, appears in exactly the same place. A failure that will pass, a rate limit or
+an unavailable dependency, tells the analyst when to try again, from the wait the response advertised.
+
+% Distils ADR 0008, 0009, 0010 and 0020.
 \section{Multi-tenancy with row-level security}
 \label{sec:design-tenancy}
-% To write: ADR 0008 and 0009. Stub so the communications and workbench sections resolve.
+
+The engine serves several institutions from one deployment. They share the regulatory logic and the process;
+they must never share data, and the design must not depend on every query remembering that. Three layouts were
+considered: a database per tenant, a schema per tenant, and one schema in which every row names its tenant. The
+first two isolate well but multiply everything an operator has to run, from migrations to dashboards, by the
+number of customers. The third keeps one of everything, and is only safe if isolation is enforced somewhere a
+forgotten filter cannot reach. The design takes the third and puts the enforcement in the database, with
+PostgreSQL's row-level security \cite{pgrls}.
+
+Every business table carries the tenant's identifier, and every one has the same policy: a row is visible, and
+may be written, only when its tenant is the one bound to the current transaction (figure~\ref{fig:rls}). The
+service binds the tenant at the start of each transaction from the authenticated caller, never from anything the
+client sends, and binds it for that transaction only, so a pooled connection cannot carry one tenant's identity
+into another tenant's request. When nothing is bound the setting is empty and the policy matches no rows, so
+every mistake in this area fails closed; the store also refuses to open a transaction at all without a tenant.
+The service runs as a database role that is subject to the policies, while the schema's owner, which runs
+migrations, is not. The two things the service legitimately needs across tenants, a count of disputes by state
+for the dashboards and the purge of expired idempotency keys, are provided by the owner as a view and a function
+rather than by giving the service broader access. Idempotency keys are themselves scoped by tenant, because clients
+choose them and two tenants may choose the same one.
+
+\begin{figure}[htbp]
+\begin{lstlisting}[language=SQL]
+CREATE FUNCTION current_tenant_id() RETURNS uuid LANGUAGE sql STABLE AS $$
+    SELECT NULLIF(current_setting('app.tenant_id', true), '')::uuid
+$$;
+CREATE POLICY tenant_isolation ON disputes
+    USING (tenant_id = current_tenant_id())
+    WITH CHECK (tenant_id = current_tenant_id());
+
+-- at the start of every transaction (Store.WithTx), local to that transaction
+SELECT set_config('app.tenant_id', $1, true);
+\end{lstlisting}
+\caption{The tenant policy, here on \code{disputes} (\code{migrations/0003\_tenants.sql}), and the binding the
+store makes before any query. An unbound setting yields \code{NULL}, which matches no rows.}
+\label{fig:rls}
+\end{figure}
+
+The tenant therefore has to come from the credential, and there are two kinds of caller with different needs.
+A tenant's own systems, such as the online bank that opens disputes, run unattended and expect a credential they
+can store: they present a \emph{tenant key}, a random secret shown once when it is issued and kept only as a hash,
+which names its tenant and can be revoked on its own. Analysts are people, and expect sign-in, sessions,
+multi-factor authentication and password recovery, which a dispute engine has no business reimplementing. They
+sign in through an identity provider \cite{oidc} in which every tenant has its own realm, so that each institution's
+users, password rules and sign-in page are separate from every other's at the level of the identity system and
+not only by a field in a token. The tenant's short name in the address of the workbench chooses the realm before
+anyone signs in. The engine verifies an analyst's token itself: the issuer of the token decides the tenant, an
+issuer that no tenant owns is refused, and a tenant claim inside the token that disagrees with its issuer is
+refused as a sign of a misconfigured realm. Both kinds of credential end in the same context, a tenant and a
+principal, and everything below that point is shared.
+
+The browser never holds either credential. An analyst's tokens live in a session on the workbench's server,
+behind a cookie that scripts on the page cannot read, and every call to the engine is made by that server on the
+analyst's behalf; a script injected into a page therefore has no token to steal. The price of the design is that
+every new table needs its tenant column, its policy and its grants, and a table that lacks them fails a test of the
+service role's privileges before it can be released. The isolation it buys is tested against the database role
+the service actually uses, as chapter~\ref{ch:evaluation} reports (section~\ref{sec:eval-isolation}).
 
 % Distils ADR 0026.
 \section{Authorization}
