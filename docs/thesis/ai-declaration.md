@@ -1,16 +1,17 @@
 # Declaration of AI use (draft, kept true as the work proceeds)
 
-Generative AI (Claude, via the Claude Code command-line tool) was used throughout the development of the
-software as a pair-programming assistant: drafting code and tests from my specifications, proposing
-alternatives for design decisions that I then made and recorded as architecture decision records,
-writing the first versions of configuration and documentation files, and diagnosing failures. All
-generated code was reviewed, run and tested by me, and the repository's history shows every change as
-a reviewed pull request.
+Generative AI (Claude, through the Claude Code command-line tool) was used throughout the development of the
+software as a pair-programming assistant: drafting code and tests from my specifications, proposing alternatives for
+design decisions that I then made and recorded as architecture decision records, writing the first versions of
+configuration and documentation files, and diagnosing failures. All generated code was reviewed, run and tested by
+me, and the repository's history shows every change as a reviewed pull request.
 
-For the written thesis, AI was used to check grammar and to suggest rephrasing of sentences I had
-written. No section of the thesis text was produced by the tool from a prompt; the argument, the
-structure and the wording are my own. Figures were produced from the repository (diagrams generated
-from code, screenshots of the running system) and evaluation numbers come from the committed
-measurement runs, not from the tool.
+The same tool drafted the text of the thesis chapters. The decisions the text argues for, the scope, the
+choice of regimes and the structure of each chapter are mine; the drafts were written from my architecture
+decision records, the repository and the committed evaluation runs, and I reviewed and revised every chapter,
+checked each factual claim against the code, the tests or the measurements it points to, and checked each
+citation against its source. Figures were produced from the repository (diagrams generated from code,
+screenshots of the running system) and every number in the evaluation comes from a committed measurement run,
+not from the tool. I take full responsibility for the content.
 
 The exact template required by the faculty will be followed once provided.

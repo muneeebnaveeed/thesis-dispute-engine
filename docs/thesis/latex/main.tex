@@ -14,6 +14,9 @@
 % captured figures are written into this directory by pnpm screenshot, so Overleaf compiles from it unchanged
 \graphicspath{{figures/}}
 \usepackage{booktabs}
+\usepackage{array}
+% ragged-right paragraph column for narrow table cells
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
 \usepackage{caption}
 \usepackage{listings}
 \usepackage{xcolor}
@@ -31,7 +34,7 @@
 % Identifiers are set like code, uniformly, through one macro; the final pass only touches this.
 \newcommand{\code}[1]{\texttt{#1}}
 
-\title{Automated Fraud Dispute Resolution Engine}
+\title{The Customer Is Always Right, Except When It's Not: Finite State Machines for Payment Dispute Resolution and First-Party Fraud Detection}
 \author{Muneeb Naveed}
 \date{2027}
 
