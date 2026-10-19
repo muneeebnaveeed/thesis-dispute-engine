@@ -5,10 +5,77 @@
 
 
 % Sections are written as the decisions land (docs/adr); order follows the outline, so earlier sections are
-% filled in later. This one distils ADR 0002 (the SLA columns) and ADR 0013.
+% filled in later. This one distils ADR 0002.
 \section{The regime-parameterised state machine}
 \label{sec:design-state-machine}
-% To write: ADR 0002. Kept as a stub so the cross-references from later sections resolve.
+
+Every strand of a dispute described in chapter~\ref{ch:introduction} depends on one fact, which is where the
+dispute currently stands. A clock is met by entering a state, a posting is caused by entering a state, a
+notice is owed because a state was entered, and an authorization policy decides on the state the dispute is
+in. The lifecycle is therefore the spine of the design, and the first decision was how to model it when four
+regimes disagree about what a lifecycle contains. One option was a workflow per regime. The other, taken
+here, is a single state machine whose shape is shared and whose regime decides which parts of it exist.
+
+The shared lifecycle has fifteen states (figure~\ref{fig:state-machine}). A dispute is \emph{initiated}, an
+analyst opens the \emph{investigation}, and the customer may be sent a questionnaire and answer it. The
+customer may then receive money in one of three forms, which are three different states because they are
+three different things in law: a \emph{provisional credit} that can be taken back, a \emph{fast refund}
+that is final, and a \emph{no-questions-asked refund} of a direct debit. From there the bank may file a
+chargeback, which the acquirer acknowledges, the merchant may answer with evidence, and the network rules
+won or lost. A provisional credit is then either made final or reversed. Every path ends in \emph{closed},
+and a closed dispute can be appealed, which reopens the investigation.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{state-machine.pdf}
+\caption{The dispute lifecycle under all four regimes, drawn from the transition table by a test
+(\code{domain/diagram\_test.go}, \code{make thesis:figures}). Each arrow is the event that enters its target
+state. Coloured boxes group the states into phases; an arrow from a dot in a phase's colour stands for the
+same step taken from several of the phase's states. The dark \emph{Closed} boxes are one end state, repeated
+beside each phase that can end the dispute. Names in brackets and on arrows are the regimes a state, a phase or a step is limited to (SEPA direct debit,
+PSD2 card payments, Regulation~E, Regulation~Z); an unmarked arrow is open to every regime that reaches it. The appeal, from \emph{Closed} back to \emph{Investigating}
+and allowed once, is not drawn.}
+\label{fig:state-machine}
+\end{figure}
+
+What differs between regimes is expressed as a handful of properties of the regime's rules, never as a test
+of the regime's name. The kind of money the customer receives is one: none, a no-questions-asked refund, a
+fast refund or a provisional credit. Whether the regime has adjudication at all is another, and whether the
+merchant may contest it a third. Whether a provisional credit exists is derived from the first. The
+transition function asks these questions and nothing else. A SEPA claim can be refunded straight from
+initiation, because its refund needs no investigation; a credit-card dispute under Regulation~Z files the
+chargeback directly from the investigation, because there is no refund step to come first; a won chargeback
+under Regulation~E cannot close until the provisional credit is made final, while under PSD2 the refund was
+final all along and the dispute closes at once. The result is that the regimes reach different parts of the
+same machine: six states under SEPA, eleven under PSD2, thirteen under Regulation~E and ten under
+Regulation~Z. A fifth regime would be a new row of rules and its tests, not new code in the machine. The
+regime itself is fixed when the dispute opens, from the transaction's rail and currency
+(figure~\ref{fig:regimes}), and never changes afterwards, so a dispute cannot drift from one set of rules to
+another halfway through.
+
+The machine is a single pure function from a dispute and an event to the next dispute, written as one table
+of cases rather than with a state-machine library. A library would have needed either one machine per
+regime, which is the design that was rejected, or guard callbacks on shared transitions, which would hide
+the table that the gates make readable. The function never changes the dispute it is given; it returns
+the next one or refuses with an invalid-transition error, which the API reports as a \code{409} problem
+(section~\ref{sec:design-failures}). The events a dispute currently offers are not listed anywhere: they are
+found by asking the function about each event in turn. The workbench's buttons and the engine's answers
+therefore cannot disagree, since they are the same computation, and a test checks it for every reachable
+state of every regime. An appeal is the one transition outside the table. It is allowed only from
+\emph{closed}, at most once under each regime's rules, returns the dispute to the investigation, and starts
+a new resolution clock (section~\ref{sec:design-clocks}).
+
+Because the machine is the spine, its tests are the strongest in the repository. The set of reachable
+states of each regime is pinned, so that a change to the lifecycle is a visible decision rather than a side
+effect of an edit; every reachable state must be able to reach \emph{closed}, so no regime has a dead end;
+and twenty-nine named scenarios, each ending in \emph{closed}, must between them walk every transition a
+regime accepts. Run \code{2026-10-19\_1200} records the result: all 64 accepted transitions across the four
+regimes are walked. The 416 pairs of state and event the regimes refuse are counted in the same run and never
+offered as actions, and the refusals that carry the regulation, such as a SEPA claim that tries to file a
+chargeback or a Regulation~Z dispute that tries to issue a refund, are each a named test of their own.
+Figure~\ref{fig:state-machine} is produced from the same table by a test that compares it with a stored
+copy, so the figure in this thesis cannot quietly fall out of step with the code: changing the lifecycle
+fails the build until the figure is regenerated.
 
 \section{Regulatory clocks}
 \label{sec:design-clocks}
