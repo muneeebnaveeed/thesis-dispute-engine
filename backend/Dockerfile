@@ -2,7 +2,7 @@
 # Multi-stage: build with the pinned Go toolchain, run from distroless as a
 # non-root user. GO_VERSION must match mise.toml; scripts/check-runtime-versions.sh
 # fails CI on drift, and CI passes the value in from mise.toml.
-ARG GO_VERSION=1.27.1
+ARG GO_VERSION=1.27.2
 
 FROM golang:${GO_VERSION}-alpine AS build
 WORKDIR /src
