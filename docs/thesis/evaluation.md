@@ -50,6 +50,7 @@ Runs are committed; the thesis cites the directory name.
 | `2026-09-30_1050` | main before authorization (df94471), 20 requests/s, API only | 21 ms | 9 ms | 5 ms |
 | `2026-09-30_1052` | first authorization build (6613298): Cedar decision per operation, team-scope RLS | 25 ms | 21 ms | 10 ms |
 | `2026-09-30_1057` | final authorization build (1c9ecad): access data read once per transaction | 25 ms | 20 ms | 10 ms |
+| `2026-10-19_1200` | the same API (502aa59), correctness step now including the Postgres-backed suites | 43 ms | 17 ms | 10 ms |
 
 Server-side percentiles from Prometheus; the first two runs at 7.6 requests/s on the laptop, the second showing
 the cost of the six domain components landing in the same transaction. The third run (2439 API requests, 359
@@ -68,6 +69,13 @@ stayed at 0.96 ms in both runs, so the restrictive policies did not make queries
 trips: a request now also reads its caller's access data and the dispute's facts (its event log and transaction)
 beside what it already read. Reading access data once per transaction instead of once per decision won back about
 0.6 ms at p50 on writes; reusing the event log the view already loads is the next saving.
+
+The `2026-10-19_1200` run is the first whose correctness step ran the Postgres-backed suites (24 tests, among them
+append-only enforcement, eight concurrent writers and isolation under row-level security) and recorded transition
+coverage per regime: every accepted transition of all four regimes is walked by a named scenario. The API is the
+code of `2026-09-30_1057`; the same mix of statuses and deliberate 409s came back, reads and events kept their
+latencies, and create p99 rose to 43 ms. Those suites had just run against the same database, which is the likely
+cause rather than the code.
 
 ## Limitations to state
 
