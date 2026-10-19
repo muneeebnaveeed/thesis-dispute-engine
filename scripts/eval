@@ -9,6 +9,8 @@ seconds=${EVAL_SECONDS:-120}
 key=${EVAL_KEY:-tk_dev_tenant_a}
 api=${DISPUTE_API_URL:-http://localhost:8090}
 prom=${PROMETHEUS_URL:-http://localhost:9090}
+test_db=${DISPUTE_TEST_DATABASE_URL:-postgres://dispute:dispute@localhost:5432/dispute?sslmode=disable}
+test_app_db=${DISPUTE_TEST_APP_DATABASE_URL:-postgres://dispute_api:dispute_api@localhost:5432/dispute?sslmode=disable}
 # EVAL_SILENT=1 opens disputes on the probe account (no mail); EVAL_WORKBENCH=<url> adds page loads through the
 # workbench at EVAL_PAGES per second, signed in with the cookie frontend/scripts/session-cookie.ts prints.
 extra=()
@@ -23,20 +25,31 @@ mkdir -p "$out"
 curl -fsS "$api/readyz" >/dev/null || die "API not ready at $api (make otel:up)"
 curl -fsS "$prom/-/ready" >/dev/null || die "Prometheus not ready at $prom (make otel:up)"
 
-info "correctness suites"
-(cd "$root/backend" && go test -count=1 -json ./internal/dispute/... ./internal/platform/... 2>/dev/null) \
+info "correctness suites, unit and Postgres-backed"
+(cd "$root/backend" && DISPUTE_TEST_DATABASE_URL="$test_db" DISPUTE_TEST_APP_DATABASE_URL="$test_app_db" \
+  go test -tags integration -count=1 -json ./internal/dispute/... ./internal/platform/... 2>/dev/null) \
   | python3 -c '
 import sys, json, collections
 per = collections.defaultdict(lambda: {"passed": 0, "failed": 0, "tests": []})
+transitions = {}
 for line in sys.stdin:
     try: e = json.loads(line)
     except ValueError: continue
+    out = e.get("Output", "")
+    if "transition-coverage " in out:
+        row = json.loads(out.split("transition-coverage ", 1)[1])
+        transitions[row["regime"]] = row
     if e.get("Test") and e.get("Action") in ("pass", "fail") and "/" not in e["Test"]:
         p = per[e["Package"].split("/backend/")[-1]]
         p["passed" if e["Action"] == "pass" else "failed"] += 1
         p["tests"].append(e["Test"])
-json.dump(per, open(sys.argv[1], "w"), indent=2, sort_keys=True)
+json.dump({"packages": per, "transitions": transitions}, open(sys.argv[1], "w"), indent=2, sort_keys=True)
 print("  " + ", ".join("%s: %d passed, %d failed" % (k, v["passed"], v["failed"]) for k, v in sorted(per.items())))
+for k, v in sorted(transitions.items()):
+    print("  %s: %d states, %d of %d accepted transitions walked by %d scenarios, %d refused pairs" % (
+        k, v["states"], v["walked"], v["accepted"], v["scenarios"], v["refused"]))
+if not transitions: sys.exit("no transition-coverage lines; did the domain suite run?")
+if any(v["failed"] for v in per.values()): sys.exit("a correctness suite failed")
 ' "$out/correctness.json"
 
 info "load run: $rps iterations/s (about 5 requests each) for ${seconds}s; the tenant budget is 600 requests/min, raise DISPUTE_RATE_PER_MINUTE on the API to go faster"

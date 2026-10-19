@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"errors"
 	"slices"
 	"testing"
@@ -22,70 +23,227 @@ func run(t *testing.T, regime Regime, events ...Event) Dispute {
 	return d
 }
 
-func TestHappyPaths(t *testing.T) {
-	cases := []struct {
-		name   string
-		regime Regime
-		events []Event
-		want   State
-	}{
+type scenario struct {
+	name   string
+	regime Regime
+	events []Event
+}
+
+// Every accepted transition of every regime is walked by at least one of these; TestTransitionCoverage enforces it.
+func scenarios() []scenario {
+	return []scenario{
 		{
 			name:   "SEPA DD: no-questions-asked refund straight from initiation",
 			regime: RegimeEUSEPADirectDebit,
 			events: []Event{EventIssueRefund, EventClose},
-			want:   StateClosed,
+		},
+		{
+			name:   "SEPA DD: investigated and refunded",
+			regime: RegimeEUSEPADirectDebit,
+			events: []Event{EventOpenInvestigation, EventIssueRefund, EventClose},
+		},
+		{
+			name:   "SEPA DD: questionnaire returned, then refunded",
+			regime: RegimeEUSEPADirectDebit,
+			events: []Event{EventOpenInvestigation, EventSendQuestionnaire, EventReceiveQuestionnaire, EventIssueRefund, EventClose},
+		},
+		{
+			name:   "SEPA DD: denied during investigation",
+			regime: RegimeEUSEPADirectDebit,
+			events: []Event{EventOpenInvestigation, EventClose},
+		},
+		{
+			name:   "SEPA DD: questionnaire never returned",
+			regime: RegimeEUSEPADirectDebit,
+			events: []Event{EventOpenInvestigation, EventSendQuestionnaire, EventClose},
+		},
+		{
+			name:   "SEPA DD: denied after the questionnaire",
+			regime: RegimeEUSEPADirectDebit,
+			events: []Event{EventOpenInvestigation, EventSendQuestionnaire, EventReceiveQuestionnaire, EventClose},
 		},
 		{
 			name:   "PSD2 card: investigate, fast refund, recover via chargeback, won",
 			regime: RegimeEUPSD2Card,
-			events: []Event{
-				EventOpenInvestigation, EventSendQuestionnaire, EventReceiveQuestionnaire,
-				EventIssueRefund, EventFileChargeback, EventAcknowledgeChargeback,
-				EventSubmitEvidence, EventWinChargeback, EventClose,
-			},
-			want: StateClosed,
+			events: []Event{EventOpenInvestigation, EventSendQuestionnaire, EventReceiveQuestionnaire, EventIssueRefund, EventFileChargeback, EventAcknowledgeChargeback, EventSubmitEvidence, EventWinChargeback, EventClose},
+		},
+		{
+			name:   "PSD2 card: fast refund, not recovered",
+			regime: RegimeEUPSD2Card,
+			events: []Event{EventOpenInvestigation, EventIssueRefund, EventClose},
+		},
+		{
+			name:   "PSD2 card: chargeback won without evidence",
+			regime: RegimeEUPSD2Card,
+			events: []Event{EventOpenInvestigation, EventIssueRefund, EventFileChargeback, EventAcknowledgeChargeback, EventWinChargeback, EventClose},
+		},
+		{
+			name:   "PSD2 card: chargeback lost on evidence",
+			regime: RegimeEUPSD2Card,
+			events: []Event{EventOpenInvestigation, EventIssueRefund, EventFileChargeback, EventAcknowledgeChargeback, EventSubmitEvidence, EventLoseChargeback, EventClose},
+		},
+		{
+			name:   "PSD2 card: chargeback lost without evidence",
+			regime: RegimeEUPSD2Card,
+			events: []Event{EventOpenInvestigation, EventIssueRefund, EventFileChargeback, EventAcknowledgeChargeback, EventLoseChargeback, EventClose},
+		},
+		{
+			name:   "PSD2 card: denied during investigation",
+			regime: RegimeEUPSD2Card,
+			events: []Event{EventOpenInvestigation, EventClose},
+		},
+		{
+			name:   "PSD2 card: questionnaire never returned",
+			regime: RegimeEUPSD2Card,
+			events: []Event{EventOpenInvestigation, EventSendQuestionnaire, EventClose},
+		},
+		{
+			name:   "PSD2 card: denied after the questionnaire",
+			regime: RegimeEUPSD2Card,
+			events: []Event{EventOpenInvestigation, EventSendQuestionnaire, EventReceiveQuestionnaire, EventClose},
 		},
 		{
 			name:   "Reg E: provisional credit, chargeback won, final credit",
 			regime: RegimeUSRegE,
-			events: []Event{
-				EventOpenInvestigation, EventIssueRefund, EventFileChargeback,
-				EventAcknowledgeChargeback, EventWinChargeback, EventIssueFinalCredit, EventClose,
-			},
-			want: StateClosed,
+			events: []Event{EventOpenInvestigation, EventIssueRefund, EventFileChargeback, EventAcknowledgeChargeback, EventWinChargeback, EventIssueFinalCredit, EventClose},
 		},
 		{
 			name:   "Reg E: provisional credit, chargeback lost, credit reversed",
 			regime: RegimeUSRegE,
-			events: []Event{
-				EventOpenInvestigation, EventIssueRefund, EventFileChargeback,
-				EventAcknowledgeChargeback, EventSubmitEvidence, EventLoseChargeback,
-				EventReverseProvisionalCredit, EventClose,
-			},
-			want: StateClosed,
+			events: []Event{EventOpenInvestigation, EventIssueRefund, EventFileChargeback, EventAcknowledgeChargeback, EventSubmitEvidence, EventLoseChargeback, EventReverseProvisionalCredit, EventClose},
+		},
+		{
+			name:   "Reg E: questionnaire returned, chargeback won on evidence, final credit",
+			regime: RegimeUSRegE,
+			events: []Event{EventOpenInvestigation, EventSendQuestionnaire, EventReceiveQuestionnaire, EventIssueRefund, EventFileChargeback, EventAcknowledgeChargeback, EventSubmitEvidence, EventWinChargeback, EventIssueFinalCredit, EventClose},
+		},
+		{
+			name:   "Reg E: chargeback lost without evidence, credit reversed",
+			regime: RegimeUSRegE,
+			events: []Event{EventOpenInvestigation, EventIssueRefund, EventFileChargeback, EventAcknowledgeChargeback, EventLoseChargeback, EventReverseProvisionalCredit, EventClose},
+		},
+		{
+			name:   "Reg E: provisional credit kept without a chargeback",
+			regime: RegimeUSRegE,
+			events: []Event{EventOpenInvestigation, EventIssueRefund, EventClose},
+		},
+		{
+			name:   "Reg E: denied during investigation",
+			regime: RegimeUSRegE,
+			events: []Event{EventOpenInvestigation, EventClose},
+		},
+		{
+			name:   "Reg E: questionnaire never returned",
+			regime: RegimeUSRegE,
+			events: []Event{EventOpenInvestigation, EventSendQuestionnaire, EventClose},
+		},
+		{
+			name:   "Reg E: denied after the questionnaire",
+			regime: RegimeUSRegE,
+			events: []Event{EventOpenInvestigation, EventSendQuestionnaire, EventReceiveQuestionnaire, EventClose},
 		},
 		{
 			name:   "Reg Z: no credit path, chargeback filed from investigation",
 			regime: RegimeUSRegZ,
-			events: []Event{
-				EventOpenInvestigation, EventFileChargeback, EventAcknowledgeChargeback,
-				EventLoseChargeback, EventClose,
-			},
-			want: StateClosed,
+			events: []Event{EventOpenInvestigation, EventFileChargeback, EventAcknowledgeChargeback, EventLoseChargeback, EventClose},
 		},
 		{
-			name:   "any regime: denied during investigation",
-			regime: RegimeEUPSD2Card,
+			name:   "Reg Z: questionnaire returned, chargeback won on evidence",
+			regime: RegimeUSRegZ,
+			events: []Event{EventOpenInvestigation, EventSendQuestionnaire, EventReceiveQuestionnaire, EventFileChargeback, EventAcknowledgeChargeback, EventSubmitEvidence, EventWinChargeback, EventClose},
+		},
+		{
+			name:   "Reg Z: chargeback lost on evidence",
+			regime: RegimeUSRegZ,
+			events: []Event{EventOpenInvestigation, EventFileChargeback, EventAcknowledgeChargeback, EventSubmitEvidence, EventLoseChargeback, EventClose},
+		},
+		{
+			name:   "Reg Z: chargeback won without evidence",
+			regime: RegimeUSRegZ,
+			events: []Event{EventOpenInvestigation, EventFileChargeback, EventAcknowledgeChargeback, EventWinChargeback, EventClose},
+		},
+		{
+			name:   "Reg Z: denied during investigation",
+			regime: RegimeUSRegZ,
 			events: []Event{EventOpenInvestigation, EventClose},
-			want:   StateClosed,
+		},
+		{
+			name:   "Reg Z: questionnaire never returned",
+			regime: RegimeUSRegZ,
+			events: []Event{EventOpenInvestigation, EventSendQuestionnaire, EventClose},
+		},
+		{
+			name:   "Reg Z: denied after the questionnaire",
+			regime: RegimeUSRegZ,
+			events: []Event{EventOpenInvestigation, EventSendQuestionnaire, EventReceiveQuestionnaire, EventClose},
 		},
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := run(t, tc.regime, tc.events...); got.State != tc.want {
-				t.Errorf("final state = %s, want %s", got.State, tc.want)
+}
+
+func TestScenariosEndClosed(t *testing.T) {
+	for _, sc := range scenarios() {
+		t.Run(sc.name, func(t *testing.T) {
+			if got := run(t, sc.regime, sc.events...); got.State != StateClosed {
+				t.Errorf("final state = %s, want %s", got.State, StateClosed)
 			}
 		})
+	}
+}
+
+type transition struct {
+	from  State
+	event Event
+}
+
+// Logs one line per regime for docs/thesis/data (scripts/eval reads it) and fails on any accepted transition no
+// scenario walks. Appeals are left out; TestAppeals covers them.
+func TestTransitionCoverage(t *testing.T) {
+	for _, regime := range AllRegimes() {
+		states := reachable(t, regime)
+		accepted := map[transition]bool{}
+		refused := 0
+		for _, s := range states {
+			for _, e := range AllEvents() {
+				if e == EventAppeal {
+					continue
+				}
+				if _, err := (Dispute{Regime: regime, State: s}).Apply(e); err == nil {
+					accepted[transition{s, e}] = true
+				} else {
+					refused++
+				}
+			}
+		}
+		walked := map[transition]bool{}
+		count := 0
+		for _, sc := range scenarios() {
+			if sc.regime != regime {
+				continue
+			}
+			count++
+			d := run(t, regime)
+			for _, e := range sc.events {
+				walked[transition{d.State, e}] = true
+				next, err := d.Apply(e)
+				if err != nil {
+					t.Fatalf("%s: %v", sc.name, err)
+				}
+				d = next
+			}
+		}
+		for tr := range accepted {
+			if !walked[tr] {
+				t.Errorf("%s: %s from %s is accepted but no scenario walks it", regime, tr.event, tr.from)
+			}
+		}
+		row, err := json.Marshal(map[string]any{
+			"regime": regime, "states": len(states), "accepted": len(accepted), "walked": len(walked),
+			"refused": refused, "scenarios": count,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("transition-coverage %s", row)
 	}
 }
 

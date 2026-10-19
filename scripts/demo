@@ -71,7 +71,8 @@ if ((check_only == 0)); then
   fi
 
   info "starting containers (first run builds images and takes a few minutes)"
-  "${compose[@]}" "${profiles[@]}" up -d --build --wait
+  "$root/scripts/compose-build" "${profiles[@]}"
+  "${compose[@]}" "${profiles[@]}" up -d --wait
 
   info "seeding tenants, accounts and transactions"
   (cd "$root/backend" && go run ./cmd/seed >/dev/null) || die "seeding failed"

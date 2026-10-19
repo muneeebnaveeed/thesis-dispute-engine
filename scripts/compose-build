@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Builds the images a compose invocation would build, through buildx bake with host networking allowed.
+# Compose v5 always builds through bake, which refuses `network: host` (deploy/compose.yml) without an entitlement
+# that compose itself cannot pass.
+# Usage: scripts/compose-build [compose options such as --profile and --env-file] [-- service...]
+set -euo pipefail
+source "$(dirname "$0")/lib/common.sh"
+root=$(repo_root)
+opts=()
+while (($#)) && [[ $1 != -- ]]; do opts+=("$1"); shift; done
+(($#)) && shift
+plan=$(mktemp)
+trap 'rm -f "$plan"' EXIT
+docker compose -f "$root/deploy/compose.yml" "${opts[@]}" build --print "$@" >"$plan" 2>/dev/null
+grep -q '"target"' "$plan" || exit 0
+docker buildx bake -f "$plan" --load --allow network.host \
+  --allow "fs.read=$root/backend" --allow "fs.read=$root/frontend"

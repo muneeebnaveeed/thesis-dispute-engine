@@ -8,8 +8,8 @@ from a dated run under `data/`, never typed by hand.
 
 | Question | Measure | Produced by |
 | --- | --- | --- |
-| Does the engine apply each regime's rules correctly? | table-driven transition tests per regime: accepted and refused transitions, appeal limits, reachability pins | `go test -json ./internal/dispute/domain/` |
-| Is the log append-only and are concurrent writers serialised? | database refusal of update, delete and truncate; eight writers on one dispute produce exactly one winner per version | `go test ./internal/dispute/infrastructure/postgres/` |
+| Does the engine apply each regime's rules correctly? | per regime: reachable states, accepted transitions and the share walked by a named scenario (the suite fails below all of them), refused pairs, appeal limits, reachability pins | `TestTransitionCoverage` and the domain suite |
+| Is the log append-only and are concurrent writers serialised? | database refusal of update, delete and truncate; eight writers on one dispute produce exactly one winner per version | `go test -tags integration ./internal/dispute/infrastructure/postgres/` |
 | Are retries safe? | identical replays return the stored response, mismatched bodies are refused | same, plus `dispute_idempotent_replays_total` under load |
 | Is tenant isolation a database guarantee? | cross-tenant reads, writes, replays and raw queries as the API role return nothing | `TestTenantIsolationUnderRLS`, browser suite |
 | How does it perform under sustained load? | p50, p95, p99 latency per route, achieved requests per second, error share, 409 share | `cmd/eval` load run read back from Prometheus |
@@ -31,7 +31,9 @@ has no address, so the run sends no mail) and `EVAL_WORKBENCH=http://localhost:3
 loads per second through the frontend server, signed in as the seeded analyst; the cookie comes from
 `frontend/scripts/session-cookie.ts`). It writes:
 
-- `data/<date>/correctness.json`: test counts per package and the list of transition cases.
+- `data/<date>/correctness.json`: test counts per package, unit and Postgres-backed (the suites run with the
+  integration tag against the stack's database), and per regime the transition coverage figure 6.2 is drawn from.
+  Runs before `2026-10-19` left the Postgres-backed tests out and have no per-regime section.
 - `data/<date>/load.json`: achieved rate, status histogram, replay count, per-route latency percentiles
   from `http_server_request_duration_seconds` over the run window; with a workbench, page and server-function
   percentiles for it; and the runtime picture of both processes (goroutines, heap, Postgres p95, event loop
