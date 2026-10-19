@@ -3,3 +3,52 @@
 
 % Budget and sources: docs/thesis/outline.md. Every claim about behaviour points at a test, a figure or a number in data/.
 
+% WRITING BRIEF (not thesis text). Budget: 3 pages, about 1,100 words, no figures.
+% Each bullet is the job of one paragraph; the wording is to be written, not lifted from here.
+% Sources: wiki Thesis.md (Overview, Scope clarification), ADR 0002, the title and its hook.
+%
+% Proposed sections:
+%
+% 1.1 The problem (about 400 words)
+%  - P1. What a payment dispute is, from the customer's side: a charge they do not recognise or did not get
+%    what they paid for, raised with their own bank. One concrete example in one sentence (a card payment to
+%    a shop that never delivered, raised with the bank two weeks later).
+%  - P2. Why it is hard for the bank: the same complaint carries legal deadlines, a duty to refund before the
+%    facts are known, a process with the card network on the other side, letters the customer is owed, and
+%    money moving in the bank's own core system. Name these five strands once; each returns in chapter 4.
+%  - P3. First-party ("friendly") fraud: the customer who disputes a payment they did make. The bank must
+%    still give the benefit of the doubt up front, then let evidence decide. This is the tension in the
+%    title's hook ("the customer is always right, until the evidence arrives"). Avoid market-size statistics
+%    unless one of the ten references carries them (none does today; see the note at the end).
+%
+% 1.2 Why disputes are regime-specific (about 300 words)
+%  - P4. The rules differ by payment rail and jurisdiction, and the differences are structural, not just
+%    different numbers: PSD2 card disputes get a refund by the next business day, a SEPA direct debit can be
+%    refunded with no questions and no adjudication, Regulation E has provisional credit, Regulation Z has no
+%    credit at all. One sentence per regime; the detail belongs to chapter 2.
+%  - P5. The consequence for software: either a separate workflow per regime, or one lifecycle whose
+%    reachable states, deadlines and money movements are configuration. State the thesis claim here: one
+%    finite state machine, parameterised by the regime, is enough for all four (ADR 0002). Say explicitly
+%    that the system is issuer-side (the title omits it; the wiki flags this as a must for chapter 1).
+%
+% 1.3 What was built (about 250 words)
+%  - P6. One paragraph, outcome-first: a multi-tenant dispute engine for issuers, with an analyst workbench,
+%    two EU regimes as the focus and two US regimes as comparison. List the parts in the order of chapter 4
+%    (state machine, clocks, ledger and core adapter, questionnaire, communications, fraud scoring,
+%    tenancy and authorization), no tool names.
+%  - P7. What makes it more than a prototype, in one or two sentences: correctness pinned by tests per
+%    regime, isolation enforced by the database, every number in the evaluation reproducible from a
+%    committed run. Point to chapter 6 and run 2026-10-19_1200 (every accepted transition of every regime
+%    walked by a named scenario).
+%
+% 1.4 Structure of the thesis (about 150 words)
+%  - P8. One sentence per chapter, 2 to 7, plus the appendix. Use \ref{ch:background} and so on.
+%
+% Keep out of chapter 1: tool and framework names (they are decisions, chapter 4 and 5 justify them),
+% the regime table (chapter 2), anything about how the work was organised.
+%
+% Open points for the author:
+%  - Title: the cover shows the registered title (main.tex \title); confirm whether the paper title
+%    "The Customer Is Always Right, Until the Evidence Arrives" may replace it, and write P3 to match.
+%  - A first-party-fraud statistic would strengthen P3 but needs a reference; references.md already lists
+%    eleven against a cap of ten, so adding one means dropping one.

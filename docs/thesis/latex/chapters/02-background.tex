@@ -3,3 +3,59 @@
 
 % Budget and sources: docs/thesis/outline.md. Every claim about behaviour points at a test, a figure or a number in data/.
 
+% WRITING BRIEF (not thesis text). Budget: 4 pages, about 1,300 words plus one table.
+% Each bullet is the job of one paragraph; the wording is to be written, not lifted from here.
+% Sources: wiki "Payment Dispute Regulatory & Compliance Landscape" (distil, do not transfer; it is design
+% input and far larger than this chapter), references 1 to 4. Citations: \cite{psd2}, \cite{sepacore},
+% \cite{rege}, \cite{regz}. Article numbers must agree with section 4.2 (clocks) and figure \ref{fig:clocks}.
+%
+% Proposed sections:
+%
+% 2.1 The parties to a dispute (about 250 words)
+%  - P1. The four-party card model: cardholder, merchant, issuer (the cardholder's bank), acquirer (the
+%    merchant's bank), with the card network between issuer and acquirer. One sentence each.
+%  - P2. Where this system sits: on the issuer's side. It receives the complaint, owes the legal duties,
+%    decides on credit, and files outward through the network. Contrast in one sentence with merchant-side
+%    dispute tools, which defend a chargeback rather than raise one.
+%
+% 2.2 The European regimes (about 400 words)
+%  - P3. PSD2 for card payments: an unauthorised payment is refunded immediately and at the latest by the end
+%    of the next business day (art. 73(1)); the payer's loss is capped at EUR 50 unless they acted
+%    fraudulently or with gross negligence (art. 74); a reply to a complaint within fifteen business days
+%    (art. 101(2)). Note that PSD2 has no idea of a provisional credit: the refund is final unless recovered.
+%  - P4. SEPA Core Direct Debit: the payer may claim an authorised debit back within eight weeks with no
+%    reason and no merchant defence (\cite{sepacore}; art. 76 PSD2); the bank refunds or justifies a refusal
+%    within ten business days (art. 77(1)); unauthorised debits stay claimable for thirteen months. This is
+%    the case with no adjudication at all, and the shortest path through the state machine.
+%
+% 2.3 The US regimes, for comparison (about 300 words)
+%  - P5. Regulation E (debit cards and electronic transfers): provisional credit within ten business days if
+%    the investigation is not finished, investigation within forty-five days, liability capped at USD 50 when
+%    reported in time (1005.11, 1005.6).
+%  - P6. Regulation Z (credit cards): acknowledgement within thirty days, resolution within two billing
+%    cycles and at most ninety days (1026.13). No credit is issued; collection of the disputed amount is
+%    suspended instead. Say why the US is here at all: to show the model generalises (ADR 0002), not as a
+%    target market.
+%
+% 2.4 Chargebacks (about 200 words)
+%  - P7. How the issuer recovers money it refunded: the chargeback through the network, the acquirer's
+%    acknowledgement, the merchant's evidence, the network's decision. Name representment and
+%    pre-arbitration in one sentence and say they are folded into "evidence submitted, then won or lost"
+%    (chapter 3 lists this as a scope cut). No reason-code taxonomy here.
+%
+% 2.5 What a dispute engine must therefore guarantee (about 150 words, plus the table)
+%  - P8. Draw the requirements out of 2.2 to 2.4, as the bridge to chapter 3: the right states for the
+%    regime and no others; deadlines kept per regime in the right calendar; money moved exactly once, and
+%    reversible where the law allows; a written record the customer is owed; an audit trail of who did what.
+%  - Table (tab:regimes, a table not a figure, counts toward the third): rows the four regimes, columns
+%    rail, refund or credit, deadline(s), adjudication yes/no, merchant may contest, liability cap. Source of
+%    truth: domain/regime.go and ADR 0002; keep the deadlines identical to figure \ref{fig:clocks}.
+%
+% Keep out of chapter 2: SCA and 3-D Secure, Compelling Evidence 3.0, PSD3, ISO 8583 detail, PCI DSS, the
+% Hungarian arbitration board. They are in the wiki; at most one sentence each in chapter 7 if wanted.
+%
+% Open points for the author:
+%  - ADR 0002 gives the SEPA resolution SLA as "8 weeks (13 months with evidence)", while section 4.2 uses
+%    PSD2 art. 77(1), ten business days, as the refund clock. Both are right (claim window versus the bank's
+%    deadline); P4 should state both so the reader sees why the clock is ten days.
+%  - Reference 2 (SEPA rulebook) needs a version and year in references.bib before citing.

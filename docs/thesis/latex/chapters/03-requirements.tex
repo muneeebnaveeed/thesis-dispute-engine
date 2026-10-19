@@ -3,3 +3,64 @@
 
 % Budget and sources: docs/thesis/outline.md. Every claim about behaviour points at a test, a figure or a number in data/.
 
+% WRITING BRIEF (not thesis text). Budget: 3 pages, about 1,000 words plus one table.
+% Each bullet is the job of one paragraph; the wording is to be written, not lifted from here.
+% Sources: wiki Thesis.md (Objectives, Feature specification), ADR 0002, 0007, 0009, 0013, 0014, 0026, 0027,
+% docs/api/openapi.yaml (operations), domain/rail.go, domain/questionnaire.go (the four reasons).
+%
+% Proposed sections:
+%
+% 3.1 Actors (about 200 words)
+%  - P1. Three actors, each with what they need: the tenant (an issuer or payment provider using the
+%    service), whose own systems open disputes with a tenant key; the analyst, a person at the tenant who
+%    works the dispute in the workbench and signs in through the tenant's own realm; the tenant
+%    administrator, who manages keys, templates and teams. The customer is not a user of the system but the
+%    person every deadline and letter is for. Use the term "tenant key", never "API key".
+%
+% 3.2 Use cases (about 350 words, plus the table)
+%  - P2. Name the main flow once, end to end: a tenant system opens a dispute for a transaction; the regime
+%    follows from the rail and currency (card in EUR is PSD2, SEPA debit in EUR is SEPA, card in USD is
+%    Regulation E, credit card in USD is Regulation Z: domain/rail.go); the customer is told; the analyst
+%    investigates, may send a questionnaire, credits or refunds within the clock, files a chargeback where the
+%    regime has one, and closes; an appeal reopens it once.
+%  - P3. The supporting use cases, one sentence each: find and filter disputes (overdue only, by reason or
+%    state); answer the four dispute reasons' questionnaires (unauthorised, not received, duplicate, amount
+%    differs); see and resend the letters and emails; reassign a dispute between teams; manage tenant keys,
+%    letter templates and the logo.
+%  - Table (tab:usecases): use case, actor, the operation(s) in the API contract (createDispute,
+%    applyDisputeEvent, listDisputes, reassignDispute, resendNotice, createTenantKey, and so on), and the
+%    chapter 4 section that designs it. This table is the trace from requirement to design and is worth
+%    its space; keep it to about ten rows.
+%
+% 3.3 Quality requirements (about 250 words)
+%  - P4. Correctness: no transition the regime forbids, and every one it allows is reachable and tested
+%    (point at section 6.x and run 2026-10-19_1200).
+%  - P5. Money exactly once: retries with the same idempotency key never pay twice, and a decline from the
+%    core leaves no trace (ADR 0014, 0015).
+%  - P6. Isolation and accountability: a tenant never sees another's data, enforced by the database rather
+%    than by code paths; the actor on every event is the authenticated caller; the person who investigated a
+%    claim does not also pay it out (ADR 0008, 0026, 0027).
+%  - P7. Operability: every request traceable end to end; deadlines measurable as a distribution, not a
+%    report (ADR 0003, 0013).
+%
+% 3.4 What was deliberately left out (about 200 words)
+%  - P8. The cuts, each with its reason in a clause, written as decisions:
+%    - representment, pre-arbitration and arbitration folded into one evidence step;
+%    - statutory extensions of deadlines (for example Regulation E's longer windows for new accounts);
+%    - a real card network and a real banking core (the core is a simulator behind a port);
+%    - learned fraud models (rules that explain themselves instead; section 4.5);
+%    - multi-currency disputes, and a second language per tenant;
+%    - a cache or broker beside PostgreSQL (ADR 0007), and any edge or CDN layer, so the application is its
+%      own rate limiter;
+%    - storing real card numbers; all data is synthetic.
+%  - P9. One closing sentence: the fraud-scoring engine and the frontend were marked from the outset as the
+%    first things to cut if time ran short, and both survived in a deliberately modest form. Indirect
+%    wording only; the text never names who gave that guidance.
+%
+% Keep out of chapter 3: how any of it was implemented, tool names, numbers from the evaluation beyond a
+% pointer.
+%
+% Open points for the author:
+%  - The outline maps chapter 3 to ADR 0007 only; the cut list above draws on more (0013, 0014, 0019).
+%    Update outline.md once the chapter settles.
+%  - Section numbers for the pointers in P4 and P8 depend on chapters 4 and 6; use \ref labels, not numbers.
