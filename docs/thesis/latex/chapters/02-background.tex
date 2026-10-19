@@ -3,3 +3,117 @@
 
 % Budget and sources: docs/thesis/outline.md. Every claim about behaviour points at a test, a figure or a number in data/.
 
+\section{The parties to a dispute}
+\label{sec:bg-parties}
+
+A card payment involves four parties and an intermediary. The \emph{cardholder} pays; the
+\emph{merchant} is paid; the \emph{issuer} is the cardholder's bank, which issued the card and holds
+the account or extends the credit; the \emph{acquirer} is the merchant's bank, which accepts card
+payments on the merchant's behalf. Between issuer and acquirer sits the \emph{card network}, which
+routes the messages, sets the scheme rules, including those for disputes, and settles the
+amounts between the banks, but holds no customer accounts of its own. A direct debit has the same
+shape without the network: the payer's bank and the payee's bank exchange the debit and any
+claim against it through the payment scheme.
+
+A dispute engine can sit on either side of this picture, and the two sides do opposite things.
+Merchant-side tools receive a chargeback that has already been raised and help the merchant
+defend it with evidence. The system described in this thesis sits with the issuer. It receives
+the customer's complaint, carries the legal duties that complaint triggers, decides whether and
+when to refund or credit the customer, and, where the regime allows, raises the chargeback
+outward through the network to recover the money. Every regime below is therefore read for what
+it requires of the issuer.
+
+\section{The European regimes}
+\label{sec:bg-eu}
+
+In the European Union the payer's rights against their bank come from the second Payment Services
+Directive (PSD2) \cite{psd2}. A payer who notices an unauthorised or incorrectly executed payment
+must report it without undue delay and at most thirteen months after the debit
+\cite[art.~71(1)]{psd2}. For an unauthorised payment the bank must then refund the amount
+immediately, and in any event by the end of the following business day \cite[art.~73(1)]{psd2}.
+The only exception is a reasonable suspicion of fraud by the payer, which the bank must report to
+the national authority in writing; it is not a licence to investigate first and refund later.
+The payer's own share of the loss is capped at fifty euro, except where they acted fraudulently
+or with gross negligence \cite[art.~74(1)]{psd2}. Whatever the outcome, the bank must answer the
+customer's complaint in writing within fifteen business days \cite[art.~101(2)]{psd2}. There is no
+notion of a provisional credit in this regime: the refund is the customer's, and if the bank
+wants the money back it must recover it from the other side, through the card network.
+
+Direct debits add a right that has no counterpart elsewhere. For a payment the payer did
+authorise, PSD2 gives a right to a refund within eight weeks of the debit when the payment was
+initiated by the payee \cite[art.~76]{psd2}, and the SEPA Core Direct Debit scheme makes that right
+unconditional: within eight weeks the payer can claim the debit back without giving a reason, and
+the merchant has no defence \cite{sepacore}. The bank must refund, or justify a refusal, within ten
+business days of the request \cite[art.~77(1)]{psd2}. An unauthorised debit remains claimable for
+thirteen months, as above. The two periods answer different questions: eight weeks is how long
+the customer has to ask, and ten business days is how long the bank has to act. For the design
+the important point is the absence of adjudication. A SEPA claim inside the eight weeks has no
+evidence step, no chargeback and no possible defeat, and so takes the shortest path any dispute
+can take.
+
+\section{The US regimes, for comparison}
+\label{sec:bg-us}
+
+Two American regulations cover the same ground for debit and credit cards, and they are included
+because they differ from the European regimes, and from each other, in ways that test whether one
+state machine can carry them. Regulation~E governs debit cards and other electronic transfers.
+The bank has ten business days to investigate; if it needs longer, up to forty-five days, it must
+provisionally credit the customer within the first ten and tell them so
+\cite[\S~1005.11(c)]{rege}. The customer's liability for an unauthorised transfer is limited, to
+fifty dollars where a lost or stolen card is reported promptly \cite[\S~1005.6]{rege}. The
+provisional credit is exactly that: if the investigation finds no error, the bank may take it
+back after notice.
+
+Regulation~Z governs credit cards and takes yet another approach \cite{regz}. The issuer must
+acknowledge a billing-error notice in writing within thirty days and resolve it within two
+billing cycles, and at most ninety days \cite[\S~1026.13(c)]{regz}. Nothing is credited while the
+question is open. Instead the issuer may not collect the disputed amount or report it as
+delinquent until the dispute is resolved. A credit-card dispute therefore has no refund state to
+reach at all. These two regimes are not the market the system is built for; they are there to
+show that the model is general rather than European by construction.
+
+\section{Chargebacks}
+\label{sec:bg-chargebacks}
+
+When an issuer has refunded or credited a customer, it can try to recover the money through the
+card network with a \emph{chargeback}. The issuer files the chargeback under one of the network's
+reason codes; the network passes it to the acquirer, which acknowledges it and asks the merchant
+whether to accept it or to contest it with evidence; the network's rules then decide which side
+bears the loss. In practice a contested chargeback can go through several further rounds, under
+names such as representment, pre-arbitration and arbitration, each with its own deadlines and
+fees. This thesis folds those rounds into a single step, in which evidence is submitted and the
+chargeback is then either won or lost. Chapter~\ref{ch:requirements} records that as a deliberate
+cut. A chargeback is possible only where a merchant can be charged back: it exists for the card
+regimes and not for a SEPA claim inside its eight weeks.
+
+\section{What a dispute engine must therefore guarantee}
+\label{sec:bg-guarantees}
+
+The four regimes, summarised in figure~\ref{fig:regimes}, share a lifecycle, in which a complaint
+is opened, investigated, settled and closed, and differ in which parts of that lifecycle exist.
+From them follow the guarantees the rest of the thesis designs for. The engine must allow each
+dispute exactly the steps its regime allows, and no others. It must run each regime's deadlines,
+in business days where the law says business days, in the calendar of the institution that owes
+them. It must move money once and only once, in the right direction, and be able to reverse a
+credit where the regime provides for it. It must produce the written notices the customer is owed.
+And it must keep a record of who did what, and when, that an auditor can trust.
+
+\begin{figure}[htbp]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{L{2.4cm}L{2.0cm}L{3.0cm}L{3.5cm}L{2.1cm}l}
+\toprule
+Regime & Rail & Money to the customer & Deadlines & Adjudication & Cap \\
+\midrule
+PSD2 card & card, EUR & final refund & 1 and 15 business days & yes & EUR 50 \\
+SEPA Core DD & debit, EUR & no-questions refund & 10 and 15 business days & no & none \\
+Regulation E & card, USD & provisional credit & 10 business, 45 calendar days & yes & USD 50 \\
+Regulation Z & credit card, USD & none (collection suspended) & 30 and 90 calendar days & yes & none \\
+\bottomrule
+\end{tabular}
+\caption{The four regimes as the engine models them (\code{domain/regime.go}, \code{domain/rail.go}). The
+deadlines are the clocks of figure~\ref{fig:clocks}; ``adjudication'' means a chargeback the merchant may
+contest.}
+\label{fig:regimes}
+\end{figure}

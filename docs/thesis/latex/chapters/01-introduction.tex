@@ -3,3 +3,95 @@
 
 % Budget and sources: docs/thesis/outline.md. Every claim about behaviour points at a test, a figure or a number in data/.
 
+\section{The problem}
+\label{sec:intro-problem}
+
+A payment dispute begins with a customer who looks at a statement and objects to a line on it. The
+charge may be one they do not recognise at all, a purchase that never arrived, a subscription
+taken twice, or an amount larger than the one they agreed to. Whatever the reason, the customer
+does not take it to the shop. They take it to their own bank, because that is where the money
+left from, and because the law in most jurisdictions gives them rights against that bank that it
+does not give them against the shop.
+
+For the bank the complaint is the start of a process with several strands running at once. There
+are legal deadlines, which differ by jurisdiction and payment method and some of which are
+measured in business days. There is a duty, in several regimes, to give the customer their money
+back before anyone knows whether the complaint is justified. There is a second process on the
+other side of the card network, in which the bank tries to recover that money from the merchant's
+bank and the merchant answers with evidence. There are letters and emails the customer is owed at
+particular points, with particular content. And there is the money itself, which must move in the
+bank's own core system exactly once, and move back if the law allows and the outcome requires it.
+Each of these strands is simple in isolation. The difficulty is that they all depend on the same
+question, which is where the dispute currently stands, and that a mistake in any one of them is
+either a breach of a legal duty or a loss.
+
+The strands are complicated further by the customer who disputes a payment they did in fact make.
+First-party fraud, often called friendly fraud, is a dispute raised in bad faith, or at least in
+error, by the legitimate cardholder: the parcel that did arrive, the purchase a family member made
+with the card, the subscription the customer forgot they had started. The bank cannot treat every
+customer as a suspect; the regulation that protects customers assumes good faith and frequently
+requires the refund to come first. Nor can it ignore that some disputes are not what they claim to
+be. The position this thesis takes is in its title. The customer is given the benefit of the doubt
+at the start, with the refund or credit the law requires, and the evidence then decides how the
+dispute ends. The engine's job is to make both halves of that sentence hold at once.
+
+\section{Why disputes are regime-specific}
+\label{sec:intro-regimes}
+
+The rules a bank follows depend on the payment rail and the jurisdiction, and the differences
+between them are not merely different numbers in the same process. Under the European Payment
+Services Directive, an unauthorised card payment is refunded by the end of the next business day
+and the refund is final unless the bank later recovers it \cite{psd2}. A SEPA direct debit can be
+claimed back within eight weeks with no reason given and no defence available to the merchant
+\cite{sepacore}. The United States' Regulation~E, for debit cards, instead requires a provisional
+credit while the bank investigates \cite{rege}, and Regulation~Z, for credit cards, issues no
+credit at all and suspends the collection of the disputed amount \cite{regz}. Some regimes have a
+merchant on the other side who may contest the claim; one has nobody. Chapter~\ref{ch:background}
+sets these regimes out in detail.
+
+Software that handles disputes under more than one regime therefore has a choice to make. It can
+treat each regime as its own workflow, with its own states and its own code, and accept that a
+fix in one is not a fix in the others. Or it can look for the lifecycle the regimes share and
+express their differences as configuration of that one lifecycle. This thesis argues for the
+second: a single finite state machine, parameterised by the regulatory regime, in which the
+regime decides which states are reachable, which deadlines run and which money moves, and the
+state machine itself is the same for all of them. The system is written from the issuer's side,
+that is, from the position of the customer's own bank, which receives the complaint, owes the
+legal duties and files the chargeback outward. Two European regimes, PSD2 card payments and SEPA
+direct debits, are the focus of the work; two American regimes are modelled alongside them to
+show that the model generalises rather than to serve a market.
+
+\section{What was built}
+\label{sec:intro-built}
+
+The result is a dispute engine that a bank or payment provider can use as a service, with an
+analyst workbench in front of it. Several institutions share one deployment, and the database
+itself keeps each one's data apart. The engine models the dispute lifecycle as a state machine
+gated by regime, starts the regulatory clocks each regime requires in the institution's own
+business-day calendar, posts every movement of money to a ledger and through a port to the
+institution's core banking system, collects the customer's account of what happened through a
+questionnaire chosen by the dispute's reason, sends the letters and emails the customer is owed,
+and scores each dispute with readable rules that can hold a credit until a person justifies it.
+Who may do what inside an institution is decided by policy over the authenticated caller, and
+the caller is recorded on every event. Chapter~\ref{ch:design} takes these parts in turn.
+
+The work aims to be more than a prototype in one respect in particular: its claims can be
+checked. The behaviour of each regime is pinned by tests that walk every transition the regime
+allows and refuse the ones it forbids; isolation between institutions is tested against the
+database rather than assumed from the code; and every number in the evaluation comes from a
+measurement run that is committed to the repository and can be repeated with one command
+(chapter~\ref{ch:evaluation}).
+
+\section{Structure of the thesis}
+\label{sec:intro-structure}
+
+Chapter~\ref{ch:background} introduces the parties to a dispute and the four regulatory regimes,
+and draws from them what a dispute engine must guarantee. Chapter~\ref{ch:requirements} turns
+those guarantees into requirements, lists the use cases, and records what was deliberately left
+out. Chapter~\ref{ch:design} presents the design, one decision at a time: the regime-parameterised
+state machine, the clocks, the ledger and the banking core, the questionnaire, communications and
+fraud scoring, and the tenancy and authorization model. Chapter~\ref{ch:implementation} describes
+how the design was built and operated, from the generated API contract to the analyst workbench
+and its observability. Chapter~\ref{ch:evaluation} evaluates correctness, isolation, concurrency
+and performance, and states the limitations. Chapter~\ref{ch:conclusion} concludes and outlines
+future work. The appendix contains excerpts of the API contract and the raw evaluation tables.

@@ -3,3 +3,102 @@
 
 % Budget and sources: docs/thesis/outline.md. Every claim about behaviour points at a test, a figure or a number in data/.
 
+\section{Actors}
+\label{sec:req-actors}
+
+The system is offered as a service to institutions that handle disputes: banks that issue cards
+and hold accounts, and payment providers acting for them. Each such institution is a
+\emph{tenant}. A tenant's own systems, typically the online banking or card platform through which
+a customer raises a complaint, open disputes and follow their progress through the API, and
+identify themselves with a \emph{tenant key} issued for that purpose. The people who work the
+disputes are the tenant's \emph{analysts}. They use the workbench, sign in through their own
+institution's identity realm, belong to teams, and hold a rung of seniority within a team that
+bounds what they may do. A \emph{tenant administrator} is an analyst who additionally manages
+the tenant's keys, email templates and appearance. The \emph{customer}, finally, never uses the
+system directly, but every deadline, letter and movement of money in it exists for them.
+
+\section{Use cases}
+\label{sec:req-use-cases}
+
+One use case carries the system and the rest support it. A tenant system opens a dispute against a
+transaction on the customer's account, giving the reason the customer chose. The regime is not
+chosen by the caller; it follows from the transaction's rail and currency, so a card payment in
+euro is handled under PSD2, a SEPA debit in euro under the direct-debit rules, a card payment in
+dollars under Regulation~E and a credit-card payment in dollars under Regulation~Z
+(\code{domain/rail.go}). The customer is told that the dispute has been opened. An analyst opens
+the investigation, may send the customer a questionnaire and receive the answers, refunds or
+credits the customer within the regime's clock, files a chargeback where the regime has one,
+records its outcome, and closes the dispute with the settlement the outcome requires. A closed
+dispute can be appealed once, which reopens the investigation with a new resolution clock.
+
+Around that flow sit the use cases that make it workable for a team of people. Analysts find
+disputes by identifier, state or reason, and can narrow the list to the ones whose deadlines have
+passed. The customer's questionnaire depends on the dispute's reason, of which there are four: an
+unauthorised payment, goods or services not received, a duplicate charge, and an amount different
+from the one agreed. Analysts write to the customer from a catalogue of email templates, see every letter and email
+sent, and can send one again. A team lead
+can move a dispute to another team. Tenant administrators issue and revoke tenant keys and adapt the
+email templates to their institution. Figure~\ref{fig:use-cases} traces each use case to the
+operations of the API contract and to the section of chapter~\ref{ch:design} that designs it.
+
+\begin{figure}[htbp]
+\centering
+\small
+\begin{tabular}{L{4.6cm}L{2.6cm}L{4.4cm}l}
+\toprule
+Use case & Actor & Operations & Design \\
+\midrule
+Open a dispute & tenant system & \code{createDispute} & \ref{sec:design-state-machine} \\
+Work a dispute through its lifecycle & analyst & \code{getDispute}, \code{applyDisputeEvent} & \ref{sec:design-state-machine} \\
+Keep the regulatory deadlines & engine & (on every event) & \ref{sec:design-clocks} \\
+Move money for a credit or reversal & engine & (on every event) & \ref{sec:design-ledger}, \ref{sec:design-core} \\
+Collect the customer's account & analyst & \code{applyDisputeEvent} & \ref{sec:design-questionnaire} \\
+Hold a credit on a risky dispute & engine, analyst & \code{applyDisputeEvent} & \ref{sec:design-fraud} \\
+Find and filter disputes & analyst & \code{listDisputes} & \ref{sec:design-clocks} \\
+Notify the customer & engine, analyst & \code{composeEmail}, \code{resendNotice} & \ref{sec:design-communications} \\
+Move a dispute to another team & team lead & \code{reassignDispute} & \ref{sec:design-teams} \\
+Manage keys and templates & tenant administrator & \code{createTenantKey}, \code{putTenantTemplate} & \ref{sec:design-tenancy} \\
+\bottomrule
+\end{tabular}
+\caption{Use cases, the operations of the API contract that serve them (\code{docs/api/openapi.yaml}),
+and the sections that design them.}
+\label{fig:use-cases}
+\end{figure}
+
+\section{Quality requirements}
+\label{sec:req-quality}
+
+Four properties matter more than any single feature, because a failure of any of them is either a
+breach of a legal duty or a loss of money. The first is correctness of the lifecycle: a dispute may
+take no step its regime forbids, and every step the regime allows must be reachable and covered by
+a test. The second is that money moves exactly once. A caller that repeats a request, because a
+response was lost, must get the original answer rather than a second payment, and a refusal from
+the core banking system must leave no trace of the step that caused it. The third is isolation
+and accountability. No tenant may ever see another tenant's data, and this must hold even when
+the application code is wrong, which means the database has to enforce it; the actor recorded on
+every event must be the authenticated caller rather than whatever the request claims; and the
+analyst who investigated a dispute may not also pay it out. The fourth is operability. Every
+request must be traceable from the workbench to the database, and compliance with the deadlines
+must be measurable as it happens, not reconstructed afterwards for a report.
+Chapter~\ref{ch:evaluation} returns to each of the four with a test or a measurement.
+
+\section{What was deliberately left out}
+\label{sec:req-scope}
+
+A dispute engine for a real bank would do more than this one, and the following were left out on
+purpose. The rounds of a contested chargeback after the merchant's first answer, such as
+pre-arbitration and arbitration, are folded into a single evidence step, since they add states
+and deadlines but no new kind of decision. The extensions the regulations allow for complex
+cases, such as Regulation~E's longer periods for new accounts, are not modelled; every dispute
+runs the standard clocks. The card network and the core banking system are simulated behind
+ports rather than integrated, as no real network or bank was available to a thesis project. Fraud
+is scored with fixed, readable rules rather than a learned model, because there are no labelled
+outcomes to learn from and a customer is entitled to an explanation. Each dispute has a single
+currency and each tenant writes to its customers in a single language. PostgreSQL is the only
+stateful dependency, with no separate cache or message broker, and there is no edge network in
+front of the service, so the application does its own rate limiting. No real card numbers are
+stored anywhere; all data is synthetic.
+
+Two larger parts were marked from the outset as the first things to cut if time ran short: the
+fraud-scoring engine and the analyst-facing frontend. Both survived, each in a deliberately modest
+form, and chapters~\ref{ch:design} and~\ref{ch:implementation} explain what that form is and why.
