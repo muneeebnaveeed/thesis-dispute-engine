@@ -8,8 +8,8 @@ from a dated run under `data/`, never typed by hand.
 
 | Question | Measure | Produced by |
 | --- | --- | --- |
-| Does the engine apply each regime's rules correctly? | table-driven transition tests per regime: accepted and refused transitions, appeal limits, reachability pins | `go test -json ./internal/dispute/domain/` |
-| Is the log append-only and are concurrent writers serialised? | database refusal of update, delete and truncate; eight writers on one dispute produce exactly one winner per version | `go test ./internal/dispute/infrastructure/postgres/` |
+| Does the engine apply each regime's rules correctly? | per regime: reachable states, accepted transitions and the share walked by a named scenario (the suite fails below all of them), refused pairs, appeal limits, reachability pins | `TestTransitionCoverage` and the domain suite |
+| Is the log append-only and are concurrent writers serialised? | database refusal of update, delete and truncate; eight writers on one dispute produce exactly one winner per version | `go test -tags integration ./internal/dispute/infrastructure/postgres/` |
 | Are retries safe? | identical replays return the stored response, mismatched bodies are refused | same, plus `dispute_idempotent_replays_total` under load |
 | Is tenant isolation a database guarantee? | cross-tenant reads, writes, replays and raw queries as the API role return nothing | `TestTenantIsolationUnderRLS`, browser suite |
 | How does it perform under sustained load? | p50, p95, p99 latency per route, achieved requests per second, error share, 409 share | `cmd/eval` load run read back from Prometheus |
@@ -31,7 +31,9 @@ has no address, so the run sends no mail) and `EVAL_WORKBENCH=http://localhost:3
 loads per second through the frontend server, signed in as the seeded analyst; the cookie comes from
 `frontend/scripts/session-cookie.ts`). It writes:
 
-- `data/<date>/correctness.json`: test counts per package and the list of transition cases.
+- `data/<date>/correctness.json`: test counts per package, unit and Postgres-backed (the suites run with the
+  integration tag against the stack's database), and per regime the transition coverage figure 6.2 is drawn from.
+  Runs before `2026-10-19` left the Postgres-backed tests out and have no per-regime section.
 - `data/<date>/load.json`: achieved rate, status histogram, replay count, per-route latency percentiles
   from `http_server_request_duration_seconds` over the run window; with a workbench, page and server-function
   percentiles for it; and the runtime picture of both processes (goroutines, heap, Postgres p95, event loop
@@ -48,6 +50,7 @@ Runs are committed; the thesis cites the directory name.
 | `2026-09-30_1050` | main before authorization (df94471), 20 requests/s, API only | 21 ms | 9 ms | 5 ms |
 | `2026-09-30_1052` | first authorization build (6613298): Cedar decision per operation, team-scope RLS | 25 ms | 21 ms | 10 ms |
 | `2026-09-30_1057` | final authorization build (1c9ecad): access data read once per transaction | 25 ms | 20 ms | 10 ms |
+| `2026-10-19_1200` | the same API (502aa59), correctness step now including the Postgres-backed suites | 43 ms | 17 ms | 10 ms |
 
 Server-side percentiles from Prometheus; the first two runs at 7.6 requests/s on the laptop, the second showing
 the cost of the six domain components landing in the same transaction. The third run (2439 API requests, 359
@@ -66,6 +69,13 @@ stayed at 0.96 ms in both runs, so the restrictive policies did not make queries
 trips: a request now also reads its caller's access data and the dispute's facts (its event log and transaction)
 beside what it already read. Reading access data once per transaction instead of once per decision won back about
 0.6 ms at p50 on writes; reusing the event log the view already loads is the next saving.
+
+The `2026-10-19_1200` run is the first whose correctness step ran the Postgres-backed suites (24 tests, among them
+append-only enforcement, eight concurrent writers and isolation under row-level security) and recorded transition
+coverage per regime: every accepted transition of all four regimes is walked by a named scenario. The API is the
+code of `2026-09-30_1057`; the same mix of statuses and deliberate 409s came back, reads and events kept their
+latencies, and create p99 rose to 43 ms. Those suites had just run against the same database, which is the likely
+cause rather than the code.
 
 ## Limitations to state
 

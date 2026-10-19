@@ -32,7 +32,7 @@ on screen and printed small. JPEG rather than the smaller WebP because pdflatex 
 | 5.8 | 5 | Finding a dispute by id, state or reason | `latex/figures/search.jpg` | done |
 | 5.9 | 5 | The organisation and the signed-in analyst on the rail | `latex/figures/sidebar.jpg` | done |
 | 6.1 | 6 | Typed-decision accuracy per use case, two models | `eval/decisions/results-*.json` | done (`06-evaluation.tex`) |
-| 6.2 | 6 | Transition coverage per regime | `make thesis:eval` correctness table | todo (after first run) |
+| 6.2 | 6 | Transition coverage per regime | `make thesis:eval`, `correctness.json` transitions | source |
 | 6.3 | 6 | Latency percentiles per route under load | `make thesis:eval` latency table | todo |
 | 6.4 | 6 | Concurrency: eight writers on one dispute, outcomes | `store_test.go` concurrency test | source |
 | 6.5 | 6 | Isolation: cross-tenant attempts and their results | `tenancy_test.go`, browser suite | source |

@@ -158,17 +158,20 @@ workbench\:image: ## Build the frontend container image
 
 workbench\:e2e: ## Browser suite against the full local stack (starts Postgres, API and Keycloak, seeds, builds the frontend)
 	deploy/keycloak/render-realms.sh >/dev/null
-	$(COMPOSE) --profile app --profile auth up -d --build --wait postgres migrate api keycloak
+	scripts/compose-build --profile app --profile auth -- migrate api
+	$(COMPOSE) --profile app --profile auth up -d --wait postgres migrate api keycloak
 	$(MAKE) --no-print-directory 'db:up' 'db:seed'
 	$(PNPM) e2e
 
 ##@ Stack (Docker Compose)
 
 stack\:up: ## PostgreSQL + the API built from backend/Dockerfile
-	$(COMPOSE) --profile app up -d --build
+	scripts/compose-build --profile app
+	$(COMPOSE) --profile app up -d
 
 stack\:dev: ## PostgreSQL + the API in a Go toolchain container with live reload (bind mount)
-	$(COMPOSE) --profile dev up --build
+	scripts/compose-build --profile dev
+	$(COMPOSE) --profile dev up
 
 stack\:down: ## Stop everything started by stack:up, otel:up or auth:up (keeps the DB volume)
 	$(COMPOSE) --profile app --profile otel --profile auth down
@@ -182,7 +185,8 @@ auth\:down: ## Stop Keycloak (keeps its database)
 	$(COMPOSE) --profile auth down
 
 otel\:up: ## PostgreSQL + API + Grafana LGTM (http://localhost:3001, admin/admin) + synthetic probe; seeds the DB
-	$(COMPOSE) --env-file deploy/otel.env --profile otel up -d --build
+	scripts/compose-build --env-file deploy/otel.env --profile otel
+	$(COMPOSE) --env-file deploy/otel.env --profile otel up -d
 	$(MAKE) --no-print-directory 'db:seed'
 
 otel\:down: ## Stop the otel stack
