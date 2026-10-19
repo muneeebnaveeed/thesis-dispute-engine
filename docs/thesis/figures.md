@@ -32,10 +32,10 @@ on screen and printed small. JPEG rather than the smaller WebP because pdflatex 
 | 5.8 | 5 | Finding a dispute by id, state or reason | `latex/figures/search.jpg` | done |
 | 5.9 | 5 | The organisation and the signed-in analyst on the rail | `latex/figures/sidebar.jpg` | done |
 | 6.1 | 6 | Typed-decision accuracy per use case, two models | `eval/decisions/results-*.json` | done (`06-evaluation.tex`) |
-| 6.2 | 6 | Transition coverage per regime | `make thesis:eval`, `correctness.json` transitions | source |
-| 6.3 | 6 | Latency percentiles per route under load | `make thesis:eval` latency table | todo |
-| 6.4 | 6 | Concurrency: eight writers on one dispute, outcomes | `store_test.go` concurrency test | source |
-| 6.5 | 6 | Isolation: cross-tenant attempts and their results | `tenancy_test.go`, browser suite | source |
+| 6.2 | 6 | Transition coverage per regime | `make thesis:eval`, `correctness.json` transitions | done (`06-evaluation.tex`, table) |
+| 6.3 | 6 | Latency percentiles per route under load | `make thesis:eval`, `load.json` | done (`06-evaluation.tex`, table) |
+| 6.4 | 6 | Concurrency: eight writers on one dispute, outcomes | `store_test.go` concurrency test | done as text (`06-evaluation.tex`) |
+| 6.5 | 6 | Isolation: cross-tenant attempts and their results | `tenancy_test.go`, `team_scope_test.go` | done as text (`06-evaluation.tex`) |
 
 Budget check: 36 pages of text allows at most 12 pages of figures; the register holds 20 figures,
 so most must be compact (half a page). Screenshots are cropped to the relevant panel.
