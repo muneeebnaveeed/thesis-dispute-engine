@@ -65,17 +65,10 @@ state of every regime. An appeal is the one transition outside the table. It is 
 \emph{closed}, at most once under each regime's rules, returns the dispute to the investigation, and starts
 a new resolution clock (section~\ref{sec:design-clocks}).
 
-Because the machine is the spine, its tests are the strongest in the repository. The set of reachable
-states of each regime is pinned, so that a change to the lifecycle is a visible decision rather than a side
-effect of an edit; every reachable state must be able to reach \emph{closed}, so no regime has a dead end;
-and twenty-nine named scenarios, each ending in \emph{closed}, must between them walk every transition a
-regime accepts. Run \code{2026-10-19\_1200} records the result: all 64 accepted transitions across the four
-regimes are walked. The 416 pairs of state and event the regimes refuse are counted in the same run and never
-offered as actions, and the refusals that carry the regulation, such as a SEPA claim that tries to file a
-chargeback or a Regulation~Z dispute that tries to issue a refund, are each a named test of their own.
-Figure~\ref{fig:state-machine} is produced from the same table by a test that compares it with a stored
-copy, so the figure in this thesis cannot quietly fall out of step with the code: changing the lifecycle
-fails the build until the figure is regenerated.
+Its tests, from the pinned set of reachable states of each regime to a gate that fails unless a named scenario
+walks every accepted transition, are reported in section~\ref{sec:eval-correctness}. Figure~\ref{fig:state-machine}
+is drawn from the same table by a test that compares it with a stored copy, so changing the lifecycle fails the
+build until the figure is regenerated.
 
 \section{Regulatory clocks}
 \label{sec:design-clocks}
@@ -132,20 +125,16 @@ rule or to a holiday calendar cannot silently move a deadline that was already c
 dispute opened before the feature existed has no clocks rather than an invented breach. Second,
 the calendar is tenant data, not code: a tenant's settings name its time zone and public holidays,
 entered at onboarding, and the due time is the last instant of the $n$th permitted day in that
-zone. A complaint received on a Friday evening in Budapest is due by the end of Monday, Budapest
-time, or Tuesday if Monday is a national holiday; the same complaint received at the same instant
-by a bank in New York, where it is still Friday afternoon, is also due Monday but four hours and
-two time zones later. The unit tests in \code{domain/deadline\_test.go} fix these cases.
+zone; the unit tests in \code{domain/deadline\_test.go} fix weekends, holidays and the difference
+between time zones.
 
 Status is never stored. A clock is \emph{running}, \emph{met}, \emph{late} (satisfied after its
 due time), \emph{breached} (open and past due) or \emph{void}, and the answer is a comparison of
 three timestamps with the current time at the moment someone asks. Nothing therefore has to run
 at midnight to notice a breach; the workbench's ``overdue only'' filter, the API's
-\code{overdue} parameter and the \code{dispute.deadlines\_overdue} gauge all ask the same question
-of the same rows, and a histogram of the slack at the moment each clock is satisfied
-(\code{dispute.deadline\_slack}) turns compliance from a report into a distribution. The one place
-the derivation shows is idempotent replay: a repeated request returns the response as first
-stored, so its statuses are as of the first request, which is what a replay promises anyway.
+\code{overdue} parameter and the overdue gauge all ask the same question of the same rows, and a
+histogram of the slack at the moment each clock is satisfied turns compliance from a report into a
+distribution.
 
 % Distils ADR 0015.
 \section{The banking core adapter}
@@ -167,12 +156,9 @@ touch the customer's account cross this port; suspense, recovery and loss are th
 and never leave the engine. Each tenant names its core in its settings and a router picks the
 adapter by that name, so two tenants on one deployment can be two different banks; the two seed
 tenants are configured differently on purpose, one refusing credits above a limit and one
-answering slowly. The simulator that stands behind the port in this build speaks in the same
-fields a real one would (message types 0200 and 0210, processing code 20 for a credit and 01 for a
-debit, the amount in minor units, a system trace number, the reference number derived from the
-posting reference, the numeric currency code), remembers what it has seen, and can be told per
-tenant to decline, to refuse debits on named accounts, to be slow or to be down
-(\code{infrastructure/mockcore}).
+answering slowly. The simulator behind the port in this build speaks the message types and fields a real
+switch would, remembers what it has seen, and can be told per tenant to decline, to refuse debits
+on named accounts, to be slow or to be down (\code{infrastructure/mockcore}).
 
 The decision that shapes everything else is \emph{when} to call. The engine calls the core inside
 the transition's own database transaction, with a bounded timeout, and treats the answer as part
@@ -242,8 +228,7 @@ asserts a zero balance and a customer who never ends up net debited
 fails the build rather than a reconciliation months on.
 
 The amount credited is the disputed amount less a liability the analyst may assign to the
-customer, which the regime caps: fifty euro for a lost or stolen instrument under PSD2 art.~74,
-fifty dollars under Regulation~E \S~1005.6(b), none under SEPA Core or Regulation~Z. The liability
+customer, capped by the regime (figure~\ref{fig:regimes}). The liability
 travels in the refund event's payload, as does the settlement choice on close; both are validated
 against the regime before the transition is written, and a refusal is a 422 problem naming the
 field, after which the dispute is exactly as it was: no event, no posting. Postings themselves are
@@ -362,16 +347,10 @@ generic internal error whose only detail is the request reference, under which t
 cause. The list of codes is kept in two places, the contract and the Go code that emits them, and a test fails if
 the two ever differ.
 
-The workbench turns the same contract into one closed vocabulary of ten failure kinds. Nine follow from the
-server's codes, among them a payment the bank's core declined, which an analyst must be able to tell apart from a
-dispute in the wrong state; the tenth, a server that could not be reached at all, is one only the client can
-observe. The table from code to kind must name every code in the contract, which the compiler checks, and a code
-from a newer server that the table does not yet know is treated as an internal failure, so the analyst still sees
-the request reference rather than a blank. Every response is classified once, where it is read, so a page decides
-what to show from the kind and never from a message. Forms validate against the contract's own schemas before
-anything is sent, so a structural mistake is shown under its field without a round trip, and a field error from
-the server, should one still arrive, appears in exactly the same place. A failure that will pass, a rate limit or
-an unavailable dependency, tells the analyst when to try again, from the wait the response advertised.
+The workbench classifies every response once into a closed set of ten failure kinds, nine from the server's
+codes and one, an unreachable server, that only a client can observe; the table from code to kind must cover every
+code in the contract, which the compiler checks, and a page decides what to show from the kind, never from a
+message.
 
 % Distils ADR 0008, 0009, 0010 and 0020.
 \section{Multi-tenancy with row-level security}
@@ -417,19 +396,16 @@ store makes before any query. An unbound setting yields \code{NULL}, which match
 The tenant therefore has to come from the credential, and there are two kinds of caller with different needs.
 A tenant's own systems, such as the online bank that opens disputes, run unattended and expect a credential they
 can store: they present a \emph{tenant key}, a random secret shown once when it is issued and kept only as a hash,
-which names its tenant and can be revoked on its own. Analysts are people, and expect sign-in, sessions,
-multi-factor authentication and password recovery, which a dispute engine has no business reimplementing. They
-sign in through an identity provider \cite{oidc} in which every tenant has its own realm, so that each institution's
-users, password rules and sign-in page are separate from every other's at the level of the identity system and
-not only by a field in a token. The tenant's short name in the address of the workbench chooses the realm before
+which names its tenant and can be revoked on its own. Analysts are people, and sign in through an identity provider
+\cite{oidc} in which every tenant has its own realm, so each institution's users and sign-in rules are
+separate from every other's at the level of the identity system, not only by a field in a token. The tenant's short name in the address of the workbench chooses the realm before
 anyone signs in. The engine verifies an analyst's token itself: the issuer of the token decides the tenant, an
 issuer that no tenant owns is refused, and a tenant claim inside the token that disagrees with its issuer is
 refused as a sign of a misconfigured realm. Both kinds of credential end in the same context, a tenant and a
 principal, and everything below that point is shared.
 
-The browser never holds either credential. An analyst's tokens live in a session on the workbench's server,
-behind a cookie that scripts on the page cannot read, and every call to the engine is made by that server on the
-analyst's behalf; a script injected into a page therefore has no token to steal. The price of the design is that
+The browser never holds either credential; how the workbench keeps an analyst's tokens on its server is
+described in section~\ref{sec:impl-sessions}. The price of the design is that
 every new table needs its tenant column, its policy and its grants, and a table that lacks them fails a test of the
 service role's privileges before it can be released. The isolation it buys is tested against the database role
 the service actually uses, as chapter~\ref{ch:evaluation} reports (section~\ref{sec:eval-isolation}).
@@ -508,16 +484,8 @@ sees rather than narrowed it \cite{pgrls}. The two lines disagree in one place b
 Reassigning a dispute to a team the lead is not in cannot pass a row policy, because an update's
 new row must also be readable by the caller; that single move therefore runs as the owner,
 bounded to the caller's tenant, current membership and the version they read, after the policy
-engine has allowed it. The policy engine itself is cheap: a decision against a cached policy set
-takes about 25 microseconds on the development machine, and recompiling a tenant's policies after a
-change about 0.3 milliseconds. The second line is not. Measured end to end at twenty requests a
-second against the same build without authorization, the median read rose from 2.1 to 4.2
-milliseconds and the median event from 3.0 to 5.0 (runs \code{2026-09-30\_1050} and
-\code{2026-09-30\_1057}). The row policies did not make queries slower, since the database's own
-95th percentile per query stayed at 0.96 milliseconds; the time is extra round trips, as each
-request now also reads its caller's access data and the facts a decision needs. That is a cost of
-where the decision is taken, inside the request's transaction on committed facts, and it can be
-reduced without moving it.
+engine has allowed it. What this costs per request is measured in section~\ref{sec:eval-latency}: extra round trips
+rather than policy evaluation, a price of deciding inside the request's transaction on committed facts.
 
 % Distils ADR 0017.
 \section{Communications}
@@ -541,14 +509,10 @@ the transition, from facts it already holds (the account, the original transacti
 clocks, the ledger, the questionnaire), as structured paragraphs with the provision each one
 satisfies, and stores it as a row in the same transaction. A letter is thereby complete the moment
 it exists; the workbench lays it out on a printable page from the paragraphs, so no markup is ever
-trusted. An email is an entry in an outbox: a dispatcher claims unsent rows across tenants through
-owner-defined functions, the same device the purge uses to cross tenant boundaries
-(section~\ref{sec:design-tenancy}), renders text and HTML from the same paragraphs, hands them to
-the relay, and records the outcome. A nudge after every commit keeps latency low; a timer keeps
-nothing lost; a backoff that grows per attempt and row locks that skip what another replica holds
-let several instances share the work. The trade is the usual one for an outbox: delivery is
-at-least-once, so a relay that accepted a message but failed to say so may receive it twice,
-whereas a letter, being a row, cannot be duplicated.
+trusted. An email is an entry in an outbox, which a dispatcher drains after every commit and on a timer,
+so a notice survives a crash between the commit and the send. The trade is the usual one for an
+outbox: delivery is at-least-once, so a relay that accepted a message but failed to say so may
+receive it twice, whereas a letter, being a row, cannot be duplicated.
 
 Analysts also write on their own initiative, to ask for documents or to report where a case
 stands, and the same machinery serves them through a small addition (ADR~0019). Their emails are
@@ -564,6 +528,5 @@ credential cannot compose one at all.
 Two smaller consequences follow. The acknowledgement clock of section~\ref{sec:design-clocks} is
 met by the acknowledgement notice, not by any state, because the acknowledgement is what the
 regulation asks for. And the customer's file becomes complete and auditable from the dispute alone:
-every paragraph ever sent, to which address, by which channel, and whether it went. The browser
-suite closes the loop by opening a dispute and finding the acknowledgement in the development mail
-relay, and by opening a Regulation~E dispute and printing its letter.
+every paragraph ever sent, to which address, by which channel, and whether it went. Golden files pin the paragraphs of
+every kind of notice under each regime, so a change in what a customer reads is a reviewed diff.
