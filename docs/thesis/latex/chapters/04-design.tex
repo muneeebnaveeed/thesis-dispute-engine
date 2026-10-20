@@ -87,7 +87,7 @@ days. An engine that treats deadlines as documentation leaves the analyst to com
 leaves the institution unable to answer the auditor's first question, namely how often it met
 them.
 
-The design carries each deadline as a \emph{clock} on the regime's rules (table~\ref{fig:clocks}):
+The design carries each deadline as a \emph{clock} on the regime's rules (appendix, figure~\ref{fig:clocks}):
 a kind, a count, a unit and the citation. There are three kinds, and each is defined by the states
 that satisfy it rather than by the regime, in the same spirit as the gates of the state machine
 (section~\ref{sec:design-state-machine}): the refund clock is met by entering any credit state,
@@ -95,28 +95,6 @@ the acknowledgement clock by opening the investigation, the resolution clock by 
 that can no longer be met, such as the refund clock of a dispute closed without a credit, is
 voided rather than breached. An appeal restarts the resolution clock and numbers the new one by the
 appeal, so a dispute's history keeps every clock it ever had.
-
-\begin{figure}[htbp]
-\centering
-\small
-\begin{tabular}{llrll}
-\toprule
-Regime & Clock & Count & Unit & Basis \\
-\midrule
-\code{EU\_PSD2\_CARD} & refund & 1 & business days & PSD2 art.~73(1) \\
- & resolution & 15 & business days & PSD2 art.~101(2) \\
-\code{EU\_SEPA\_DIRECT\_DEBIT} & refund & 10 & business days & PSD2 art.~77(1) \\
- & resolution & 15 & business days & PSD2 art.~101(2) \\
-\code{US\_REG\_E} & refund & 10 & business days & 12 CFR 1005.11(c)(1) \\
- & resolution & 45 & calendar days & 12 CFR 1005.11(c)(2) \\
-\code{US\_REG\_Z} & acknowledge & 30 & calendar days & 12 CFR 1026.13(c)(1) \\
- & resolution & 90 & calendar days & 12 CFR 1026.13(c)(2) \\
-\bottomrule
-\end{tabular}
-\caption{The clocks each regime starts when a dispute opens (\code{domain/regime.go}). Extensions the law
-permits for complex cases are not modelled; see section~\ref{sec:limitations}.}
-\label{fig:clocks}
-\end{figure}
 
 Two decisions follow from treating a due date as something the institution has told the customer.
 First, the due time is computed once, when the dispute opens, and stored as a row alongside the
@@ -187,7 +165,7 @@ imagined a provisional-credit engine and a final-credit engine as separate compo
 disappear into one small ledger once the question is put correctly: not ``what kind of credit is
 this?'' but ``where is the money now?''
 
-The ledger has four accounts from the issuer's point of view (figure~\ref{fig:ledger}): the
+The ledger has four accounts from the issuer's point of view (appendix, figure~\ref{fig:ledger}): the
 customer's account, a suspense account holding what the bank has advanced and not yet cleared, and
 recovery and loss, which clear it. Every movement is a double-entry posting, and every posting is
 caused by a transition: entering a credit state debits suspense and credits the customer; a
@@ -197,25 +175,6 @@ the customer instead; and closing settles whatever remains, recovered or written
 analyst's word or the regime's default. As with the state machine and the clocks, nothing here
 tests the regime's name: the postings follow from the state entered and two properties of the
 rules.
-
-\begin{figure}[htbp]
-\centering
-\small
-\begin{tabular}{L{5.5cm}L{4.1cm}L{2.4cm}L{1.6cm}}
-\toprule
-State entered & Posting & Debit & Credit \\
-\midrule
-any credit state & credit (disputed less liability) & suspense & customer \\
-\code{PROVISIONAL\_CREDIT\_REVERSED} & reversal (outstanding) & customer & suspense \\
-\code{CHARGEBACK\_WON} & recovery (outstanding) & recovery & suspense \\
-\code{CHARGEBACK\_LOST}, no provisional credit & write-off (outstanding) & loss & suspense \\
-\code{CLOSED}, outstanding & settlement, recovered or written off & recovery or loss & suspense \\
-\bottomrule
-\end{tabular}
-\caption{Postings caused by entering a state (\code{domain/ledger.go}). ``Outstanding'' is the dispute's suspense
-balance before the transition; a posting of zero is not written.}
-\label{fig:ledger}
-\end{figure}
 
 The property that matters is that suspense is zero when a dispute closes: whatever the bank
 advanced was taken back, recovered or written off, and nothing is left in limbo. It is not
