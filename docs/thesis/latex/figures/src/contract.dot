@@ -1,0 +1,30 @@
+// Figure: contract to code, what is generated on each side. From Makefile api:generate and frontend/scripts/generate-api.ts.
+digraph contract {
+  rankdir=TB; splines=ortho; nodesep=0.4; ranksep=0.5; newrank=true;
+  node [shape=box, style="rounded,filled", fillcolor=white, color="gray35", fontname="Times", fontsize=15];
+  edge [color="gray35", penwidth=1.6, arrowsize=1.0];
+
+  sql  [label="SQL migrations\nand queries", fillcolor="#fffbe6"];
+  spec [label="OpenAPI document\n(the contract)", fillcolor="#fffbe6"];
+
+  subgraph cluster_go {
+    label="Engine (Go), make api:generate"; labelloc=b; labeljust=l; fontname="Times"; fontsize=14;
+    style=solid; penwidth=1.4; bgcolor="#e8f1fb"; pencolor="#3f73a8"; fontcolor="#3f73a8";
+    queries [label="Typed query functions\n(sqlc)"];
+    server [label="Server interface and types\n(oapi-codegen)"];
+    validator [label="Request validator\n(kin-openapi)"];
+  }
+  subgraph cluster_ts {
+    label="Workbench (TypeScript), generate-api.ts"; labelloc=b; labeljust=r; fontname="Times"; fontsize=14;
+    style=solid; penwidth=1.4; bgcolor="#e7f5ea"; pencolor="#3b8a50"; fontcolor="#3b8a50";
+    types [label="Types and request functions\n(openapi-typescript)"];
+    schemas [label="Validation schemas\n(TypeBox)"];
+  }
+
+  sql -> queries;
+  spec -> server; spec -> validator;
+  spec -> types; spec -> schemas;
+  schemas -> types [dir=both, style=dashed, constraint=false];
+  { rank=same; sql; spec; }
+  { rank=same; queries; server; validator; types; schemas; }
+}

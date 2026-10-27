@@ -1,0 +1,34 @@
+// Figure: bounded contexts and layers of the service. Hand-drawn from backend/internal; make thesis:figures renders it.
+digraph layers {
+  rankdir=TB; splines=ortho; nodesep=0.35; ranksep=0.45; newrank=true;
+  node [shape=box, style="rounded,filled", fillcolor=white, color="gray35", fontname="Times", fontsize=15];
+  edge [color="gray35", penwidth=1.6, arrowsize=1.0];
+
+  cmd [label="Commands\napi, migrate, seed, eval, tenant, tenantkey", fillcolor="#f4f4f4"];
+
+  subgraph cluster_dispute {
+    label="Dispute context"; labelloc=t; labeljust=l; fontname="Times"; fontsize=14;
+    style=solid; penwidth=1.4; bgcolor="#e8f1fb"; pencolor="#3f73a8"; fontcolor="#3f73a8";
+    ports [label="Ports\nHTTP handlers implementing the generated interface"];
+    app   [label="Application\nuse cases, authorization, transactions"];
+    domain [label="Domain\nstate machine, regimes, clocks, ledger, notices, risk\n(pure: no I/O)", fillcolor="#fffbe6"];
+    infra [label="Infrastructure\nPostgreSQL store, mail relay, simulated core, decision model"];
+  }
+
+  subgraph cluster_platform {
+    label="Platform (no domain knowledge)"; labelloc=b; labeljust=r; fontname="Times"; fontsize=14;
+    style=solid; penwidth=1.4; bgcolor="#e7f5ea"; pencolor="#3b8a50"; fontcolor="#3b8a50";
+    platform [label="config, errs, httpserver, auth, ratelimit,\ntelemetry, tenant, principal, postgres, money"];
+  }
+
+  websession [label="Web sessions\nsealed analyst sessions (opaque)", fillcolor="#f2eaf8", color="#7a4ea3"];
+
+  cmd -> ports;
+  ports -> app;
+  app -> domain;
+  infra -> app [label="  implements its ports", fontname="Times", fontsize=13, style=dashed];
+  infra -> domain [style=invis];
+  app -> platform [style=dashed, color="#3b8a50"];
+  ports -> websession [style=dashed, color="#7a4ea3", constraint=false];
+  { rank=same; app; infra; }
+}

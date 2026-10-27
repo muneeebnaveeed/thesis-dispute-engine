@@ -12,12 +12,21 @@ every behaviour that wraps a request is a small piece of code in the repository 
 convention: recovery from a panic, a request identifier, a structured log line, and, for the operations that need
 them, authentication, the rate limit and validation against the contract. The server sets explicit timeouts for
 reading, writing and idle connections, and on a termination signal it stops accepting requests, lets the ones in
-flight finish and flushes its telemetry before it exits. The code follows the layers of the design. The
+flight finish and flushes its telemetry before it exits. The code follows the layers of the design (figure~\ref{fig:layers}). The
 \code{dispute} context has a pure domain layer with no input or output at all, which is why chapter~\ref{ch:design}
 can describe the state machine, the clocks and the ledger as functions; an application layer of use cases that
 orchestrate it; infrastructure adapters for the database, the mail relay and the simulated core; and HTTP ports
 that implement the generated interface. A shared platform package holds what has no domain knowledge, such as
 configuration, errors, telemetry and the database pool.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{layers.pdf}
+\caption{The layers of the service. Solid arrows are calls; the infrastructure implements interfaces the
+application declares, so the application never imports it; the domain does no input or output. The web-session
+package stores the workbench's sealed sessions (section~\ref{sec:impl-sessions}).}
+\label{fig:layers}
+\end{figure}
 
 PostgreSQL is the only stateful dependency, and that was a decision rather than a default. Every mechanism that
 is often given its own system lives in the database instead, inside the same transaction and the same trace as the work
@@ -28,7 +37,8 @@ under a millisecond at the 95th percentile (section~\ref{sec:eval-latency}). A d
 its current state and a version, beside an append-only log of every transition with its actor, payload, the
 idempotency key that caused it and the trace of the request. A transition reads the row, runs the state machine in
 memory and writes back only if the version is still the one it read; a concurrent writer that got there first
-makes the write affect no row, and the caller receives a conflict instead of waiting on a lock. A unique index on
+makes the write affect no row, and the caller receives a conflict instead of waiting on a lock
+\cite{kleppmann2017}. A unique index on
 the dispute and its sequence number guards the same rule a second time.
 
 The 83 queries are written in SQL and compiled into typed Go functions, so a column renamed in a migration breaks
@@ -47,7 +57,7 @@ build. One command regenerates everything derived from it on the server: the typ
 server interface, the request and response types and the validator from the OpenAPI document. A second command
 regenerates and compares the result with what is committed, and fails with the list of files that differ, so the
 check runs in continuous integration and on a developer's machine in the same way. On the client, a script reads
-the same document and writes two files: the TypeScript types and request functions, and a validation schema for
+the same document and writes two files (figure~\ref{fig:contract}): the TypeScript types and request functions, and a validation schema for
 every component schema in the document.
 
 The two client files are generated independently, from different libraries, and could disagree. Each generated
@@ -57,6 +67,15 @@ surprise in a form. The workbench validates in one place only: a module that acc
 Standard Schema interface, adapts the generated ones behind it, and returns either the value or one error per
 field. Forms use it before they submit, and every server function uses it on its input before it calls the
 engine, so a malformed request is refused at the edge of each side even though both sides would refuse it anyway.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{contract.pdf}
+\caption{What is generated from the contract and the SQL on each side. The dashed arrow is the compile-time check
+that each validation schema's type equals the generated type of the same component (figure~\ref{fig:schema-pair});
+continuous integration regenerates everything and fails on any difference from what is committed.}
+\label{fig:contract}
+\end{figure}
 
 \begin{figure}[htbp]
 \begin{lstlisting}
@@ -87,7 +106,7 @@ last line compiles only if the schema's type equals the type generated for the s
 \section{Sessions and sign-in}
 \label{sec:impl-sessions}
 
-An analyst reaches the workbench through their institution's front door, an address ending in the tenant's short
+An analyst reaches the workbench through their institution's front door (figure~\ref{fig:signin}), an address ending in the tenant's short
 name. An unauthenticated visit there starts the authorization-code flow with proof-key protection against that
 tenant's realm and remembers the page that was asked for, restricted to the workbench's own paths. The callback
 validates the identity token, creates a new session identifier and gives the browser a cookie carrying only that
@@ -102,6 +121,14 @@ service key rather than a tenant's credential. The engine keeps the ciphertext a
 on every read and sweeps expired rows, but cannot read what it stores; neither can anyone holding a copy of the
 database. Every page renders on the server with the session's access token, and every later action is a server
 function that reads the same token on the server, so the browser never sees a token at all.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{\textwidth}{!}{\input{figures/src/signin.tex}}
+\caption{An analyst of the tenant \code{otp} signing in. The tokens stay on the workbench server (shaded); the
+engine stores the session sealed and cannot read it, and the browser holds only the session's identifier.}
+\label{fig:signin}
+\end{figure}
 
 Tokens are refreshed only on the server. When a refresh fails, the browser is sent back through the front door,
 which signs the analyst in again silently while their session with the identity provider lasts, so a long-open tab
@@ -222,11 +249,11 @@ rate becomes something the running system reports rather than something the auth
 
 Telemetry was part of the first commit, because a system whose behaviour is regulated must be able to show what it
 did, and because instrumentation added late tends to cover what was easy rather than what matters. Both services,
-the engine and the workbench server, use OpenTelemetry and are configured only through the standard environment
-variables; without them they still create every span and metric but export nothing, so a developer's run stays
+the engine and the workbench server, use OpenTelemetry \cite{otelspec} and are configured only through the standard
+environment variables; without them they still create every span and metric but export nothing, so a developer's run stays
 quiet. Every request is a span named after its route pattern rather than its address, which keeps the number of
 distinct names bounded by the routing table. Every database statement is a child span named after its query, with
-no values recorded. Logs go to standard output and, with the trace's identifiers attached, to the same backend as
+no values recorded (appendix, figure~\ref{fig:trace}). Logs go to standard output and, with the trace's identifiers attached, to the same backend as
 the traces, after a redaction step that runs before any destination.
 
 A request from the workbench is one trace across both services: the workbench server opens a span per request and
@@ -238,7 +265,7 @@ its delivery, minutes or hours later, links back. Nothing in an attribute carrie
 personal data.
 
 Locally the signals land in a Grafana stack started with the rest of the system, which provisions two dashboards,
-one per service, and three alert rules from the repository: more than one percent of responses failing with a
+one per service (appendix, figure~\ref{fig:dashboard}), and three alert rules from the repository: more than one percent of responses failing with a
 server error, a 99th-percentile latency above one second, and an outbox that is not draining. The rules alert on
 symptoms a user would notice rather than on causes such as processor or memory use, which are diagnostics. A
 synthetic probe keeps a trickle of realistic traffic flowing so that no panel is ever empty, and the evaluation of
@@ -257,7 +284,8 @@ change is always tested against what it will actually be merged into. A pull req
 template of type, a two- or three-sentence description of its effect, whether it includes tests, how it rolls out
 and which decision record it implements, and one of the eight checks rejects a body that does not.
 
-Continuous integration runs one job per area, with a named step per check, so a failure names its cause. The
+Continuous integration runs one job per area, with a named step per check, so a failure names its cause
+(appendix, figure~\ref{fig:ci}). The
 backend job checks formatting, that generated code is current, static analysis, the linter, that the module files
 are tidy, the dependency vulnerability database, and that the authorization policies validate against their
 schema. The backend test job runs the unit and database-backed suites with the race detector against a real

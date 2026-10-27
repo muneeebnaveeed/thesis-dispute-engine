@@ -1,0 +1,25 @@
+% Figure: analyst sign-in sequence (docs/authentication.md, ADR 0011, 0020). Drawn in TikZ so Overleaf compiles it unchanged.
+\begin{tikzpicture}[x=1cm,y=-0.62cm,font=\small,
+  actor/.style={draw=gray!70,rounded corners=2pt,fill=white,minimum width=2.9cm,minimum height=0.75cm,align=center,font=\small\bfseries},
+  msg/.style={-{Stealth[length=2.2mm]},line width=0.9pt,draw=gray!80!black},
+  ret/.style={msg,dashed},
+  lbl/.style={above,font=\footnotesize,align=center,inner sep=1.5pt,fill=white,fill opacity=0.85,text opacity=1}]
+  \def\B{0}\def\W{5.2}\def\R{10.0}\def\E{14.6}
+  \fill[blue!6] (\W-1.5,0.6) rectangle (\W+1.5,15.6);
+  \node[actor] at (\B,0) {Browser};
+  \node[actor,draw=blue!50!black] at (\W,0) {Workbench server};
+  \node[actor] at (\R,0) {Tenant's realm};
+  \node[actor] at (\E,0) {Engine};
+  \foreach \x in {\B,\W,\R,\E} \draw[gray!60,line width=0.6pt] (\x,0.6) -- (\x,15.6);
+  \draw[msg] (\B,1.6) -- node[lbl]{1 \texttt{GET /otp/...}, no session} (\W,1.6);
+  \draw[ret] (\W,2.9) -- node[lbl]{2 redirect (PKCE, state, nonce)} (\B,2.9);
+  \draw[msg] (\B,4.2) -- node[lbl,pos=0.75]{3 sign in (password, MFA)} (\R,4.2);
+  \draw[ret] (\R,5.5) -- node[lbl,pos=0.75]{4 redirect with a code} (\B,5.5);
+  \draw[msg] (\B,6.8) -- node[lbl]{5 \texttt{/auth/callback}} (\W,6.8);
+  \draw[msg] (\W,8.1) -- node[lbl]{6 code + PKCE verifier} (\R,8.1);
+  \draw[ret] (\R,9.4) -- node[lbl]{7 ID, access, refresh tokens} (\W,9.4);
+  \draw[msg] (\W,10.7) -- node[lbl,pos=0.5]{8 store the session, sealed (AES-256-GCM)} (\E,10.7);
+  \draw[ret] (\W,12.0) -- node[lbl]{9 cookie: session id only} (\B,12.0);
+  \draw[msg] (\B,13.3) -- node[lbl]{10 page or server function} (\W,13.3);
+  \draw[msg] (\W,14.6) -- node[lbl,pos=0.5]{11 read the session; call the API with the access token} (\E,14.6);
+\end{tikzpicture}
