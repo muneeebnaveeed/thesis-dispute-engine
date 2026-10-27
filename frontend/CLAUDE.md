@@ -70,7 +70,7 @@ lint and format fixes. `make workbench:dev` for the dev server on :3002. Inside 
   label, the cva class, the a11y wiring and the error line; the `<form>` uses `submitting(form)`;
   a contract schema validates through `validators: { onSubmit: schemaValidator(schema) }` and the
   mutation receives `parsed(schema, value)`; writes run inside `submitTo(formApi, () =>
-mutation.mutateAsync(...))`, which puts an API validation refusal on the fields it names. Field
+  mutation.mutateAsync(...))`, which puts an API validation refusal on the fields it names. Field
   names mirror the API's error pointers (`answers.<id>`, `fields.<id>`). Never read `FormData` or
   keep form values in `useState`.
 - Telemetry (ADR 0022): `src/server/telemetry/` holds the SDK bootstrap, the request span, the
