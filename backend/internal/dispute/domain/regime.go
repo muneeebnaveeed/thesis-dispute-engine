@@ -63,7 +63,7 @@ var rules = map[Regime]Rules{
 		Regime: RegimeEUSEPADirectDebit,
 		Refund: RefundNoQuestionsAsked,
 		Clocks: []Clock{
-			{Kind: DeadlineRefund, Count: 10, Unit: BusinessDays, Basis: "PSD2 art. 77(1): refund or justification within 10 business days of the request"},
+			{Kind: DeadlineRefund, Count: 10, Unit: BusinessDays, Basis: "PSD2 art. 77(2): refund or justification within 10 business days of the request"},
 			{Kind: DeadlineResolution, Count: 15, Unit: BusinessDays, Basis: "PSD2 art. 101(2): final reply to a complaint within 15 business days"},
 		},
 		HasAdjudication:    false,
@@ -91,7 +91,7 @@ var rules = map[Regime]Rules{
 		Regime: RegimeUSRegE,
 		Refund: RefundProvisionalCredit,
 		Clocks: []Clock{
-			{Kind: DeadlineRefund, Count: 10, Unit: BusinessDays, Basis: "12 CFR 1005.11(c)(1): provisional credit within 10 business days"},
+			{Kind: DeadlineRefund, Count: 10, Unit: BusinessDays, Basis: "12 CFR 1005.11(c)(2)(i): provisional credit within 10 business days"},
 			{Kind: DeadlineResolution, Count: 45, Unit: CalendarDays, Basis: "12 CFR 1005.11(c)(2): investigation complete within 45 days"},
 		},
 		HasAdjudication:    true,

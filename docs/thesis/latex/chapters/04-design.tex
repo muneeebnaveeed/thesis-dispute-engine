@@ -78,7 +78,7 @@ particular dates. The dates are where the regimes differ most visibly. PSD2 requ
 be refunded ``immediately, and in any event no later than by the end of the following business
 day'' \cite[art.~73(1)]{psd2} and a final reply to a complaint within fifteen business days
 \cite[art.~101(2)]{psd2}; for an authorised direct debit the refund or a justification is due
-within ten business days of the request \cite[art.~77(1)]{psd2}. Regulation~E requires provisional
+within ten business days of the request \cite[art.~77(2)]{psd2}. Regulation~E requires provisional
 credit within ten business days and a completed investigation within forty-five days
 \cite[\S~1005.11(c)]{rege}; Regulation~Z requires a written acknowledgement within thirty days and
 a resolution within two billing cycles, at most ninety days \cite[\S~1026.13(c)]{regz}. Two of the
@@ -361,7 +361,15 @@ separate from every other's at the level of the identity system, not only by a f
 anyone signs in. The engine verifies an analyst's token itself: the issuer of the token decides the tenant, an
 issuer that no tenant owns is refused, and a tenant claim inside the token that disagrees with its issuer is
 refused as a sign of a misconfigured realm. Both kinds of credential end in the same context, a tenant and a
-principal, and everything below that point is shared.
+principal, and everything below that point is shared (figure~\ref{fig:credentials}).
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{credentials.pdf}
+\caption{Two kinds of credential resolving to one tenant context, which every transaction binds before its first
+query so that row-level security can scope it.}
+\label{fig:credentials}
+\end{figure}
 
 The browser never holds either credential; how the workbench keeps an analyst's tokens on its server is
 described in section~\ref{sec:impl-sessions}. The price of the design is that
@@ -453,7 +461,7 @@ rather than policy evaluation, a price of deciding inside the request's transact
 A dispute is a conversation with the customer as much as a sequence of states, and the regimes
 say when the bank must speak: Regulation~Z wants a written acknowledgement within thirty days
 \cite[\S~1026.13(c)(1)]{regz}; Regulation~E wants the customer told of a provisional credit
-\cite[\S~1005.11(c)(2)(iv)]{rege}, told the date and amount of a reversal before it happens
+\cite[\S~1005.11(c)(2)(ii)]{rege}, told the date and amount of a reversal when it is debited
 \cite[\S~1005.11(d)(2)]{rege}, and told the outcome with the right to see the documents relied on
 \cite[\S~1005.11(d)(1)]{rege}. What the bank owes is therefore domain knowledge, and the engine
 keeps it where it keeps the rest: a function from the state entered to the notices it triggers,

@@ -201,7 +201,7 @@ thesis\:build: ## Build docs/thesis/latex/main.tex to docs/thesis/latex/build/ma
 	docker run --rm --network host -v "$(CURDIR)/docs/thesis/latex:/work" -w /work texlive/texlive:latest latexmk -pdf -interaction=nonstopmode main.tex >/dev/null && echo "docs/thesis/latex/build/main.pdf"
 
 thesis\:figures: ## Render generated figures into docs/thesis/latex/figures (the lifecycle diagram comes from the transition table's golden file)
-	docker run --rm --network host -v "$(CURDIR):/work" -w /work alpine:3 sh -c 'apk add --no-cache -q graphviz font-liberation >/dev/null && dot -Tpdf -o docs/thesis/latex/figures/state-machine.pdf backend/internal/dispute/domain/testdata/state-machine.dot && chown $(shell id -u):$(shell id -g) docs/thesis/latex/figures/state-machine.pdf'
+	docker run --rm --network host -v "$(CURDIR):/work" -w /work alpine:3 sh -c 'apk add --no-cache -q graphviz font-liberation >/dev/null && dot -Tpdf -o docs/thesis/latex/figures/state-machine.pdf backend/internal/dispute/domain/testdata/state-machine.dot && for f in docs/thesis/latex/figures/src/*.dot; do dot -Tpdf -o docs/thesis/latex/figures/$$(basename $$f .dot).pdf $$f; done && chown $(shell id -u):$(shell id -g) docs/thesis/latex/figures/*.pdf'
 
 thesis\:eval: ## Evaluation run into docs/thesis/data/<date>/ (needs make otel:up); EVAL_RPS, EVAL_SECONDS, EVAL_KEY
 	scripts/eval

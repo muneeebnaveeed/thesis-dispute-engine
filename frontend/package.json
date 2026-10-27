@@ -25,6 +25,7 @@
     "generate:check": "bash scripts/generate-check.sh",
     "shadcn": "node scripts/shadcn.ts",
     "screenshot": "node scripts/screenshot.ts",
+    "screenshot:ops": "node scripts/screenshot-ops.ts",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui"
   },
