@@ -3,3 +3,81 @@
 
 % Budget and sources: docs/thesis/outline.md. Every claim about behaviour points at a test, a figure or a number in data/.
 
+\section{What the thesis shows}
+\label{sec:conclusion-shows}
+
+The thesis set out to show that payment disputes under different regulatory regimes do not need different
+software: that one finite state machine, parameterised by the regime, can carry the lifecycle of a PSD2 card
+dispute, a SEPA direct-debit claim, a Regulation~E debit-card error and a Regulation~Z billing error, with the
+regime deciding which states exist, which deadlines run and which money moves. The engine built to test that claim
+carries all four. Its fifteen states are shared, and each regime reaches the part of them its rules describe: six
+under SEPA, eleven under PSD2, thirteen under Regulation~E and ten under Regulation~Z. None of the differences is
+written as a test of a regime's name; each is a property of the rules, from the kind of money the customer receives
+to whether a merchant may contest. The evaluation backs the claim with a test rather than an argument: every one of
+the 64 transitions the four regimes accept is walked by a named scenario that ends in a closed dispute, and every
+pair of state and event a regime forbids is refused (section~\ref{sec:eval-correctness}).
+
+The rest of the work answers the question that follows from the first, which is whether a lifecycle held this way
+can bear the weight of a real issuer's process. Deadlines are computed once, in the tenant's own business-day
+calendar, and their status is derived on demand, so compliance is a distribution that can be read at any moment
+rather than a report assembled afterwards. Money moves once: through a double-entry ledger whose suspense account
+is zero whenever a dispute closes, and through a port to the bank's core whose duplicate detection makes a retry
+after a timeout safe. Several institutions share one deployment, and the database rather than the code keeps
+them apart; the actor on every event is the authenticated caller, and the analyst who investigated a dispute
+cannot pay it out. These are the properties chapter~\ref{ch:requirements} put above any single feature, and each
+is checked by a test against the real database rather than asserted
+(sections~\ref{sec:eval-log} and~\ref{sec:eval-isolation}).
+
+\section{What the decisions cost}
+\label{sec:conclusion-costs}
+
+Several decisions bought correctness at a price that the evaluation measured. Taking each authorization decision
+inside the request's transaction, on facts already committed, doubled the median latency of a read from about two
+to about four milliseconds; the cost is extra round trips to the database rather than the policy engine itself, and
+the measurement shows where to recover it without moving the decision (section~\ref{sec:eval-latency}). Calling the
+banking core inside the transaction makes the engine as slow as the slowest core it talks to, in exchange for never
+recording a refund the core did not make. Keeping PostgreSQL as the only stateful dependency puts every
+counter, session and outbox in the same database as the disputes; the measurements show its queries well under a
+millisecond at this load, and the reversal is written down as a measurement to wait for rather than a preference.
+
+Other decisions limited what the system claims rather than what it does. Fraud is scored by fixed rules whose
+weights are judgement, not fitted to outcomes, and the score may only hold a credit until a person writes down why
+it should go out; it never denies a dispute. The typed-decision model is offered to analysts only behind a
+confidence gate, and its accuracy was measured on a synthetic set its author labelled. The banking core and the
+card network are simulators behind ports. Each of these is stated in the text where it applies and collected in
+section~\ref{sec:limitations}, so that what the thesis claims and what it measured do not drift apart.
+
+Two parts were marked from the outset as the first to cut if time ran short: the fraud-scoring engine and the
+analyst-facing workbench. Both were kept, in a form chosen to be defensible rather than impressive. The scoring is
+readable and can only slow money down; the workbench never holds a token and shows only the actions the engine would
+accept.
+
+\section{Future work}
+\label{sec:conclusion-future}
+
+The most direct extensions deepen the lifecycle the thesis already models. The contested rounds of a chargeback
+after the merchant's first answer, such as pre-arbitration and arbitration, are folded into one evidence step; they
+would become states of their own, gated by the same properties, with deadlines from the card network's rules. The
+statutory extensions of deadlines, such as the longer periods Regulation~E allows for new accounts or the holding
+reply PSD2 permits in exceptional cases, would become clocks that an event may extend, with the extension recorded
+beside the clock it moves. Both are additions to the rules rather than to the machine, which is the test the design
+was meant to pass.
+
+The next regulatory step is already visible. The European Union's Payment Services Regulation, provisionally agreed
+at the end of 2025, extends the issuer's liability to some payments a customer was deceived into authorising, such as
+those made to a fraudster impersonating the bank. Under it a dispute may arise from a payment that was authorised, the question becomes whether the bank's own fraud controls
+met the expected standard, and the evidence comes from the bank rather than the merchant. That is a new regime in
+the sense of this thesis: a row of rules, its clocks and its postings, and a test of whether the gates the four
+existing regimes needed are enough for a fifth.
+
+Integration would turn the simulators into adapters. A real core speaks the same instructions and receipts as the
+simulated one, so the work is in the adapter and in observing a real core's behaviour when it is slow or silent,
+which the port was designed for but has not met. The card network would receive the chargebacks that the engine now only
+records, and its answers would become the events that the analyst now enters by hand.
+
+Finally, the two measurements the running system already records would decide two of its open questions. The share
+of the decision model's proposals that analysts keep, recorded whenever an analyst is shown one, is the honest
+measure of whether the proposals help. And the outcomes of disputes, once there are enough of them, are
+the labelled data a learned fraud model would need, against which the fixed rules could be compared rather than
+replaced. Both are reasons the engine records what it records: the system was built so that its next decisions can
+be taken on evidence, as its first ones were.
