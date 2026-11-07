@@ -58,29 +58,29 @@ the chargeback is won or lost (chapter~\ref{ch:requirements}).
 \section{What a dispute engine must therefore guarantee}
 \label{sec:bg-guarantees}
 
-The four regimes, summarised in figure~\ref{fig:regimes}, share a lifecycle of opening,
+The four regimes, summarised in table~\ref{tab:regimes}, share a lifecycle of opening,
 investigation, settlement and closure, and differ in which parts of it exist. The engine must
 therefore allow each dispute exactly the steps its regime allows; run its deadlines, in business
 days where the law says so, in the calendar of the institution that owes them; move money exactly
 once, reversing a credit where the regime provides for it; produce the notices the customer is
 owed; and keep a record of who did what, and when, that an auditor can trust.
 
-\begin{figure}[htbp]
+\begin{table}[H]
 \centering
-\small
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{L{2.4cm}L{2.0cm}L{3.0cm}L{3.5cm}L{2.1cm}l}
-\toprule
-Regime & Rail & Money to the customer & Deadlines & Adjudication & Cap \\
-\midrule
+\caption{The four regimes as the engine models them (\code{domain/regime.go}, \code{domain/rail.go}). The
+deadlines are the clocks of table~\ref{tab:clocks}; ``contested'' says whether the
+merchant may contest a chargeback.}
+\label{tab:regimes}
+\tablefont
+\begin{NiceTabular}{L{2.2cm}L{1.9cm}L{2.7cm}L{3.1cm}L{2.2cm}l}
+\CodeBefore
+  \rowcolor{tablehead}{1}
+  \rowcolors{2}{tablerowalt}{tablerow}
+\Body
+\hd{Regime} & \hd{Rail} & \hd{Money to the customer} & \hd{Deadlines} & \hd{Contested} & \hd{Cap} \\
 PSD2 card & card, EUR & final refund & 1 and 15 business days & yes & EUR 50 \\
 SEPA Core DD & debit, EUR & no-questions refund & 10 and 15 business days & no & none \\
 Regulation E & card, USD & provisional credit & 10 business, 45 calendar days & yes & USD 50 \\
-Regulation Z & credit card, USD & none (collection suspended) & 30 and 90 calendar days & yes & none \\
-\bottomrule
-\end{tabular}
-\caption{The four regimes as the engine models them (\code{domain/regime.go}, \code{domain/rail.go}). The
-deadlines are the clocks of figure~\ref{fig:clocks}; ``adjudication'' means a chargeback the merchant may
-contest.}
-\label{fig:regimes}
-\end{figure}
+Regulation Z & credit card, USD & none (collection suspended) & 30 and 90 calendar days & yes & none
+\end{NiceTabular}
+\end{table}

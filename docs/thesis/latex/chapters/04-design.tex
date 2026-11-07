@@ -45,7 +45,7 @@ provisional credit is made final, while under PSD2 the refund was final all alon
 different parts of the same machine: six states under SEPA, eleven under PSD2, thirteen under Regulation~E and
 ten under Regulation~Z. A fifth regime would need a new row of rules, its entry in the list of regimes, the
 branch that selects it and its tests, but no new code in the machine. The regime is fixed when the dispute
-opens, from the transaction's rail and the account's currency (figure~\ref{fig:regimes}), so a dispute cannot
+opens, from the transaction's rail and the account's currency (table~\ref{tab:regimes}), so a dispute cannot
 drift from one set of rules to another.
 
 The machine is one pure function from a dispute and an event to the next dispute, written as a table of cases
@@ -60,11 +60,11 @@ section~\ref{sec:eval-correctness}.
 
 A dispute must reach particular states by particular dates, from PSD2's refund by the end of the next business
 day \cite[art.~73(1)]{psd2} to Regulation~Z's resolution within ninety days \cite[\S~1026.13(c)]{regz}
-(figure~\ref{fig:regimes}). Three of the four regimes count business days for at least one clock, which depends on
+(table~\ref{tab:regimes}). Three of the four regimes count business days for at least one clock, which depends on
 the jurisdiction's holidays. An engine that treats deadlines as documentation leaves the analyst to compute them,
 and the institution unable to say how often it met them.
 
-Each deadline is therefore a \emph{clock} on the regime's rules (appendix, figure~\ref{fig:clocks}): a kind, a
+Each deadline is therefore a \emph{clock} on the regime's rules (appendix, table~\ref{tab:clocks}): a kind, a
 count, a unit and the citation. Each of the three kinds is defined by what satisfies it rather than by the
 regime: the refund clock is met by entering any credit state, the acknowledgement clock by sending the
 acknowledgement notice, the resolution clock by closing. A clock that can no longer be met, such as the refund
@@ -110,7 +110,7 @@ its promise.
 Three of the four regimes move the customer's money before anyone knows who was right. The original proposal
 imagined separate provisional-credit and final-credit engines; both disappear into one small ledger once the
 question becomes ``where is the money now?'' rather than ``what kind of credit is this?''. The ledger has four
-accounts from the issuer's point of view (appendix, figure~\ref{fig:ledger}): the customer's account, a suspense
+accounts from the issuer's point of view (appendix, table~\ref{tab:ledger}): the customer's account, a suspense
 account holding what the bank has advanced and not yet cleared, and recovery and loss, which clear it. Every
 posting is double-entry and caused by a transition: entering a credit state debits suspense and credits the
 customer, a reversal does the opposite, a won chargeback recovers, a lost one writes off unless a provisional

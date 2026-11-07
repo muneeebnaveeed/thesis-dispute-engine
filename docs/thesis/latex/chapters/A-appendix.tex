@@ -8,27 +8,29 @@
 
 The deadlines section~\ref{sec:design-clocks} describes, as the engine's rules carry them.
 
-\begin{figure}[H]
+\begin{table}[H]
 \centering
-\small
-\begin{tabular}{llrll}
-\toprule
-Regime & Clock & Count & Unit & Basis \\
-\midrule
-\code{EU\_PSD2\_CARD} & refund & 1 & business days & PSD2 art.~73(1) \\
- & resolution & 15 & business days & PSD2 art.~101(2) \\
-\code{EU\_SEPA\_DIRECT\_DEBIT} & refund & 10 & business days & PSD2 art.~77(2) \\
- & resolution & 15 & business days & PSD2 art.~101(2) \\
-\code{US\_REG\_E} & refund & 10 & business days & 12 CFR 1005.11(c)(2)(i) \\
- & resolution & 45 & calendar days & 12 CFR 1005.11(c)(2) \\
-\code{US\_REG\_Z} & acknowledge & 30 & calendar days & 12 CFR 1026.13(c)(1) \\
- & resolution & 90 & calendar days & 12 CFR 1026.13(c)(2) \\
-\bottomrule
-\end{tabular}
 \caption{The clocks each regime starts when a dispute opens (\code{domain/regime.go}). Extensions the law
 permits for complex cases are not modelled; see section~\ref{sec:limitations}.}
-\label{fig:clocks}
-\end{figure}
+\label{tab:clocks}
+\tablefont
+\begin{NiceTabular}{llrll}
+\CodeBefore
+  \rowcolor{tablehead}{1}
+  \rowcolor{tablerow}{2,3,6,7}
+  \rowcolor{tablerowalt}{4,5,8,9}
+\Body
+\hd{Regime} & \hd{Clock} & \hd{Count} & \hd{Unit} & \hd{Basis} \\
+\Block{2-1}{PSD2 card} & refund & 1 & business days & PSD2 art.~73(1) \\
+& resolution & 15 & business days & PSD2 art.~101(2) \\
+\Block{2-1}{SEPA Core DD} & refund & 10 & business days & PSD2 art.~77(2) \\
+& resolution & 15 & business days & PSD2 art.~101(2) \\
+\Block{2-1}{Regulation~E} & refund & 10 & business days & 12 CFR 1005.11(c)(2)(i) \\
+& resolution & 45 & calendar days & 12 CFR 1005.11(c)(2) \\
+\Block{2-1}{Regulation~Z} & acknowledge & 30 & calendar days & 12 CFR 1026.13(c)(1) \\
+& resolution & 90 & calendar days & 12 CFR 1026.13(c)(2)
+\end{NiceTabular}
+\end{table}
 
 \clearpage
 \section{Ledger postings}
@@ -36,24 +38,25 @@ permits for complex cases are not modelled; see section~\ref{sec:limitations}.}
 
 The postings section~\ref{sec:design-ledger} describes, one row per state that causes one.
 
-\begin{figure}[H]
+\begin{table}[H]
 \centering
-\small
-\begin{tabular}{L{5.5cm}L{4.1cm}L{2.4cm}L{1.6cm}}
-\toprule
-State entered & Posting & Debit & Credit \\
-\midrule
+\caption{Postings caused by entering a state (\code{domain/ledger.go}). ``Outstanding'' is the dispute's suspense
+balance before the transition; a posting of zero is not written.}
+\label{tab:ledger}
+\tablefont
+\begin{NiceTabular}{L{5.5cm}L{4.1cm}L{2.4cm}L{1.6cm}}
+\CodeBefore
+  \rowcolor{tablehead}{1}
+  \rowcolors{2}{tablerowalt}{tablerow}
+\Body
+\hd{State entered} & \hd{Posting} & \hd{Debit} & \hd{Credit} \\
 any credit state & credit (disputed less liability) & suspense & customer \\
 \code{PROVISIONAL\_CREDIT\_REVERSED} & reversal (outstanding) & customer & suspense \\
 \code{CHARGEBACK\_WON} & recovery (outstanding) & recovery & suspense \\
 \code{CHARGEBACK\_LOST}, no provisional credit & write-off (outstanding) & loss & suspense \\
-\code{CLOSED}, outstanding & settlement, recovered or written off & recovery or loss & suspense \\
-\bottomrule
-\end{tabular}
-\caption{Postings caused by entering a state (\code{domain/ledger.go}). ``Outstanding'' is the dispute's suspense
-balance before the transition; a posting of zero is not written.}
-\label{fig:ledger}
-\end{figure}
+\code{CLOSED}, outstanding & settlement, recovered or written off & recovery or loss & suspense
+\end{NiceTabular}
+\end{table}
 
 \clearpage
 \section{The dispute page}
