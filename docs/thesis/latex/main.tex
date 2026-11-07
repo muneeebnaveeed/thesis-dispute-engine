@@ -20,6 +20,7 @@
 % ragged-right paragraph column for narrow table cells
 \newcolumntype{L}[1]{>{\raggedright\arraybackslash}m{#1}}
 \usepackage{caption}
+\usepackage{rotating}  % sidewaysfigure for the data model
 \usepackage{float}   % [H] keeps appendix tables under their headings
 \usepackage{listings}
 \usepackage{xcolor}
@@ -34,7 +35,7 @@
 \captionsetup{font=small,labelfont={bf,color=tablehead},justification=raggedright,singlelinecheck=false}
 \captionsetup[table]{position=top,skip=8pt}
 \newcommand{\tablefont}{\small\fontfamily{qhv}\selectfont}
-\NiceMatrixOptions{rounded-corners=6pt,cell-space-limits=5pt}
+\NiceMatrixOptions{rounded-corners=6pt,cell-space-limits=3pt}
 \newcommand{\hd}[1]{\textcolor{white}{\bfseries #1}}
 \usepackage[hidelinks]{hyperref}
 \usepackage[style=numeric,sorting=none,maxbibnames=6]{biblatex}

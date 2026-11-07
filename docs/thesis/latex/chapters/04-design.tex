@@ -200,8 +200,10 @@ The engine serves several institutions from one deployment, and they must never 
 depending on every query remembering that. A database or schema per tenant isolates well but multiplies
 everything an operator runs by the number of customers. The design keeps one schema in which every row names its
 tenant, and puts the enforcement in the database with PostgreSQL's row-level security \cite{pgrls}. Every
-business table has the same policy: a row is visible and writable only when its tenant is the one bound to the
-current transaction (figure~\ref{fig:rls}). The service binds the tenant from the authenticated caller, never
+table that holds a tenant's disputes, accounts or teams has the same policy: a row is visible and writable only
+when its tenant is the one bound to the current transaction (figure~\ref{fig:rls}; the core tables are drawn in
+the appendix, figure~\ref{fig:erd}). Only the credential and session tables, read before any tenant is known,
+are outside it. The service binds the tenant from the authenticated caller, never
 from the request, and only for that transaction, so a pooled connection cannot carry one tenant into another's
 request. When nothing is bound the policy matches no rows, so mistakes fail closed.
 

@@ -59,6 +59,20 @@ any credit state & credit (disputed less liability) & suspense & customer \\
 \end{table}
 
 \clearpage
+\section{Data model}
+\label{sec:appendix-erd}
+
+\begin{sidewaysfigure}
+\centering
+\includegraphics[width=\textheight,height=0.8\textwidth,keepaspectratio]{erd.pdf}
+\caption{The core tables of the schema and their foreign keys, generated from the migrated database by
+\code{scripts/erd}; 13 of the 23 tables are shown. Primary keys are bold. Every table drawn also references
+\code{tenants} through its \code{tenant\_id}; only the first links are drawn. RLS marks a table under the
+row-level security policy of figure~\ref{fig:rls}.}
+\label{fig:erd}
+\end{sidewaysfigure}
+
+\clearpage
 \section{The dispute page}
 \label{sec:appendix-dispute}
 
