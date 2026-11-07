@@ -25,16 +25,16 @@ questionnaire, refunds or credits within the regime's clock, files a chargeback 
 has one, records its outcome, and closes the dispute with the settlement it requires. A closed
 dispute can be appealed once, reopening the investigation with a new resolution clock.
 
-Figure~\ref{fig:use-cases} traces this and the supporting use cases to the operations of
+Table~\ref{tab:use-cases} traces this and the supporting use cases to the operations of
 the API contract and to the sections of chapter~\ref{ch:design} that design them.
 
-\begin{figure}[htbp]
+\begin{table}[htb]
 \centering
-\small
+\caption{Use cases, the operations of the API contract that serve them (\code{docs/api/openapi.yaml}),
+and the sections that design them.}
+\label{tab:use-cases}
 \begin{tabular}{L{4.6cm}L{2.6cm}L{4.4cm}l}
-\toprule
-Use case & Actor & Operations & Design \\
-\midrule
+\tablehead \hd{Use case} & \hd{Actor} & \hd{Operations} & \hd{Design} \\
 Open a dispute & tenant system & \code{createDispute} & \ref{sec:design-state-machine} \\
 Work a dispute through its lifecycle & analyst & \code{getDispute}, \code{applyDisputeEvent} & \ref{sec:design-state-machine} \\
 Keep the regulatory deadlines & engine & (on every event) & \ref{sec:design-clocks} \\
@@ -45,12 +45,9 @@ Find and filter disputes & analyst & \code{listDisputes} & \ref{sec:design-clock
 Notify the customer & engine, analyst & \code{composeEmail}, \code{resendNotice} & \ref{sec:design-communications} \\
 Move a dispute to another team & team lead & \code{reassignDispute} & \ref{sec:design-teams} \\
 Manage keys and templates & tenant administrator & \code{createTenantKey}, \code{putTenantTemplate} & \ref{sec:design-tenancy} \\
-\bottomrule
+\tableend
 \end{tabular}
-\caption{Use cases, the operations of the API contract that serve them (\code{docs/api/openapi.yaml}),
-and the sections that design them.}
-\label{fig:use-cases}
-\end{figure}
+\end{table}
 
 \section{Quality requirements}
 \label{sec:req-quality}

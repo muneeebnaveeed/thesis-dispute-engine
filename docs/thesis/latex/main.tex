@@ -22,7 +22,21 @@
 \usepackage{caption}
 \usepackage{float}   % [H] keeps appendix tables under their headings
 \usepackage{listings}
-\usepackage{xcolor}
+\usepackage[table]{xcolor}
+\usepackage{etoolbox}
+
+% Tables: a teal header band, tinted alternate rows and a closing rule in the same colour.
+\definecolor{tablehead}{HTML}{0F6E56}
+\definecolor{tablerow}{HTML}{EAF6F1}
+\definecolor{tablesum}{HTML}{CDEBDF}
+\captionsetup{font=small,labelfont={bf,color=tablehead},justification=raggedright,singlelinecheck=false}
+\captionsetup[table]{position=top,skip=6pt}
+\AtBeginEnvironment{table}{\small\renewcommand{\arraystretch}{1.4}\setlength{\aboverulesep}{0pt}%
+  \setlength{\belowrulesep}{0pt}\arrayrulecolor{tablehead}\rowcolors{2}{white}{tablerow}}
+\newcommand{\hd}[1]{\textcolor{white}{\bfseries #1}}
+\newcommand{\tablehead}{\rowcolor{tablehead}}
+\newcommand{\tablesum}{\rowcolor{tablesum}}
+\newcommand{\tableend}{\specialrule{1.2pt}{0pt}{0pt}}
 \usepackage[hidelinks]{hyperref}
 \usepackage[style=numeric,sorting=none,maxbibnames=6]{biblatex}
 \addbibresource{references.bib}
