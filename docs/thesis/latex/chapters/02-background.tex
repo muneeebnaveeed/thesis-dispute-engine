@@ -71,13 +71,16 @@ owed; and keep a record of who did what, and when, that an auditor can trust.
 deadlines are the clocks of table~\ref{tab:clocks}; ``contested'' says whether the
 merchant may contest a chargeback.}
 \label{tab:regimes}
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{L{2.2cm}L{1.9cm}L{2.7cm}L{3.1cm}L{2.2cm}l}
-\tablehead \hd{Regime} & \hd{Rail} & \hd{Money to the customer} & \hd{Deadlines} & \hd{Contested} & \hd{Cap} \\
+\tablefont
+\begin{NiceTabular}{L{2.2cm}L{1.9cm}L{2.7cm}L{3.1cm}L{2.2cm}l}
+\CodeBefore
+  \rowcolor{tablehead}{1}
+  \rowcolors{2}{tablerowalt}{tablerow}
+\Body
+\hd{Regime} & \hd{Rail} & \hd{Money to the customer} & \hd{Deadlines} & \hd{Contested} & \hd{Cap} \\
 PSD2 card & card, EUR & final refund & 1 and 15 business days & yes & EUR 50 \\
 SEPA Core DD & debit, EUR & no-questions refund & 10 and 15 business days & no & none \\
 Regulation E & card, USD & provisional credit & 10 business, 45 calendar days & yes & USD 50 \\
-Regulation Z & credit card, USD & none (collection suspended) & 30 and 90 calendar days & yes & none \\
-\tableend
-\end{tabular}
+Regulation Z & credit card, USD & none (collection suspended) & 30 and 90 calendar days & yes & none
+\end{NiceTabular}
 \end{table}

@@ -18,25 +18,24 @@
 \usepackage{booktabs}
 \usepackage{array}
 % ragged-right paragraph column for narrow table cells
-\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}m{#1}}
 \usepackage{caption}
 \usepackage{float}   % [H] keeps appendix tables under their headings
 \usepackage{listings}
-\usepackage[table]{xcolor}
+\usepackage{xcolor}
 \usepackage{etoolbox}
 
-% Tables: a teal header band, tinted alternate rows and a closing rule in the same colour.
+% Tables: rounded, colour-banded, sans-serif, every cell vertically centred (nicematrix).
+\usepackage{nicematrix}
 \definecolor{tablehead}{HTML}{0F6E56}
 \definecolor{tablerow}{HTML}{EAF6F1}
+\definecolor{tablerowalt}{HTML}{F6FBF9}
 \definecolor{tablesum}{HTML}{CDEBDF}
 \captionsetup{font=small,labelfont={bf,color=tablehead},justification=raggedright,singlelinecheck=false}
-\captionsetup[table]{position=top,skip=6pt}
-\AtBeginEnvironment{table}{\small\renewcommand{\arraystretch}{1.4}\setlength{\aboverulesep}{0pt}%
-  \setlength{\belowrulesep}{0pt}\arrayrulecolor{tablehead}\rowcolors{2}{white}{tablerow}}
+\captionsetup[table]{position=top,skip=8pt}
+\newcommand{\tablefont}{\small\fontfamily{qhv}\selectfont}
+\NiceMatrixOptions{rounded-corners=6pt,cell-space-limits=5pt}
 \newcommand{\hd}[1]{\textcolor{white}{\bfseries #1}}
-\newcommand{\tablehead}{\rowcolor{tablehead}}
-\newcommand{\tablesum}{\rowcolor{tablesum}}
-\newcommand{\tableend}{\specialrule{1.2pt}{0pt}{0pt}}
 \usepackage[hidelinks]{hyperref}
 \usepackage[style=numeric,sorting=none,maxbibnames=6]{biblatex}
 \addbibresource{references.bib}
