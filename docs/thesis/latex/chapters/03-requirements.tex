@@ -6,40 +6,27 @@
 \section{Actors}
 \label{sec:req-actors}
 
-The system is offered as a service to institutions that handle disputes: banks that issue cards
-and hold accounts, and payment providers acting for them. Each such institution is a
-\emph{tenant}. A tenant's own systems, typically the online banking or card platform through which
-a customer raises a complaint, open disputes and follow their progress through the API, and
-identify themselves with a \emph{tenant key} issued for that purpose. The people who work the
-disputes are the tenant's \emph{analysts}. They use the workbench, sign in through their own
-institution's identity realm, belong to teams, and hold a rung of seniority within a team that
-bounds what they may do. A \emph{tenant administrator} is an analyst who additionally manages
-the tenant's keys, email templates and appearance. The \emph{customer}, finally, never uses the
-system directly, but every deadline, letter and movement of money in it exists for them.
+The system is offered as a service to banks and payment providers that handle disputes; each is a
+\emph{tenant}. A tenant's own systems open disputes and follow them through the API, identifying
+themselves with a \emph{tenant key}. The tenant's \emph{analysts} work the disputes in the
+workbench, in teams where a rung of seniority bounds what they may do, and a \emph{tenant
+administrator} also manages keys and email templates. The
+\emph{customer} never uses the system directly.
 
 \section{Use cases}
 \label{sec:req-use-cases}
 
-One use case carries the system and the rest support it. A tenant system opens a dispute against a
-transaction on the customer's account, giving the reason the customer chose. The regime is not
-chosen by the caller; it follows from the transaction's rail and the account's currency, so a card payment in
-euro is handled under PSD2, a SEPA debit in euro under the direct-debit rules, a card payment in
-dollars under Regulation~E and a credit-card payment in dollars under Regulation~Z
-(\code{domain/rail.go}). The customer is told that the dispute has been opened. An analyst opens
-the investigation, may send the customer a questionnaire and receive the answers, refunds or
-credits the customer within the regime's clock, files a chargeback where the regime has one,
-records its outcome, and closes the dispute with the settlement the outcome requires. A closed
-dispute can be appealed once, which reopens the investigation with a new resolution clock.
+One use case carries the system. A tenant system opens a dispute against a transaction, giving the
+reason the customer chose. The regime is not chosen by the caller; it follows from the
+transaction's rail and the account's currency (\code{domain/rail.go}): a euro card payment falls
+under PSD2, a euro SEPA debit under the direct-debit rules, and a dollar card or credit-card payment
+under Regulation~E or~Z respectively. An analyst investigates, may send the customer a
+questionnaire, refunds or credits within the regime's clock, files a chargeback where the regime
+has one, records its outcome, and closes the dispute with the settlement it requires. A closed
+dispute can be appealed once, reopening the investigation with a new resolution clock.
 
-Around that flow sit the use cases that make it workable for a team of people. Analysts find
-disputes by identifier, state or reason, and can narrow the list to the ones whose deadlines have
-passed. The customer's questionnaire depends on the dispute's reason, of which there are four: an
-unauthorised payment, goods or services not received, a duplicate charge, and an amount different
-from the one agreed. Analysts write to the customer from a catalogue of email templates, see every letter and email
-sent, and can send one again. A team lead
-can move a dispute to another team. Tenant administrators issue and revoke tenant keys and adapt the
-email templates to their institution. Figure~\ref{fig:use-cases} traces each use case to the
-operations of the API contract and to the section of chapter~\ref{ch:design} that designs it.
+Figure~\ref{fig:use-cases} traces this and the supporting use cases to the operations of
+the API contract and to the sections of chapter~\ref{ch:design} that design them.
 
 \begin{figure}[htbp]
 \centering
@@ -68,37 +55,27 @@ and the sections that design them.}
 \section{Quality requirements}
 \label{sec:req-quality}
 
-Four properties matter more than any single feature, because a failure of any of them is either a
-breach of a legal duty or a loss of money. The first is correctness of the lifecycle: a dispute may
-take no step its regime forbids, and every step the regime allows must be reachable and covered by
-a test. The second is that money moves exactly once. A caller that repeats a request, because a
-response was lost, must get the original answer rather than a second payment, and a refusal from
-the core banking system must leave no trace of the step that caused it. The third is isolation
-and accountability. No tenant may ever see another tenant's data, and this must hold even when
-the application code is wrong, which means the database has to enforce it; the actor recorded on
-every event must be the authenticated caller rather than whatever the request claims; and the
-analyst who investigated a dispute may not also issue its final credit. The fourth is operability. Every
-request must be traceable from the workbench to the database, and compliance with the deadlines
-must be measurable as it happens, not reconstructed afterwards for a report.
-Chapter~\ref{ch:evaluation} returns to each of the four with a test or a measurement.
+Four properties matter most. The first is correctness of the lifecycle: a
+dispute may take no step its regime forbids, and every step it allows must be reachable and tested.
+The second is that money moves exactly once: a repeated request must get the original answer, and
+a refusal from the core banking system must leave no trace of the step that caused it. The third
+is isolation and accountability: no tenant may see another tenant's data even when the application
+code is wrong, so the database must enforce it; the actor on every event must be the authenticated
+caller; and the analyst who investigated a dispute may not also issue its final credit. The fourth
+is operability: every request must be traceable to the database, and deadline compliance
+measurable as it happens. Chapter~\ref{ch:evaluation} returns to each with a test or a
+measurement.
 
 \section{What was deliberately left out}
 \label{sec:req-scope}
 
-A dispute engine for a real bank would do more than this one, and the following were left out on
-purpose. The rounds of a contested chargeback after the merchant's first answer, such as
-pre-arbitration and arbitration, are folded into a single evidence step, since they add states
-and deadlines but no new kind of decision. The extensions the regulations allow for complex
-cases, such as Regulation~E's longer periods for new accounts, are not modelled; every dispute
-runs the standard clocks. The core banking system is simulated behind a port rather than integrated, and the card network's
-answers are entered by the analyst as events, as no real network or bank was available to a thesis project. Fraud
-is scored with fixed, readable rules rather than a learned model, because there are no labelled
-outcomes to learn from and a customer is entitled to an explanation. Each dispute has a single
-currency and each tenant writes to its customers in a single language. PostgreSQL is the only
-stateful dependency, with no separate cache or message broker, and there is no edge network in
-front of the service, so the application does its own rate limiting. No real card numbers are
-stored anywhere; the seed data and test fixtures are synthetic.
+The rounds of a contested chargeback after the merchant's first answer are folded into a single
+evidence step, and the statutory extensions of the deadlines, such as Regulation~E's longer
+periods for new accounts, are not modelled. The core banking system is simulated behind a port,
+and the card network's answers are entered by the analyst as events, as no real network or bank
+was available. Fraud is scored with fixed, readable rules rather than a learned model, as there are
+no labelled outcomes to learn from. The seed data and test fixtures are synthetic.
 
-Two larger parts were marked in the project plan from the outset as the first things to cut if time ran short: the
-fraud-scoring engine and the analyst-facing frontend. Both survived, each in a deliberately modest
-form, and chapters~\ref{ch:design} and~\ref{ch:implementation} explain what that form is and why.
+Two larger parts were marked in the project plan from the outset as the first to cut if time ran
+short: the fraud-scoring engine and the analyst-facing frontend. Both survived in a deliberately
+modest form, which chapters~\ref{ch:design} and~\ref{ch:implementation} explain.
