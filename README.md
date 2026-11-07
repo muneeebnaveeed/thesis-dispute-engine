@@ -1,5 +1,10 @@
 # dispute-engine
 
+[![CI](https://github.com/muneeebnaveeed/thesis-dispute-engine/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/muneeebnaveeed/thesis-dispute-engine/actions/workflows/ci.yml)
+[![e2e](https://github.com/muneeebnaveeed/thesis-dispute-engine/actions/workflows/e2e.yml/badge.svg?branch=main)](https://github.com/muneeebnaveeed/thesis-dispute-engine/actions/workflows/e2e.yml)
+[![Go](https://img.shields.io/github/go-mod/go-version/muneeebnaveeed/thesis-dispute-engine?filename=backend%2Fgo.mod)](backend/go.mod)
+[![License: MIT](https://img.shields.io/github/license/muneeebnaveeed/thesis-dispute-engine)](LICENSE)
+
 An issuer-side automated fraud dispute resolution engine: the system a cardholder's bank runs
 from the moment a customer disputes a transaction. It issues provisional credit or a fast
 refund, files chargebacks toward the card network, adjudicates on evidence, communicates with
@@ -9,6 +14,24 @@ The dispute lifecycle is one finite state machine parameterised by a regulatory 
 PSD2 card disputes and SEPA Direct Debit are first-class; US Regulation E and Z are modelled
 as configuration to show the design generalises. See
 [`docs/adr/0002`](docs/adr/0002-regime-parameterised-state-machine.md).
+
+## Demo
+
+An analyst signs in through the tenant's Keycloak realm and lands on the dispute list:
+
+![Analyst sign-in and dispute list](docs/media/login.gif)
+
+Opening a dispute and driving it through the state machine; every transition lands in the event log:
+
+![Dispute lifecycle](docs/media/lifecycle.gif)
+
+The same through the API, as a bank's own systems would call it:
+
+![Opening a dispute through the API](docs/media/api.gif)
+
+Traces, metrics and logs from those requests in Grafana (`make otel:up`):
+
+![Grafana dashboard](docs/media/grafana.gif)
 
 ## Stack
 
@@ -50,7 +73,7 @@ standard `OTEL_*` variables; see `.env.example`.
 | Path | What |
 |---|---|
 | `backend/` | Go module: `cmd/{api,migrate,seed,tenantkey}`, `internal/<context>/{domain,application,infrastructure,ports}`, `internal/platform`, `migrations/` |
-| `frontend/` | Analyst dashboard (placeholder) |
+| `frontend/` | Analyst workbench (TanStack Start) |
 | `docs/adr/` | Architecture decision records |
 | `docs/thesis/` | Long-form design document |
 | `deploy/` | Compose stack and its env files |
