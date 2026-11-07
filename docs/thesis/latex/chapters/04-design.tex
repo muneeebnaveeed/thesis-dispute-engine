@@ -48,7 +48,7 @@ chargeback directly from the investigation, because there is no refund step to c
 under Regulation~E cannot close until the provisional credit is made final, while under PSD2 the refund was
 final all along and the dispute closes at once. The result is that the regimes reach different parts of the
 same machine: six states under SEPA, eleven under PSD2, thirteen under Regulation~E and ten under
-Regulation~Z. A fifth regime would be a new row of rules and its tests, not new code in the machine. The
+Regulation~Z. A fifth regime would be a new row of rules, its entry in the list of regimes and the branch that selects it, plus its tests, but no new code in the machine. The
 regime itself is fixed when the dispute opens, from the transaction's rail and currency
 (figure~\ref{fig:regimes}), and never changes afterwards, so a dispute cannot drift from one set of rules to
 another halfway through.
@@ -59,9 +59,8 @@ regime, which is the design that was rejected, or guard callbacks on shared tran
 the table that the gates make readable. The function never changes the dispute it is given; it returns
 the next one or refuses with an invalid-transition error, which the API reports as a \code{409} problem
 (section~\ref{sec:design-failures}). The events a dispute currently offers are not listed anywhere: they are
-found by asking the function about each event in turn. The workbench's buttons and the engine's answers
-therefore cannot disagree, since they are the same computation, and a test checks it for every reachable
-state of every regime. An appeal is the one transition outside the table. It is allowed only from
+found by asking the function about each event in turn. The workbench draws its buttons from the events the service reports, so they come from the same
+computation, and a test checks the function's answers for every reachable state of every regime. An appeal is the one transition outside the table. It is allowed only from
 \emph{closed}, at most once under each regime's rules, returns the dispute to the investigation, and starts
 a new resolution clock (section~\ref{sec:design-clocks}).
 
@@ -81,9 +80,9 @@ day'' \cite[art.~73(1)]{psd2} and a final reply to a complaint within fifteen bu
 within ten business days of the request \cite[art.~77(2)]{psd2}. Regulation~E requires provisional
 credit within ten business days and a completed investigation within forty-five days
 \cite[\S~1005.11(c)]{rege}; Regulation~Z requires a written acknowledgement within thirty days and
-a resolution within two billing cycles, at most ninety days \cite[\S~1026.13(c)]{regz}. Two of the
-four count business days, which depend on the jurisdiction's holidays; the others count calendar
-days. An engine that treats deadlines as documentation leaves the analyst to compute them, and
+a resolution within two billing cycles, at most ninety days \cite[\S~1026.13(c)]{regz}. Three of the
+four count business days for at least one clock, which depend on the jurisdiction's holidays (Regulation~E
+mixes ten business days with forty-five calendar days); the rest count calendar days. An engine that treats deadlines as documentation leaves the analyst to compute them, and
 leaves the institution unable to answer the auditor's first question, namely how often it met
 them.
 
@@ -91,7 +90,7 @@ The design carries each deadline as a \emph{clock} on the regime's rules (append
 a kind, a count, a unit and the citation. There are three kinds, and each is defined by the states
 that satisfy it rather than by the regime, in the same spirit as the gates of the state machine
 (section~\ref{sec:design-state-machine}): the refund clock is met by entering any credit state,
-the acknowledgement clock by opening the investigation, the resolution clock by closing. A clock
+the acknowledgement clock by sending the acknowledgement notice, the resolution clock by closing. A clock
 that can no longer be met, such as the refund clock of a dispute closed without a credit, is
 voided rather than breached. An appeal restarts the resolution clock and numbers the new one by the
 appeal, so a dispute's history keeps every clock it ever had.
@@ -210,8 +209,8 @@ earning points, each reporting a sentence that says why it scored what it did, w
 fired: how many other disputes the account raised in twelve months, how many it lost at the
 network, how long after the transaction the dispute came, whether the merchant's category is one
 where disputes concentrate, the amount, the account's age, and the contradictions in the
-questionnaire (section~\ref{sec:design-questionnaire}). The score is the sum, and three
-thresholds make it a tier.
+questionnaire (section~\ref{sec:design-questionnaire}). The score is the sum, and two
+thresholds divide it into three tiers.
 
 Two decisions keep the score honest. It is assessed when the dispute opens, from what the engine
 already knows, and assessed again when the questionnaire arrives, because that is when the
@@ -219,7 +218,7 @@ consistency signal becomes known; every assessment is kept, so the analyst sees 
 rather than a number that was always there. And its only teeth are a hold: a credit on a dispute
 whose latest tier is high is refused until the analyst records why it should go out anyway, and
 that justification is stored on the event with everything else. The score never denies a dispute,
-never moves a state and never speaks to the customer. It orders the queue and it makes a human
+never moves a state and never speaks to the customer. It is shown as a column of the queue and it makes a human
 write a sentence before money leaves on a case the rules distrust, which is what a scoring
 engine in a regulated process can responsibly do. The weights are judgement, not fitted to data;
 chapter~\ref{ch:evaluation} says so and treats them as a demonstration of the mechanism rather
@@ -294,8 +293,8 @@ Content-Type: application/problem+json
  "requestId": "ab1de00df2f8ba20",
  "allowedEvents": ["OPEN_INVESTIGATION"]}
 \end{lstlisting}
-\caption{The response to an analyst who tries to win the chargeback of a PSD2 dispute that has only just opened,
-captured from the service's handler.}
+\caption{The shape of the response to an analyst who tries to win the chargeback of a PSD2 dispute that has only
+just opened, as the error taxonomy renders it.}
 \label{fig:problem}
 \end{figure}
 
@@ -330,9 +329,10 @@ client sends, and binds it for that transaction only, so a pooled connection can
 into another tenant's request. When nothing is bound the setting is empty and the policy matches no rows, so
 every mistake in this area fails closed; the store also refuses to open a transaction at all without a tenant.
 The service runs as a database role that is subject to the policies, while the schema's owner, which runs
-migrations, is not. The two things the service legitimately needs across tenants, a count of disputes by state
-for the dashboards and the purge of expired idempotency keys, are provided by the owner as a view and a function
-rather than by giving the service broader access. Idempotency keys are themselves scoped by tenant, because clients
+migrations, is not. The few things the service legitimately needs across tenants, such as the counts of disputes by state, overdue
+deadlines and suspense by regime for the dashboards, the notice dispatcher's claim on the outbox, and the purges of
+expired idempotency keys and draft attachments, are provided by the owner as views and functions rather than by
+giving the service broader access. Idempotency keys are themselves scoped by tenant, because clients
 choose them and two tenants may choose the same one.
 
 \begin{figure}[htbp]
@@ -373,8 +373,8 @@ query so that row-level security can scope it.}
 
 The browser never holds either credential; how the workbench keeps an analyst's tokens on its server is
 described in section~\ref{sec:impl-sessions}. The price of the design is that
-every new table needs its tenant column, its policy and its grants, and a table that lacks them fails a test of the
-service role's privileges before it can be released. The isolation it buys is tested against the database role
+every new table needs its tenant column, its policy and its grants, and a test of the service role's grants fails before a
+table without them can be released; the tenant column and the policy are a review rule rather than a test. The isolation it buys is tested against the database role
 the service actually uses, as chapter~\ref{ch:evaluation} reports (section~\ref{sec:eval-isolation}).
 
 % Distils ADR 0026.
@@ -402,10 +402,10 @@ depends on. It denies by default. It resolves conflicts in one fixed way: any po
 an action overrides every policy that permits it. And its semantics are specified formally, with
 a reference implementation that can check a policy set against a schema before it is ever
 evaluated. The engine splits its policies along that first property. \emph{Guardrails} are Cedar
-in the binary that no tenant can change, written as prohibitions: whoever opened the
+in the binary that no tenant can change, mostly written as prohibitions: whoever opened the
 investigation never issues its final credit, only a lead of a dispute's team may move it
-elsewhere, tenant administration follows the realm role and nothing else, and a tenant key never
-writes to a customer. \emph{Grants} are data, one row per team, role and action, optionally bounded
+elsewhere, and a tenant key never writes to a customer. The one permit gives tenant administration to the
+realm role, and it is exclusive only because grants never compile to tenant resources. \emph{Grants} are data, one row per team, role and action, optionally bounded
 by an amount, compiled into permissions that can reach only their own team's disputes. A grant
 that cannot be expressed safely is dropped rather than escaped, so a malformed row can only take a
 permission away. Because a prohibition always wins, no combination of grants can open what a
@@ -438,9 +438,7 @@ next request. The rows are what a tenant administrator will one day edit, and th
 previous paragraphs is what makes that safe: grants compile only to permissions bounded by their
 team, while everything that must always hold is a prohibition in the binary. Generated sets of
 arbitrary grants confirm the three properties that matter, that no set lets an investigator pay
-out their own dispute, reaches a dispute outside the caller's teams, or administers the tenant;
-removing the separation-of-duties rule makes the first of them fail, which is the evidence the
-property can fail at all.
+out their own dispute, reaches a dispute outside the caller's teams, or administers the tenant.
 
 Team scope is enforced twice. Beside the policy decision, row-level security narrows every read to
 the caller's teams, so a check forgotten in a handler still cannot show one team another's work,
@@ -473,7 +471,7 @@ The design question is again \emph{when}. Sending is a side effect that can fail
 must not be undone because a mail relay was down; but a notice that is owed must not be lost
 because the process died between the commit and the send. The engine composes the notice inside
 the transition, from facts it already holds (the account, the original transaction, the running
-clocks, the ledger, the questionnaire), as structured paragraphs with the provision each one
+clocks, the ledger, the questionnaire), as structured paragraphs together with the provision the notice
 satisfies, and stores it as a row in the same transaction. A letter is thereby complete the moment
 it exists; the workbench lays it out on a printable page from the paragraphs, so no markup is ever
 trusted. An email is an entry in an outbox, which a dispatcher drains after every commit and on a timer,
@@ -488,8 +486,8 @@ language: placeholders for the analyst's fields and for facts the engine knows, 
 only when a field has a value, list-valued fields that become bullet lines. The API returns each
 template with the facts already filled and the fields left as placeholders, so the browser can
 preview the message live by the same substitution while the analyst types, and the server renders
-the final message from the same paragraphs on send. Preview and letter therefore cannot disagree,
-the analyst's email is a notice row like any other with its author recorded, and a machine
+the final message from the same paragraphs on send. The substitution is written twice, once for the browser and once for the server, and
+no test yet makes the two equal, so preview and letter agree by construction rather than by proof; the analyst's email is a notice row like any other with its author recorded, and a machine
 credential cannot compose one at all.
 
 Two smaller consequences follow. The acknowledgement clock of section~\ref{sec:design-clocks} is

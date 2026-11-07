@@ -17,7 +17,8 @@ earlier measurement of the decision model.
 The run's suites pass in full: 189 tests across 19 packages, none failing. The ones that bear on the central claim
 of chapter~\ref{ch:design}, that one state machine carries four regimes, are summarised in
 figure~\ref{fig:eval-coverage}. For each regime the test explores every state reachable from \emph{initiated},
-tries every event in each, and records which pairs are accepted and which refused. It then fails unless each
+tries every event of the transition table in each (the appeal, which sits outside the table, is not part of
+this walk), and records which pairs are accepted and which refused. It then fails unless each
 accepted transition is walked by at least one named scenario, a dispute taken from \emph{initiated} to
 \emph{closed} along a path a reader can follow, such as ``Regulation~E: chargeback lost without evidence, credit
 reversed''.
@@ -62,9 +63,9 @@ section~\ref{sec:design-core} relies on retries being safe. Four tests against a
 establish both. The first tries to rewrite history directly in the database, with an update of an event's actor,
 a delete and a truncate of the event table, and each is refused by the database itself; the dispute still has
 exactly the one event it started with. The second starts eight writers at the same instant, each applying the
-same event to the same dispute: exactly one succeeds, the other seven receive a conflict, and the dispute ends at
+same event to the same dispute: exactly one succeeds, the other seven are refused, as a conflict or as a transition no longer allowed, and the dispute ends at
 version two with two events, so the race neither lost a write nor applied one twice. The third repeats a request
-with the same idempotency key on a different connection and receives the stored response rather than a second
+with the same idempotency key and receives the stored response rather than a second
 dispute, while the same key with a different body is refused. The fourth applies a transition the regime forbids
 and checks that nothing at all was written, neither an event nor a version.
 
@@ -143,11 +144,11 @@ which is the likely cause; it has not been isolated, and the figure is reported 
 \label{sec:eval-decisions}
 
 The feature of section~\ref{sec:impl-decisions} is only defensible if the proposals are usually
-right, so it was measured before it was built. The labelled set is drawn from this system's own
+right, so it was measured before it was relied on. The labelled set is drawn from this system's own
 vocabulary: the four reasons, the yes and no questions of the unauthorised questionnaire, and the
 fifteen lifecycle states. It holds 72 complaints, 113 questionnaire answers across 40 replies, and
-69 filter fields across 50 queries. Every part carries a deliberately hard band, and roughly a
-third is Hungarian, since both seeded tenants are Hungarian banks and a customer writes in the
+69 filter fields across 50 queries. Every part carries a deliberately hard band, and about a fifth
+of it is Hungarian (a third of the reasons), since both seeded tenants are Hungarian banks and a customer writes in the
 language they complain in. Two models were run against it: an open one on a consumer GPU, and a
 hosted one (table~\ref{fig:decisions}).
 
@@ -174,11 +175,10 @@ one in two for the questionnaire.}
 \end{figure}
 
 The open model is not accurate enough for any of the three uses, and the reason it fails is not
-only accuracy. Its expected calibration error ranges from 0.21 to 0.60, and it warns on loading
-that its temperatures fall outside the calibrated range, so its confidence cannot be used to decide
+only accuracy. Its expected calibration error ranges from 0.21 to 0.60, so its confidence cannot be used to decide
 when to stay quiet. The hosted model's error of 0.011 is what makes the confidence gate meaningful:
 the single reason it got wrong, a rental company adding charges the customer never agreed to, came
-back at 0.50 with the probability split 0.63 to 0.37 between two readings a person would also
+back with its probability split between two readings a person would also
 argue about. Its three questionnaire mistakes were all the same question, which asked whether the
 card was in the customer's possession and so conflated owning it with carrying it; the question was
 reworded rather than the model replaced.
@@ -204,7 +204,7 @@ that appears only after a particular sequence of steps would not be caught merel
 somewhere. The regimes themselves are modelled as chapter~\ref{ch:requirements} describes and no further: the
 statutory extensions of the deadlines are not modelled, and every dispute runs the standard clocks; the
 contested rounds of a chargeback after the merchant's first answer are folded into one evidence step; and the
-banking core and the card network are simulated, so the behaviour of a real core under failure is assumed from
+banking core is simulated and the card network's answers are entered by hand, so the behaviour of a real core under failure is assumed from
 its interface rather than observed. The analysts' identity is delegated to the identity provider, whose own
 protections, such as multi-factor authentication, are configured rather than evaluated here. Finally, the decision
 model was measured on a synthetic, self-labelled set (section~\ref{sec:eval-decisions}); the share of its proposals

@@ -45,7 +45,8 @@ The 83 queries are written in SQL and compiled into typed Go functions, so a col
 the build rather than a request. The 24 migrations run forward only, embedded in the binary and applied by a
 separate command under the schema owner's role; the service checks the schema version when it starts and refuses
 to serve behind it. The service itself connects as a login that can read and insert where it must and cannot
-alter the schema or rewrite the event log, which is what the tests of section~\ref{sec:eval-log} rely on.
+alter the schema or rewrite the event log; a test checks the login's privileges, and the event log's triggers
+refuse a rewrite even from the owner (section~\ref{sec:eval-log}).
 Identifiers are time-ordered UUIDs generated in Go, so new rows land at the end of their indexes. The image that
 ships contains the statically linked binary on a minimal base with no shell, running as an unprivileged user.
 
@@ -55,8 +56,8 @@ ships contains the statically linked binary on a minimal base with no shell, run
 Section~\ref{sec:design-failures} made one document the contract; this section is what that costs and buys in the
 build. One command regenerates everything derived from it on the server: the typed queries from the SQL, and the
 server interface, the request and response types and the validator from the OpenAPI document. A second command
-regenerates and compares the result with what is committed, and fails with the list of files that differ, so the
-check runs in continuous integration and on a developer's machine in the same way. On the client, a script reads
+regenerates and compares the result with what is committed, and fails with the list of files that differ, and
+continuous integration runs the same regeneration and comparison. On the client, a script reads
 the same document and writes two files (figure~\ref{fig:contract}): the TypeScript types and request functions, and a validation schema for
 every component schema in the document.
 
@@ -133,9 +134,9 @@ engine stores the session sealed and cannot read it, and the browser holds only 
 Tokens are refreshed only on the server. When a refresh fails, the browser is sent back through the front door,
 which signs the analyst in again silently while their session with the identity provider lasts, so a long-open tab
 recovers instead of showing an error. A session ends in one of four ways: the analyst signs out, which also ends
-the identity provider's session; thirty minutes pass without activity; ten hours pass in total; or the identity
+the identity provider's session; thirty minutes pass without activity; the identity provider's ten-hour maximum session ends; or the identity
 provider tells the workbench directly, by back-channel logout, that the analyst was signed out elsewhere or
-disabled, which ends every workbench session belonging to them.
+disabled, which ends the workbench sessions tied to that identity-provider session.
 
 \section{The analyst workbench}
 \label{sec:impl-workbench}
@@ -229,7 +230,7 @@ because a wrong pre-filled answer costs an analyst more attention than an empty 
 Two failures found by driving the real model, rather than by testing against a fake, shaped the
 design more than the benchmark did. A question offering only the four reasons must answer with one
 of them: a message reading ``hello I have a question about my account'' came back as an
-unauthorised payment at 0.81, comfortably above the gate. The question now offers an explicit
+unauthorised payment with a confidence comfortably above the gate. The question now offers an explicit
 option for text that describes no dispute at all, and that message yields nothing. The same problem
 has a different shape for yes and no questions, which cannot abstain: asked about a message that
 answers nothing, the model returned a confident negative to every question on the questionnaire.
@@ -250,9 +251,9 @@ rate becomes something the running system reports rather than something the auth
 Telemetry was part of the first commit, because a system whose behaviour is regulated must be able to show what it
 did, and because instrumentation added late tends to cover what was easy rather than what matters. Both services,
 the engine and the workbench server, use OpenTelemetry \cite{otelspec} and are configured only through the standard
-environment variables; without them they still create every span and metric but export nothing, so a developer's run stays
-quiet. Every request is a span named after its route pattern rather than its address, which keeps the number of
-distinct names bounded by the routing table. Every database statement is a child span named after its query, with
+environment variables; without them the engine still creates every span and metric but exports nothing, and the workbench server does not
+start its telemetry at all, so a developer's run stays quiet. Every request is a span named after its route pattern rather than its address, which keeps the number of
+distinct names bounded by the routing table. Every database statement is a child span named after its query, or after its SQL text when it has no name, with
 no values recorded (appendix, figure~\ref{fig:trace}). Logs go to standard output and, with the trace's identifiers attached, to the same backend as
 the traces, after a redaction step that runs before any destination.
 
@@ -261,8 +262,8 @@ per server function, and its calls to the engine carry the trace context, so the
 any change on that side. There is deliberately no instrumentation in the browser, since the trace already starts
 at the first thing the page talks to. Work that happens later is its own trace, linked to the request that caused
 it rather than nested inside it: each queued email stores the trace context of the transition that owed it, and
-its delivery, minutes or hours later, links back. Nothing in an attribute carries a credential or a customer's
-personal data.
+its delivery, minutes or hours later, links back. No attribute is written with a credential or a customer's personal data; the
+redaction step itself is tested on the logs.
 
 Locally the signals land in a Grafana stack started with the rest of the system, which provisions two dashboards,
 one per service (appendix, figure~\ref{fig:dashboard}), and three alert rules from the repository: more than one percent of responses failing with a
@@ -271,7 +272,7 @@ symptoms a user would notice rather than on causes such as processor or memory u
 synthetic probe keeps a trickle of realistic traffic flowing so that no panel is ever empty, and the evaluation of
 chapter~\ref{ch:evaluation} reads its latency numbers back from these same metrics rather than from a separate
 harness. An operator's guide in the repository explains each panel, which signal answers which question, and four
-worked situations taken from a real run.
+worked situations.
 
 \section{Review and release discipline}
 \label{sec:impl-ci}
@@ -293,14 +294,15 @@ PostgreSQL service, and comments the coverage on the pull request beside that of
 builds the backend image and smoke-tests it the way a deployment would run it: migrations as the owner, then the
 service as its least-privileged login, until the readiness endpoint answers. The frontend job generates, type-checks,
 lints, looks for dead code, checks formatting, runs the tests, reports coverage and builds, and the frontend image
-is built and smoke-tested in the same way as the backend's. The browser suite runs as its own workflow on every
+is built and smoke-tested by fetching a page from it. The browser suite runs as its own workflow on every
 pull request that touches the application and on the main branch, and reports, but never gates a merge, because a browser test that is flaky for
 reasons outside the change would otherwise teach everyone to ignore red.
 
-The same checks run locally with one command before every push, and a pre-commit hook formats and lints the files
+Most of these checks run locally with one command before every push (the vulnerability, policy, race-detector and
+integration checks and the image builds are left to continuous integration), and a pre-commit hook formats and lints the files
 being committed. Dependencies are watched weekly across the Go module, the frontend packages, the workflows and the
-container images, and arrive as pull requests through the same gate. The two vulnerability advisories published
+deployment's container images, and arrive as pull requests through the same gate. The two vulnerability advisories published
 against the Go toolchain during the writing of this chapter show the gate working as intended: the vulnerability
 check failed on every open pull request until a separate one moved the toolchain to the fixed release. Releasing
-ends at the images: they are built, smoke-tested and reproducible from any commit on the main branch, and the
+ends at the images: they are built and smoke-tested from any commit on the main branch, and the
 deployment they would go into is outside the scope of this thesis (section~\ref{sec:req-scope}).

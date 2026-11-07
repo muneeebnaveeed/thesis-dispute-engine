@@ -66,8 +66,7 @@ change (section~\ref{sec:impl-observability}).
 \centering
 \includegraphics[width=0.85\textwidth]{trace.jpg}
 \caption{One transition traced in Tempo: the request, authentication by tenant key, the rate-limit counter, the use
-case, and each database statement it ran inside one transaction, 12~ms in total. The trace continues below the
-crop with the ledger posting, the call to the simulated core and the commit.}
+case, and each database statement it ran inside one transaction, 12~ms in total.}
 \label{fig:trace}
 \end{figure}
 
@@ -84,6 +83,7 @@ spent in each state, and disputes by state.}
 \centering
 \includegraphics[width=0.8\textwidth]{ci.jpg}
 \caption{The continuous-integration jobs of one pull request (the Go toolchain update of
-section~\ref{sec:impl-ci}): change detection and the version check gate the backend and frontend jobs.}
+section~\ref{sec:impl-ci}, pull request 107): change detection gates the backend and frontend jobs, and the
+version check runs alongside them.}
 \label{fig:ci}
 \end{figure}

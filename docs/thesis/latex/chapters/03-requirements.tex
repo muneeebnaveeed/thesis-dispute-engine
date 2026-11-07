@@ -22,7 +22,7 @@ system directly, but every deadline, letter and movement of money in it exists f
 
 One use case carries the system and the rest support it. A tenant system opens a dispute against a
 transaction on the customer's account, giving the reason the customer chose. The regime is not
-chosen by the caller; it follows from the transaction's rail and currency, so a card payment in
+chosen by the caller; it follows from the transaction's rail and the account's currency, so a card payment in
 euro is handled under PSD2, a SEPA debit in euro under the direct-debit rules, a card payment in
 dollars under Regulation~E and a credit-card payment in dollars under Regulation~Z
 (\code{domain/rail.go}). The customer is told that the dispute has been opened. An analyst opens
@@ -77,7 +77,7 @@ the core banking system must leave no trace of the step that caused it. The thir
 and accountability. No tenant may ever see another tenant's data, and this must hold even when
 the application code is wrong, which means the database has to enforce it; the actor recorded on
 every event must be the authenticated caller rather than whatever the request claims; and the
-analyst who investigated a dispute may not also pay it out. The fourth is operability. Every
+analyst who investigated a dispute may not also issue its final credit. The fourth is operability. Every
 request must be traceable from the workbench to the database, and compliance with the deadlines
 must be measurable as it happens, not reconstructed afterwards for a report.
 Chapter~\ref{ch:evaluation} returns to each of the four with a test or a measurement.
@@ -90,15 +90,15 @@ purpose. The rounds of a contested chargeback after the merchant's first answer,
 pre-arbitration and arbitration, are folded into a single evidence step, since they add states
 and deadlines but no new kind of decision. The extensions the regulations allow for complex
 cases, such as Regulation~E's longer periods for new accounts, are not modelled; every dispute
-runs the standard clocks. The card network and the core banking system are simulated behind
-ports rather than integrated, as no real network or bank was available to a thesis project. Fraud
+runs the standard clocks. The core banking system is simulated behind a port rather than integrated, and the card network's
+answers are entered by the analyst as events, as no real network or bank was available to a thesis project. Fraud
 is scored with fixed, readable rules rather than a learned model, because there are no labelled
 outcomes to learn from and a customer is entitled to an explanation. Each dispute has a single
 currency and each tenant writes to its customers in a single language. PostgreSQL is the only
 stateful dependency, with no separate cache or message broker, and there is no edge network in
 front of the service, so the application does its own rate limiting. No real card numbers are
-stored anywhere; all data is synthetic.
+stored anywhere; the seed data and test fixtures are synthetic.
 
-Two larger parts were marked from the outset as the first things to cut if time ran short: the
+Two larger parts were marked in the project plan from the outset as the first things to cut if time ran short: the
 fraud-scoring engine and the analyst-facing frontend. Both survived, each in a deliberately modest
 form, and chapters~\ref{ch:design} and~\ref{ch:implementation} explain what that form is and why.
