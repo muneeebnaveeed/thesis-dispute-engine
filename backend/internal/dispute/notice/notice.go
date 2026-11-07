@@ -186,7 +186,7 @@ func basis(r domain.Regime, kind domain.NoticeKind) string {
 	case domain.RegimeUSRegE:
 		switch kind {
 		case domain.NoticeProvisionalCredit:
-			return "This notice is given under 12 CFR 1005.11(c)(2)(iv)."
+			return "This notice is given under 12 CFR 1005.11(c)(2)(ii)."
 		case domain.NoticeReversal:
 			return "This notice is given under 12 CFR 1005.11(d)(2)."
 		case domain.NoticeResolution:
