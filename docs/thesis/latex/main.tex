@@ -21,7 +21,7 @@
 \newcolumntype{L}[1]{>{\raggedright\arraybackslash}m{#1}}
 \usepackage{caption}
 \usepackage{rotating}  % sidewaysfigure for the data model
-\usepackage{float}   % [H] keeps appendix tables under their headings
+\usepackage{float}   % [H] keeps a table or figure where the text needs it
 \usepackage{listings}
 \usepackage{xcolor}
 \usepackage{etoolbox}
@@ -51,13 +51,14 @@
 % Identifiers are set like code, uniformly, through one macro; the final pass only touches this.
 \newcommand{\code}[1]{\texttt{#1}}
 
-\title{The Customer Is Always Right, Except When It's Not: Finite State Machines for Payment Dispute Resolution and First-Party Fraud Detection}
-\author{Muneeb Naveed}
-\date{2027}
+\title{Automated Fraud Dispute Resolution Engine}
+\author{Naveed Muhammad Muneeb}
+\date{2026}
+\hypersetup{pdftitle={Automated Fraud Dispute Resolution Engine},pdfauthor={Naveed Muhammad Muneeb}}
 
 \begin{document}
 
-% The faculty title page is a fixed template; it replaces this placeholder before submission.
+% The faculty's title page template, reproduced line for line.
 \input{chapters/00-titlepage}
 
 \tableofcontents
@@ -73,8 +74,7 @@
 
 \printbibliography[title={Bibliography}]
 
-\appendix
-\input{chapters/A-appendix}
+% The faculty requires the declaration on the use of AI tools at the end of the thesis, on its template.
 \input{chapters/B-ai-declaration}
 
 \end{document}

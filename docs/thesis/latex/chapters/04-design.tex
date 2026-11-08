@@ -64,12 +64,36 @@ day \cite[art.~73(1)]{psd2} to Regulation~Z's resolution within ninety days \cit
 the jurisdiction's holidays. An engine that treats deadlines as documentation leaves the analyst to compute them,
 and the institution unable to say how often it met them.
 
-Each deadline is therefore a \emph{clock} on the regime's rules (appendix, table~\ref{tab:clocks}): a kind, a
+Each deadline is therefore a \emph{clock} on the regime's rules (table~\ref{tab:clocks}): a kind, a
 count, a unit and the citation. Each of the three kinds is defined by what satisfies it rather than by the
 regime: the refund clock is met by entering any credit state, the acknowledgement clock by sending the
 acknowledgement notice, the resolution clock by closing. A clock that can no longer be met, such as the refund
 clock of a dispute closed without a credit, is voided rather than breached, and an appeal starts a new
 resolution clock while the history keeps the old one.
+
+\begin{table}[htbp]
+\centering
+\caption{The clocks each regime starts when a dispute opens (\code{domain/regime.go}). Extensions the law
+permits for complex cases are not modelled; see section~\ref{sec:limitations}.}
+\label{tab:clocks}
+\tablefont
+\begin{NiceTabular}{llrll}
+\CodeBefore
+  \rowcolor{tablehead}{1}
+  \rowcolor{tablerow}{2,3,6,7}
+  \rowcolor{tablerowalt}{4,5,8,9}
+\Body
+\hd{Regime} & \hd{Clock} & \hd{Count} & \hd{Unit} & \hd{Basis} \\
+\Block{2-1}{PSD2 card} & refund & 1 & business days & PSD2 art.~73(1) \\
+& resolution & 15 & business days & PSD2 art.~101(2) \\
+\Block{2-1}{SEPA Core DD} & refund & 10 & business days & PSD2 art.~77(2) \\
+& resolution & 15 & business days & PSD2 art.~101(2) \\
+\Block{2-1}{Regulation~E} & refund & 10 & business days & 12 CFR 1005.11(c)(2)(i) \\
+& resolution & 45 & calendar days & 12 CFR 1005.11(c)(2) \\
+\Block{2-1}{Regulation~Z} & acknowledge & 30 & calendar days & 12 CFR 1026.13(c)(1) \\
+& resolution & 90 & calendar days & 12 CFR 1026.13(c)(2)
+\end{NiceTabular}
+\end{table}
 
 Because a due date is something the institution has told the customer, it is computed once, when the dispute
 opens, and stored beside the dispute; a later change to a rule or a holiday calendar cannot silently move it.
@@ -110,7 +134,7 @@ its promise.
 Three of the four regimes move the customer's money before anyone knows who was right. The original proposal
 imagined separate provisional-credit and final-credit engines; both disappear into one small ledger once the
 question becomes ``where is the money now?'' rather than ``what kind of credit is this?''. The ledger has four
-accounts from the issuer's point of view (appendix, table~\ref{tab:ledger}): the customer's account, a suspense
+accounts from the issuer's point of view (table~\ref{tab:ledger}): the customer's account, a suspense
 account holding what the bank has advanced and not yet cleared, and recovery and loss, which clear it. Every
 posting is double-entry and caused by a transition: entering a credit state debits suspense and credits the
 customer, a reversal does the opposite, a won chargeback recovers, a lost one writes off unless a provisional
@@ -120,8 +144,28 @@ entered and two properties of the rules, never from the regime's name.
 The property that matters is that suspense is zero when a dispute closes. It is not checked at close; it holds by
 construction, and a test proves it by enumerating every path from \code{INITIATED} to \code{CLOSED} under every
 regime, forty-three at the time of writing, replaying each with each settlement choice, and asserting a zero
-balance and a customer never left net debited (\code{TestSuspenseBalancesOnEveryPath}). Postings are append-only rows, each carrying the reference the banking core adapter uses as its idempotency key,
+balance and a customer never left net debited; the test is \code{TestSuspenseBalancesOnEveryPath}. Postings are append-only rows, each carrying the reference the banking core adapter uses as its idempotency key,
 and the amount credited is the disputed amount less a customer liability capped by the regime.
+
+\begin{table}[htbp]
+\centering
+\caption{Postings caused by entering a state (\code{domain/ledger.go}). ``Outstanding'' is the dispute's suspense
+balance before the transition; a posting of zero is not written.}
+\label{tab:ledger}
+\tablefont
+\begin{NiceTabular}{L{5.5cm}L{4.1cm}L{2.4cm}L{1.6cm}}
+\CodeBefore
+  \rowcolor{tablehead}{1}
+  \rowcolors{2}{tablerowalt}{tablerow}
+\Body
+\hd{State entered} & \hd{Posting} & \hd{Debit} & \hd{Credit} \\
+any credit state & credit (disputed less liability) & suspense & customer \\
+\code{PROVISIONAL\_CREDIT\_REVERSED} & reversal (outstanding) & customer & suspense \\
+\code{CHARGEBACK\_WON} & recovery (outstanding) & recovery & suspense \\
+\code{CHARGEBACK\_LOST}, no provisional credit & write-off (outstanding) & loss & suspense \\
+\code{CLOSED}, outstanding & settlement, recovered or written off & recovery or loss & suspense
+\end{NiceTabular}
+\end{table}
 
 % Distils ADR 0018.
 \section{Fraud scoring}
@@ -202,7 +246,7 @@ everything an operator runs by the number of customers. The design keeps one sch
 tenant, and puts the enforcement in the database with PostgreSQL's row-level security \cite{pgrls}. Every
 table that holds a tenant's disputes, accounts or teams has the same policy: a row is visible and writable only
 when its tenant is the one bound to the current transaction (figure~\ref{fig:rls}; the core tables are drawn in
-the appendix, figure~\ref{fig:erd}). Only the credential and session tables, read before any tenant is known,
+figure~\ref{fig:erd}). Only the credential and session tables, read before any tenant is known,
 are outside it. The service binds the tenant from the authenticated caller, never
 from the request, and only for that transaction, so a pooled connection cannot carry one tenant into another's
 request. When nothing is bound the policy matches no rows, so mistakes fail closed.
@@ -273,10 +317,8 @@ state, and who opened its investigation according to the event log. A refusal na
 an allowed event records the policies that allowed it, and the workbench offers only actions that would pass.
 
 % Distils ADR 0027.
-\subsection{Teams, grants and a second line}
 \label{sec:design-teams}
-
-A dispute belongs to one team, chosen when it opens by the first routing rule matching its rail, reason and
+The policies reach disputes through teams. A dispute belongs to one team, chosen when it opens by the first routing rule matching its rail, reason and
 amount. Inside a team a person holds one rung of a ladder, junior, senior or lead, expressed in Cedar's own
 hierarchy so that a grant to juniors reaches every rung above without role logic in code. Generated sets of arbitrary grants confirm the three properties that matter: no set lets an investigator issue
 the final credit of their own dispute, reach a dispute outside the caller's teams, or administer the tenant.

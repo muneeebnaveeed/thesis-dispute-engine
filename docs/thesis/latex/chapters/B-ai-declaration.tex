@@ -1,17 +1,56 @@
-\chapter*{Declaration of AI use}
-\addcontentsline{toc}{chapter}{Declaration of AI use}
+% The faculty's template, "Declaration on the Use of Artificial Intelligence Tools" (inf.unideb.hu/en/information-
+% graduating-students-0): its wording kept, its options chosen, its instructional parenthesis removed as it directs.
+\clearpage
+\phantomsection
+\addcontentsline{toc}{chapter}{Declaration on the Use of Artificial Intelligence Tools}
+\begin{center}
+  {\bfseries Declaration on the Use of Artificial Intelligence Tools\par}
+\end{center}
+\bigskip
 
-% Text maintained in docs/thesis/ai-declaration.md; the faculty template replaces this wording before submission.
-Generative AI (Claude, through the Claude Code command-line tool) was used throughout the development of the
-software as a pair-programming assistant: drafting code and tests from my specifications, proposing alternatives for
-design decisions that I then made and recorded as architecture decision records, writing the first versions of
-configuration and documentation files, and diagnosing failures. All generated code was reviewed, run and tested by
-me, and the repository's history shows every change as a reviewed pull request.
+I hereby declare that during the preparation of my thesis I have used the following artificial intelligence-based
+tool(s).
 
-The same tool drafted the text of the thesis chapters. The decisions the text argues for, the scope, the
-choice of regimes and the structure of each chapter are mine; the drafts were written from my architecture
-decision records, the repository and the committed evaluation runs, and I reviewed and revised every chapter,
-checked each factual claim against the code, the tests or the measurements it points to, and checked each
-citation against its source. Figures were produced from the repository (diagrams generated from code,
-screenshots of the running system) and every number in the evaluation comes from a committed measurement run,
-not from the tool. I take full responsibility for the content.
+\medskip
+\noindent\textbf{1. Use of AI tools}
+
+\noindent$\square$ I did not use any artificial intelligence-based tools during the preparation of my thesis.\\
+$\boxtimes$ I used artificial intelligence-based tools during the preparation of my thesis as follows
+
+\medskip
+\noindent\textbf{Name and version of the AI tool}
+
+\noindent Claude Opus 5.5 (Anthropic), used through Claude Code, Anthropic's command-line coding assistant.
+
+\medskip
+\noindent\textbf{Exactly how it was used}
+
+\begin{itemize}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
+  \item Programming assistance: drafting code and tests from my specifications, explaining and debugging program
+  code, and writing the first versions of configuration and documentation files. All generated code was reviewed,
+  run and tested by me, and every change reached the repository as a reviewed pull request.
+  \item Design support: proposing alternatives for design decisions, which I then made and recorded as
+  architecture decision records.
+  \item Text: drafting the chapters of the thesis from my architecture decision records, the repository and the
+  committed evaluation runs, followed by shortening, language correction and stylistic refinement. The scope, the
+  choice of regimes, the decisions argued for and the structure of each chapter are mine.
+  \item Figures and tables: preparing the scripts that generate diagrams from the code and capture screenshots of
+  the running system. Every number in the evaluation comes from a committed measurement run, not from the tool.
+  \item Verification: checking the claims of the text against the code, the tests and the measurements, and the
+  legal citations against their sources, which I then confirmed myself.
+\end{itemize}
+
+\medskip
+\noindent\textbf{2. Declaration of independent work}
+
+I declare that I take full responsibility for the professional content of my thesis. I acknowledge that the use
+of artificial intelligence-based tools does not replace independent work; therefore, I have verified all
+statements, results, interpretations, conclusions, and references included in the thesis.
+
+I further declare that:
+\begin{itemize}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
+  \item the final content of the thesis was compiled by me,
+  \item any AI-generated or modified content has been reviewed, verified, and corrected where necessary,
+  \item the original results, interpretations, and conclusions presented in the thesis are my responsibility,
+  \item the use of AI tools has been truthfully and fully disclosed in this declaration.
+\end{itemize}
