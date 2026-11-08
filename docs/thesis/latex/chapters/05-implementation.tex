@@ -32,8 +32,8 @@ append-only log of every transition. A transition reads the row, runs the state 
 only if the version is still the one it read; a concurrent writer that got there first makes the write affect no
 row, and the caller receives a conflict instead of waiting on a lock \cite{kleppmann2017}.
 
-The 83 queries are written in SQL and compiled into typed Go functions, so a column renamed in a migration breaks
-the build rather than a request. The 24 migrations run forward only, applied by a separate command under the
+The service's 83 queries are written in SQL and compiled into typed Go functions, so a column renamed in a migration breaks
+the build rather than a request. Its 24 migrations run forward only, applied by a separate command under the
 schema owner's role; the service checks the schema version when it starts and refuses to serve behind it. The
 service itself connects as a login that can read and insert where it must and cannot alter the schema or rewrite
 the event log; a test checks the login's privileges, and the event log's triggers refuse a rewrite even from the
@@ -265,7 +265,7 @@ printable letter, and golden files pin the paragraphs for every regime and state
 
 The emails leave through an outbox table drained by a dispatcher that is woken after every commit and also runs on
 a timer. Claiming a batch is one statement (figure~\ref{fig:outbox}): it picks the emails that are due, skips any
-row another replica has already locked, and pushes each one's next attempt back exponentially, from thirty seconds
+row another replica has already locked, and pushes each one's next attempt back exponentially, from 30 seconds
 to at most an hour, before the send is even tried. A process that dies mid-send therefore leaves the email to be
 claimed again later rather than lost, and a relay that is down receives fewer and fewer attempts rather than a flood.
 The dispatcher has no tenant of its own, so the claim is a function owned by the schema's owner, granted to the
@@ -400,7 +400,7 @@ last line compiles only if the schema's type equals the type generated for the s
 \label{sec:impl-sessions}
 
 An analyst signs in through an address ending in the tenant's short name (figure~\ref{fig:signin}), which starts
-the authorization-code flow with proof-key protection against that tenant's realm. The callback validates the identity token, creates a new
+the authorisation-code flow with Proof Key for Code Exchange (PKCE) against that tenant's realm. The callback validates the identity token, creates a new
 session identifier and gives the browser a cookie carrying only that identifier, which scripts cannot read and
 which the browser does not attach to requests other sites make in the background.
 
@@ -419,8 +419,8 @@ engine stores the session sealed and cannot read it, and the browser holds only 
 \end{figure}
 
 Tokens are refreshed only on the server. A session ends in
-one of four ways: the analyst signs out, which also ends the identity provider's session; thirty minutes pass
-without activity; the identity provider's ten-hour maximum session ends; or the identity provider tells the
+one of four ways: the analyst signs out, which also ends the identity provider's session; 30 minutes pass
+without activity; the identity provider's 10-hour maximum session ends; or the identity provider tells the
 workbench directly, by back-channel logout, that the analyst was signed out elsewhere or disabled, which ends the
 workbench sessions tied to that identity-provider session.
 
@@ -489,7 +489,9 @@ probability in one pass, generating no text, so there is nothing to parse.
 The model sits behind a port in the application layer beside the banking core of section~\ref{sec:design-core},
 for the same reasons: it is someone else's system, it can be slow or down, and the domain must not know which one
 it is. It proposes and a person disposes: no transition, clock, posting or letter may depend on it, every use is a
-pre-filled field that can be changed, and what is stored is always the value the person left. The port is
+pre-filled field that can be changed, and what is stored is always the value the person left. The adapter behind
+it calls the hosted jev-1.13 model through OpenRouter, pinned to that released version so that a recorded
+proposal names the exact model that made it. The port is
 optional, so with no model configured these fields are simply empty. A proposal below three quarters
 probability is dropped, because a wrong pre-filled answer costs an analyst more attention than an empty one.
 
@@ -524,7 +526,7 @@ transition that owed it, and its delivery links back. No attribute is written wi
 personal data; the redaction step itself is tested on the logs.
 
 Locally the signals land in a Grafana stack that provisions two dashboards, one per service
-(figure~\ref{fig:dashboard}), and three alert rules from the repository: more than one percent of responses
+(figure~\ref{fig:dashboard}), and three alert rules from the repository: more than 1\% of responses
 failing with a server error, a 99th-percentile latency above one second, and an outbox that is not draining. The
 evaluation
 of chapter~\ref{ch:evaluation} reads its latency numbers back from these same metrics rather than from a separate
@@ -552,13 +554,13 @@ spent in each state, and disputes by state.}
 \label{sec:impl-ci}
 
 Every change reached the main branch as a pull request, squashed into one commit whose message is the pull
-request's title and body; by the time of writing that was 95 merged pull requests and 28 decision records. A
+request's title and body; at the time of writing there were 111 merged pull requests and 28 decision records. A
 ruleset forbids direct and force pushes, requires signed commits, and requires eight checks to pass on a branch
 that is up to date with the main branch, so a change is tested against what it will be merged into.
 
 Continuous integration runs one job per area, with a named step per check, so a failure names its cause
 (figure~\ref{fig:ci}). The backend jobs cover formatting, generated code being current, static
-analysis, linting, the dependency vulnerability database and the authorization policies, then run the unit and
+analysis, linting, the dependency vulnerability database and the authorisation policies, then run the unit and
 database-backed suites with the race detector against a real PostgreSQL service. The image job smoke-tests the
 backend image the way a deployment would run it: migrations as the owner, then the service as its
 least-privileged login, until the readiness endpoint answers. The frontend job generates, type-checks, lints,

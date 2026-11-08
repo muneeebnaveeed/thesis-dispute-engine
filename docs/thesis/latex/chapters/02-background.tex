@@ -18,17 +18,17 @@ requires of the issuer.
 \label{sec:bg-eu}
 
 Under the second Payment Services Directive (PSD2) \cite{psd2}, a payer may report an
-unauthorised payment up to thirteen months after the debit \cite[art.~71(1)]{psd2}, and the bank
+unauthorised payment up to 13 months after the debit \cite[art.~71(1)]{psd2}, and the bank
 must then refund by the end of the following business day at the latest \cite[art.~73(1)]{psd2}, unless it reasonably suspects
-fraud by the payer. The payer's share of the loss is capped at fifty euro, except for fraud or
+fraud by the payer. The payer's share of the loss is capped at EUR~50, except for fraud or
 gross negligence \cite[art.~74(1)]{psd2}, and the complaint must be answered in writing within
-fifteen business days \cite[art.~101(2)]{psd2}. There is no provisional credit: the refund is the
+15 business days \cite[art.~101(2)]{psd2}. There is no provisional credit: the refund is the
 customer's, and the bank can only recover it through the card network.
 
 For a SEPA direct debit the right to a refund is unconditional \cite[art.~76(1)]{psd2}: within
-eight weeks of the debit \cite[art.~77(1)]{psd2} the payer can claim it back without a reason, and
+8 weeks of the debit \cite[art.~77(1)]{psd2} the payer can claim it back without a reason, and
 the merchant has no defence \cite{sepacore}. The bank must refund, or justify a refusal, within
-ten business days \cite[art.~77(2)]{psd2}. In law a SEPA claim inside the eight weeks therefore has
+10 business days \cite[art.~77(2)]{psd2}. In law a SEPA claim inside the 8 weeks therefore has
 no evidence step, no chargeback and no possible defeat. The engine does not check the window
 itself, so it also lets an analyst investigate a SEPA claim and close it without a refund, which
 is the path for a claim made too late.
@@ -36,13 +36,13 @@ is the path for a claim made too late.
 \section{The US regimes, for comparison}
 \label{sec:bg-us}
 
-Two American regulations are included for comparison. Under Regulation~E, for debit cards, a bank that needs longer than ten business days to
-investigate, up to forty-five days, must provisionally credit the customer within the first ten
+Two American regulations are included for comparison. Under Regulation~E, for debit cards, a bank that needs longer than 10 business days to
+investigate, up to 45 days, must provisionally credit the customer within the first 10
 \cite[\S~1005.11(c)]{rege}, and may take the credit back after notice if no error is found. The
-customer's liability for an unauthorised transfer is limited, to fifty dollars where a lost or
+customer's liability for an unauthorised transfer is limited, to USD~50 where a lost or
 stolen card is reported promptly \cite[\S~1005.6]{rege}. Regulation~Z, for credit cards, requires
-a billing-error notice to be acknowledged within thirty days and resolved within two billing
-cycles, at most ninety days \cite[\S~1026.13(c)]{regz}. Nothing is credited; the issuer instead may
+a billing-error notice to be acknowledged within 30 days and resolved within two billing
+cycles, at most 90 days \cite[\S~1026.13(c)]{regz}. Nothing is credited; the issuer instead may
 not collect the disputed amount or report it as delinquent meanwhile, so a credit-card dispute has
 no refund state at all.
 

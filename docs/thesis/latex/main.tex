@@ -38,8 +38,10 @@
 \NiceMatrixOptions{rounded-corners=6pt,cell-space-limits=3pt}
 \newcommand{\hd}[1]{\textcolor{white}{\bfseries #1}}
 \usepackage[hidelinks]{hyperref}
-\usepackage[style=numeric,sorting=none,maxbibnames=6]{biblatex}
+\usepackage[style=numeric,sorting=none,maxbibnames=6,urldate=iso,seconds=true]{biblatex}
 \addbibresource{references.bib}
+% let long URLs break between letters rather than run into the margin
+\setcounter{biburlnumpenalty}{9000}\setcounter{biburllcpenalty}{7000}\setcounter{biburlucpenalty}{8000}
 \usepackage{csquotes}
 
 % Code listings count as figures: typeset small, numbered through the figure counter.

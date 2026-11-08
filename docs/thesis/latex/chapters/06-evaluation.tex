@@ -59,7 +59,7 @@ a transition no longer allowed, and the dispute ends at version two with two eve
 same idempotency key receives the stored response rather than a second dispute, and the same key with a different
 body is refused. A forbidden transition writes nothing at all.
 
-Under load, in two minutes, the service opened 479 disputes, applied 958 transitions, replayed one creation in ten
+Under load, in 2 minutes, the service opened 479 disputes, applied 958 transitions, replayed one creation in ten
 with its original key, and refused one deliberately forbidden event per dispute: 526 creations answered
 \code{201} (479 new and 47 replays), 1,437 reads and transitions answered \code{200}, the 479 forbidden events
 answered \code{409}, and there were no server errors.
@@ -75,7 +75,7 @@ and inserting a row with another tenant's identifier fails with PostgreSQL's ins
 
 Team scope (section~\ref{sec:design-teams}) is tested the same way: an analyst only in another team cannot read,
 list or advance a dispute or see its events, and a team lead of another tenant sees nothing, so team scope only
-narrows tenant isolation. The authorization policies are checked over generated sets of grants: no set lets an
+narrows tenant isolation. The authorisation policies are checked over generated sets of grants: no set lets an
 investigator issue the final credit of a dispute they investigated, reach a dispute outside their teams, or
 administer the tenant.
 
@@ -83,7 +83,7 @@ administer the tenant.
 \label{sec:eval-latency}
 
 The load run measures what a single instance costs per request, not what a deployment could carry. It paced four
-lifecycle iterations a second, about twenty requests, for two minutes against one tenant, and read the server's
+lifecycle iterations a second, about 20 requests, for 2 minutes against one tenant, and read the server's
 latency histograms back from Prometheus (table~\ref{tab:eval-latency}).
 
 \begin{table}[htb]
@@ -106,15 +106,15 @@ All requests, as the client saw them & 5.1 & 15.6 & 20.9
 \end{NiceTabular}
 \end{table}
 
-An event costs more than a read because one transaction carries the authorization decision, the state machine,
+An event costs more than a read because one transaction carries the authorisation decision, the state machine,
 the clocks, the ledger postings, the notices and, where money moves, the call to the simulated core; opening a
 dispute also scores it. PostgreSQL was not the bottleneck: its 95th percentile per query was 0.97~ms.
 
-Before authorization existed, the median read took 2.1 milliseconds and the median event 3.0; a policy decision
+Before authorisation existed, the median read took 2.1 milliseconds and the median event 3.0; a policy decision
 per operation and team scope in the database raised them to 4.2 and 5.0 (runs \code{2026-09-30\_1050} and
 \code{2026-09-30\_1057}), through extra round trips rather than policy evaluation, which costs about 25
-microseconds a decision. Against that run, the 99th percentile of opening a dispute rose from 25 to 43
-milliseconds with the same code, likely because this run's database-backed suites ran against the same database
+microseconds a decision. Between the second of those runs and the run of table~\ref{tab:eval-latency}, the 99th percentile of opening a
+dispute rose from 25 to 43 milliseconds with the same code, likely because this run's database-backed suites ran against the same database
 just before the load; this has not been isolated.
 
 \section{Are the model's proposals good enough to show?}
@@ -123,14 +123,16 @@ just before the load; this has not been isolated.
 The feature of section~\ref{sec:impl-decisions} is only defensible if the proposals are usually right, so it was
 measured before it was relied on. The labelled set uses the system's own vocabulary: 72 complaints for the four
 reasons, 113 answers across 40 replies to the unauthorised questionnaire, and 69 filter fields across 50 queries
-over the fifteen states. About a fifth of it is Hungarian (a third of the reasons), since both seeded tenants are
-Hungarian banks. An open model on a consumer GPU and a hosted one were run against it (table~\ref{tab:decisions}).
+over the 15 states. About a fifth of it is Hungarian (a third of the reasons), since both seeded tenants are
+Hungarian banks. Three checkpoints of the open Laya model, run on a consumer GPU, and the hosted jev-1.13 model
+(\code{typesafe/jev-1.13}, reached through OpenRouter), the engine's default, were run against it
+(table~\ref{tab:decisions}).
 
 \begin{table}[htb]
 \centering
-\caption{Accuracy on the labelled set (\code{eval/decisions}), expected calibration error on the
-reason task, and the latency of one question. The open model runs locally on an RTX~4070; the
-hosted one is a network call costing \$0.0000216. Chance is one in four for the reason task and
+\caption{Accuracy on the labelled set (\code{eval/decisions}), expected calibration error (ECE) on the
+reason task, and the latency of one question. The Laya checkpoints run locally on an RTX~4070; jev-1.13
+is a network call costing \$0.0000216 per question. Chance is one in four for the reason task and
 one in two for the questionnaire.}
 \label{tab:decisions}
 \tablefont
@@ -141,10 +143,10 @@ one in two for the questionnaire.}
   \rowcolor{tablesum}{6}
 \Body
 \hd{Model} & \hd{Reason} & \hd{Questionnaire} & \hd{Search} & \hd{ECE} & \hd{One question} \\
-Open, English checkpoint & 0.597 & 0.469 & 0.812 & 0.401 & 17 ms \\
-Open, multilingual & 0.639 & 0.522 & 0.623 & 0.213 & 8 ms \\
-Open, typed decisions & 0.639 & 0.611 & 0.696 & 0.595 & 16 ms \\
-Hosted & \textbf{0.986} & \textbf{0.973} & \textbf{0.928} & \textbf{0.011} & 574 ms \\
+Laya, English checkpoint & 0.597 & 0.469 & 0.812 & 0.401 & 17 ms \\
+Laya, multilingual & 0.639 & 0.522 & 0.623 & 0.213 & 8 ms \\
+Laya, typed decisions & 0.639 & 0.611 & 0.696 & 0.595 & 16 ms \\
+jev-1.13 (hosted) & \textbf{0.986} & \textbf{0.973} & \textbf{0.928} & \textbf{0.011} & 574 ms \\
 Chance & 0.25 & 0.50 & & &
 \end{NiceTabular}
 \end{table}

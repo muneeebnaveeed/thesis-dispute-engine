@@ -9,12 +9,12 @@
 \label{sec:design-state-machine}
 
 Every strand of a dispute depends on where the dispute currently stands: a clock is met by entering a state, a
-posting is caused by entering a state, a notice is owed because a state was entered, and an authorization policy
+posting is caused by entering a state, a notice is owed because a state was entered, and an authorisation policy
 decides on the state the dispute is in. The lifecycle is therefore the spine of the design, and the first decision
 was how to model it when four regimes disagree about what a lifecycle contains. Instead of a workflow per regime,
 the engine has a single state machine whose shape is shared and whose regime decides which parts of it exist.
 
-The shared lifecycle has fifteen states (figure~\ref{fig:state-machine}). A dispute is \emph{initiated}, an
+The shared lifecycle has 15 states (figure~\ref{fig:state-machine}). A dispute is \emph{initiated}, an
 analyst opens the \emph{investigation}, and the customer may be sent a questionnaire and answer it. The
 customer may then receive money in one of three forms, which are separate states because they are different
 things in law: a \emph{provisional credit} that can be taken back, a \emph{fast refund} that is final, and a
@@ -42,8 +42,7 @@ transition function asks these questions and nothing else. A SEPA claim can be r
 initiation; a credit-card dispute under Regulation~Z files the chargeback directly from the investigation,
 because there is no refund to come first; a won chargeback under Regulation~E cannot close until the
 provisional credit is made final, while under PSD2 the refund was final all along. The regimes therefore reach
-different parts of the same machine: six states under SEPA, eleven under PSD2, thirteen under Regulation~E and
-ten under Regulation~Z. A fifth regime would need a new row of rules, its entry in the list of regimes, the
+different parts of the same machine: 6 states under SEPA, 11 under PSD2, 13 under Regulation~E and10 under Regulation~Z. A fifth regime would need a new row of rules, its entry in the list of regimes, the
 branch that selects it and its tests, but no new code in the machine. The regime is fixed when the dispute
 opens, from the transaction's rail and the account's currency (table~\ref{tab:regimes}), so a dispute cannot
 drift from one set of rules to another.
@@ -59,7 +58,7 @@ section~\ref{sec:eval-correctness}.
 \label{sec:design-clocks}
 
 A dispute must reach particular states by particular dates, from PSD2's refund by the end of the next business
-day \cite[art.~73(1)]{psd2} to Regulation~Z's resolution within ninety days \cite[\S~1026.13(c)]{regz}
+day \cite[art.~73(1)]{psd2} to Regulation~Z's resolution within 90 days \cite[\S~1026.13(c)]{regz}
 (table~\ref{tab:regimes}). Three of the four regimes count business days for at least one clock, which depends on
 the jurisdiction's holidays. An engine that treats deadlines as documentation leaves the analyst to compute them,
 and the institution unable to say how often it met them.
@@ -124,8 +123,7 @@ reference, and a core that did move the money before its answer was lost recogni
 duplicate instead of paying twice. The alternative, an outbox with a reconciliation job, frees the engine from the
 core's latency at the price of a window in which the dispute and the core disagree about whether the customer was
 paid. For a system whose job is to be right about that, holding the lock is the cheaper price: a slow core slows
-its own dispute and no other, and \code{TestARetryAfterSilenceIsADuplicateNotADoublePayment} holds the retry to
-its promise.
+its own dispute and no other, and a test holds the retry to its promise.\footnote{\code{TestARetryAfterSilence\-IsADuplicate\-NotADoublePayment}.}
 
 % Distils ADR 0014.
 \section{The ledger}
@@ -143,8 +141,8 @@ entered and two properties of the rules, never from the regime's name.
 
 The property that matters is that suspense is zero when a dispute closes. It is not checked at close; it holds by
 construction, and a test proves it by enumerating every path from \code{INITIATED} to \code{CLOSED} under every
-regime, forty-three at the time of writing, replaying each with each settlement choice, and asserting a zero
-balance and a customer never left net debited; the test is \code{TestSuspenseBalancesOnEveryPath}. Postings are append-only rows, each carrying the reference the banking core adapter uses as its idempotency key,
+regime, 43 at the time of writing, replaying each with each settlement choice, and asserting a zero
+balance and a customer never left net debited.\footnote{\code{TestSuspenseBalancesOnEveryPath}.} Postings are append-only rows, each carrying the reference the banking core adapter uses as its idempotency key,
 and the amount credited is the disputed amount less a customer liability capped by the regime.
 
 \begin{table}[htbp]
@@ -175,7 +173,7 @@ Fraud scoring was planned as one of the first things to cut if time ran short, a
 form. A learned model needs labelled outcomes the project does not have, and where a customer has a right to know
 why they were refused, a score nobody can explain is a liability. The engine therefore scores with seven fixed,
 readable signals, each reporting a sentence that says why it scored what it did: the account's other disputes in
-twelve months, the disputes it lost, the delay since the transaction, the merchant's category, the amount, the
+12 months, the disputes it lost, the delay since the transaction, the merchant's category, the amount, the
 account's age, and the contradictions in the questionnaire (section~\ref{sec:design-questionnaire}). The score is
 the sum, and two thresholds divide it into three tiers.
 
@@ -291,7 +289,7 @@ query so that row-level security can scope it.}
 \end{figure}
 
 % Distils ADR 0026.
-\section{Authorization}
+\section{Authorisation}
 \label{sec:design-authorization}
 
 Row-level security says which tenant a row belongs to, not who inside a tenant may do what. An issuer's
@@ -306,8 +304,9 @@ denies by default, any policy that forbids an action overrides every policy that
 formally specified, so a policy set can be checked against a schema before it runs. The engine splits its
 policies along the second property. \emph{Guardrails} live in the binary where no tenant can change them, and are
 mostly prohibitions: whoever opened the investigation never issues its final credit, only a team lead may move a
-dispute elsewhere, and a tenant key never writes to a customer. The one permit gives tenant administration to the
-realm role, and it is exclusive only because grants never compile to tenant resources. \emph{Grants} are data, one
+dispute elsewhere, and a tenant key never writes to a customer. The only permitting guardrail
+grants tenant administration to the realm role; no grant can extend it to others, because grants never compile to
+tenant resources. \emph{Grants} are data, one
 row per team, role and action, optionally bounded by an amount, compiled into permissions that reach only their
 own team's disputes; a grant that cannot be expressed safely is dropped. Because a prohibition always wins, no
 combination of grants can open what a guardrail closes, which is what will later let tenants edit their own grants.
@@ -334,7 +333,7 @@ committed facts, extra round trips per request, is measured in section~\ref{sec:
 \section{Communications}
 \label{sec:design-communications}
 
-The regimes say when the bank must speak: Regulation~Z wants a written acknowledgement within thirty days
+The regimes say when the bank must speak: Regulation~Z wants a written acknowledgement within 30 days
 \cite[\S~1026.13(c)(1)]{regz}; Regulation~E wants the customer told of a provisional credit
 \cite[\S~1005.11(c)(2)(ii)]{rege}, of the date and amount of a reversal \cite[\S~1005.11(d)(2)]{rege}, and of the
 outcome \cite[\S~1005.11(d)(1)]{rege}. The engine keeps this as a function from the state entered to the notices it
@@ -347,11 +346,11 @@ provision the notice satisfies, and stores it as a row in the same transaction. 
 it exists. An email is an entry in
 an outbox that a dispatcher drains after every commit and on a timer, which makes delivery at-least-once. The
 acknowledgement clock of section~\ref{sec:design-clocks} is met by this notice rather than by a state, because the
-acknowledgement is what the regulation asks for, and golden files pin the paragraphs of every notice under each
+acknowledgement is what the regulation asks for, and golden files (stored expected outputs that a test compares against) pin the paragraphs of every notice under each
 regime, so a change in what a customer reads is a reviewed diff.
 
-Analysts also write on their own initiative, through the same machinery (ADR~0019): templates kept as data, with
+Analysts also write on their own initiative, through the same machinery (architecture decision record, ADR, 0019): templates kept as data, with
 a deliberately tiny substitution language. The API returns each template with the engine's facts filled in, the
 browser previews the message by the same substitution as the analyst types, and the server renders the final
 message on send. The substitution is written twice, once for each side, and no test yet makes the two equal, so
-preview and letter agree by construction rather than by proof. 
+preview and letter agree only by care, not by construction or test. 
