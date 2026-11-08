@@ -1,4 +1,4 @@
-# References (at most ten)
+# References
 
 Fixed early so the text can be written against them. Format to be applied in the final pass.
 
@@ -12,5 +12,15 @@ Fixed early so the text can be written against them. Format to be applied in the
 8. PostgreSQL Global Development Group. PostgreSQL 18 Documentation: Row Security Policies.
 9. OpenTelemetry Authors. OpenTelemetry Specification, semantic conventions for HTTP and database spans.
 10. Cutler, J. W. et al. (2024). Cedar: A New Language for Expressive, Fast, Safe, and Analyzable Authorization. PACMPL 8 (OOPSLA1).
+
+11. ISO 8583:2023, Financial transaction card originated messages: interchange message specifications (the core port's vocabulary).
+12. OpenAPI Initiative (2020). OpenAPI Specification 3.0.3 (the contract).
+13. European Commission (2023). Proposal for a Payment Services Regulation, COM(2023) 367 final (future work).
+14. Harel, D. (1987). Statecharts: A Visual Formalism for Complex Systems. Science of Computer Programming 8(3). (related work)
+15. van der Aalst, W. M. P. (1998). The Application of Petri Nets to Workflow Management. J. Circuits, Systems and Computers 8(1). (related work)
+16. Stripe. Disputes documentation, the merchant-side view (related work).
+
+Ten until 2026-11-08, when the supervisor's language review asked for the standards and the regulation the text names
+and for a related-work section.
 
 Reserve: Nygard, M. (2007). Release It! (for the error taxonomy and retry semantics), only if one of the above is dropped.

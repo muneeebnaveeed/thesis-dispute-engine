@@ -32,12 +32,317 @@ append-only log of every transition. A transition reads the row, runs the state 
 only if the version is still the one it read; a concurrent writer that got there first makes the write affect no
 row, and the caller receives a conflict instead of waiting on a lock \cite{kleppmann2017}.
 
-The 83 queries are written in SQL and compiled into typed Go functions, so a column renamed in a migration breaks
-the build rather than a request. The 24 migrations run forward only, applied by a separate command under the
+The service's 83 queries are written in SQL and compiled into typed Go functions, so a column renamed in a migration breaks
+the build rather than a request. Its 24 migrations run forward only, applied by a separate command under the
 schema owner's role; the service checks the schema version when it starts and refuses to serve behind it. The
 service itself connects as a login that can read and insert where it must and cannot alter the schema or rewrite
 the event log; a test checks the login's privileges, and the event log's triggers refuse a rewrite even from the
 owner (section~\ref{sec:eval-log}).
+
+The schema behind this is drawn in figure~\ref{fig:erd}, generated from the migrated database rather than drawn by
+hand, so it cannot describe a schema that no longer exists. Every table carries its tenant, and the dispute's
+satellites (events, clocks, postings, questionnaires, notices and risk assessments) hang off the dispute row by its
+identifier and the event's sequence number, which is how a posting or a notice can always be traced to the
+transition that caused it.
+
+\begin{sidewaysfigure}
+\centering
+\includegraphics[width=\textheight,height=0.8\textwidth,keepaspectratio]{erd.pdf}
+\caption{The core tables of the schema and their foreign keys, generated from the migrated database by
+\code{scripts/erd}; 13 of the 23 tables are shown. Primary keys are bold. Every table drawn also references
+\code{tenants} through its \code{tenant\_id}; only the first links are drawn. RLS marks a table under the
+row-level security policy of figure~\ref{fig:rls}.}
+\label{fig:erd}
+\end{sidewaysfigure}
+
+\section{The state machine and the regime rules in code}
+\label{sec:impl-state-machine}
+
+The regimes of table~\ref{tab:regimes} are one Go map from the regime to a value of type \code{Rules}
+(figure~\ref{fig:rules}). Each row carries the properties the transition function is allowed to ask about, the
+regime's clocks with their legal basis as a string the workbench displays, the customer's liability cap in minor
+units, and two settings the ledger and the notices read: how a dispute closed without adjudication settles its
+suspense, and whether the regime requires notices in writing. Money is never a floating-point number anywhere in the
+engine; amounts are decimals in the domain and integers of minor units at the boundaries.
+
+\begin{figure}[htbp]
+\begin{lstlisting}
+// domain/regime.go
+type Rules struct {
+	Regime             Regime
+	Refund             RefundPath   // none, provisional, fast or NQA
+	Clocks             []Clock
+	HasAdjudication    bool
+	MerchantMayContest bool
+	LiabilityCapMinor  int64
+	MaxAppeals         int
+	CloseSettlement    SuspenseSettlement
+	WrittenNotices     bool
+	// ...
+}
+
+RegimeEUPSD2Card: {
+	Refund: RefundFast,
+	Clocks: []Clock{
+		{Kind: DeadlineRefund, Count: 1, Unit: BusinessDays,
+		 Basis: "PSD2 art. 73(1): refund by the end of the following ..."},
+		{Kind: DeadlineResolution, Count: 15, Unit: BusinessDays,
+		 Basis: "PSD2 art. 101(2): final reply to a complaint within ..."},
+	},
+	HasAdjudication:    true,
+	MerchantMayContest: true,
+	LiabilityCapMinor:  50_00, // EUR 50.00 in minor units
+},
+\end{lstlisting}
+\caption{The type a regime contributes to the engine and its row for PSD2 card payments (abridged). The other three
+rows have the same shape; the full set of clocks is table~\ref{tab:clocks}.}
+\label{fig:rules}
+\end{figure}
+
+The transition function is \code{Dispute.Apply}, a method on a small value holding the regime, the state and the
+number of appeals used. It returns a new value rather than changing the old one, so a caller that discards the
+result has changed nothing, and it performs no input or output. Inside it, one \code{switch} on the current state
+and one on the event decide the destination, and every condition in it is a property of the rules
+(figure~\ref{fig:apply}). The one exception, the appeal, is handled before the table, because it alone needs the
+counter of appeals already used.
+
+\begin{figure}[htbp]
+\begin{lstlisting}
+// domain/state.go: next gates on Rules properties, never on the Regime
+case StateChargebackWon:
+	switch e {
+	case EventIssueFinalCredit:
+		// Regulation E: the provisional credit must be made final first
+		if r.HasProvisionalCredit() {
+			return StateFinalCreditIssued, true
+		}
+	case EventClose:
+		// PSD2 and Regulation Z: nothing is left to settle
+		if !r.HasProvisionalCredit() {
+			return StateClosed, true
+		}
+	}
+\end{lstlisting}
+\caption{One case of the transition table: a won chargeback. The same two lines serve all four regimes because they
+ask whether a provisional credit exists, not which regime the dispute is under.}
+\label{fig:apply}
+\end{figure}
+
+What the workbench may offer is not a second table. \code{Dispute.Allowed} tries every event against
+\code{Apply} and returns those it accepts, and the API returns that list with every dispute, so the buttons on the
+dispute page and the \code{allowedEvents} of a refusal (figure~\ref{fig:problem}) are produced by the same function
+that enforces the rule. The lifecycle diagram of figure~\ref{fig:state-machine} is produced the same way: a test
+walks \code{Apply} for every regime, state and event and writes the graph, so the figure in this document is
+regenerated from the code rather than maintained beside it.
+
+\section{One transition, end to end}
+\label{sec:impl-transition}
+
+An analyst pressing a button on the dispute page becomes one call to the use case \code{ApplyEvent}, and every
+side effect a transition has happens inside that call and inside one database transaction. The order of the steps
+is the design of chapter~\ref{ch:design} made concrete (figure~\ref{fig:apply-event}).
+
+\begin{figure}[htbp]
+\begin{lstlisting}
+// application/service.go (abridged; any error rolls the whole call back)
+return s.idempotent(ctx, "dispute.apply_event", in.Idempotency,
+	func(tx Tx) (DisputeView, error) {
+		rec, _ := tx.GetDispute(ctx, in.DisputeID) // row-level security
+		f, _ := facts(ctx, tx, rec)                // committed facts
+		dec, _ := s.authorize(ctx, tx, action, &f) // Cedar policies
+		next, _ := rec.Lifecycle().Apply(in.Event) // the state machine
+		s.holdCheck(ctx, tx, rec, in.Payload)      // the fraud hold
+		tx.UpdateDisputeState(ctx, rec.ID, rec.Version, next.State, ...)
+		tx.AppendEvent(ctx, rec.ID, EventRecord{Seq: int(rec.Version) + 1, ...})
+		s.questionnaire(ctx, tx, rec, in.Event, payload, now) // send or record
+		s.settleDeadlines(ctx, tx, rec, next, now)       // meet or void clocks
+		s.post(ctx, tx, rec, next, ev.Seq, payload, now) // ledger and core
+		s.notify(ctx, tx, rec, next.State, ev.Seq, now)  // letters and emails
+		// ... reassess the score after a questionnaire, record metrics
+		return s.viewWith(ctx, tx, rec, &f)
+	})
+\end{lstlisting}
+\caption{The use case behind every button on the dispute page. Because each step runs inside the same
+transaction, a refusal at any step, from the policy engine to the banking core, leaves no trace of the attempt.}
+\label{fig:apply-event}
+\end{figure}
+
+The transaction itself is opened by the store, which first binds the caller's tenant to it
+(figure~\ref{fig:rls}) and, for an analyst, the caller's identity, which the team policies of
+section~\ref{sec:design-authorization} read. The dispute row is then read under those policies, so a dispute of
+another tenant or another team is simply not found. The facts the policy engine decides on are assembled from the
+row and from the event log, which is where the identity of the investigator lives, and the decision is taken
+before the state machine is even asked. The two refusals therefore stay distinct: \code{403} means the caller may not
+do this, \code{409} that nobody may do it from this state.
+
+The write is guarded by the version that was read. \code{UpdateDisputeState} changes the row only where its version
+still equals the one the use case started from, and a write that matches no row is reported as a conflict that the
+client may retry after reloading; nothing waits on a lock, and two analysts pressing different buttons at the same
+moment cannot both succeed. The event appended next takes its sequence number from the same version, so the log has
+no gaps and a uniqueness constraint on the pair of dispute and sequence makes a second writer fail even if the
+version check were removed. The event records the actor taken from the authenticated principal and the
+identifiers of the policies that allowed it.
+
+The wrapper \code{idempotent} makes the whole call repeatable. A client sends a key with every write; the wrapper
+stores the hash of the request body and the response under that key, scoped to the caller, in the same
+transaction as the work. A repeat with the same key and the same body returns the stored response and does nothing
+else; the same key with a different body is refused, because it is a bug in the client rather than a retry. Only
+after a successful commit does the use case wake the email dispatcher, so an email is never sent for a transition
+that was rolled back.
+
+\section{Clocks, postings and the banking core}
+\label{sec:impl-money}
+
+A due date is computed by walking the tenant's calendar forward one day at a time (figure~\ref{fig:due}). The
+calendar holds a time zone and a set of holiday dates read from the tenant's settings; a business day is a weekday
+that is not one of them. The deadline is the last instant of the final counted day in the tenant's zone, so a PSD2
+refund owed ``by the end of the following business day'' is due at midnight in Budapest for the seeded tenants, not in the server's zone.
+The unit tests pin weekends, a Hungarian national holiday and the tenant's zone rather than the server's.
+
+\begin{figure}[htbp]
+\begin{lstlisting}
+// domain/deadline.go
+func (c Calendar) Due(start time.Time, clock Clock) time.Time {
+	loc := c.loc()
+	day := start.In(loc)
+	day = time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, loc)
+	for n := 0; n < clock.Count; {
+		day = day.AddDate(0, 0, 1)
+		if clock.Unit == CalendarDays || c.IsBusinessDay(day) {
+			n++
+		}
+	}
+	// the end of the last counted day
+	return day.AddDate(0, 0, 1).Add(-time.Nanosecond)
+}
+\end{lstlisting}
+\caption{The due date of a clock in the tenant's calendar. The count starts on the day after the dispute opens.}
+\label{fig:due}
+\end{figure}
+
+The ledger of table~\ref{tab:ledger} is a pure function too: given the rules, the state entered, the disputed amount,
+the liability and the suspense balance already outstanding, \code{domain.Postings} returns the movements to write.
+The use case turns each movement into a row whose reference is built from the dispute, the event's sequence number
+and the kind of posting, for example \code{dispute:<id>:7:credit}. The reference is therefore the same however many
+times the request is repeated, and it is what the banking core is given as its idempotency key.
+
+Only the movements that touch the customer's account are sent to the core; suspense, recovery and loss are the
+bank's own books. The port, \code{BankingCore}, has a single method that takes the tenant's core configuration and
+an instruction and returns a receipt, and it returns an error only when no answer came, so a decline and a silence
+can never be confused. The simulated core translates each instruction into the ISO~8583 fields a real switch would
+see: a financial request message, a processing code that says whether the account is credited or debited, the
+amount in minor units, the numeric currency, and a retrieval reference number derived from the posting's reference
+(figure~\ref{fig:iso}). It remembers every reference it approved and answers a second request for one with response
+code 94, duplicate transmission, and the original authorisation. Its behaviour is set per tenant: a limit above
+which credits are declined with code 61, accounts that refuse debits with code 51, an artificial delay, or a
+complete outage. The trace of every transition shows the message, so the exchange can be inspected in the running
+system (figure~\ref{fig:trace}).
+
+\begin{figure}[htbp]
+\begin{lstlisting}
+{"mti": "0200", "de3": "200000", "de4": "000000004200", "de7": "1107142231",
+ "de11": "000017", "de37": "3F9A1C07B2E4", "de49": "978", "de102": "8f1c..."}
+{"mti": "0210", ..., "de37": "3F9A1C07B2E4", "de38": "3F9A1C", "de39": "00"}
+\end{lstlisting}
+\caption{The shape of the request and response the simulated core logs for a fast refund of EUR 42.00 (illustrative
+values, abridged): field 3 says
+the account is credited, field 37 is derived from the posting's reference, and field 39 is the response code.}
+\label{fig:iso}
+\end{figure}
+
+The call is bounded by a timeout. A decline becomes a \code{422} problem whose detail carries the core's response
+text and code; a timeout or an outage becomes a \code{503} the client retries with the same idempotency key. In both
+cases the database transaction is rolled back, so the dispute is still in its old state and has no posting that
+the core did not confirm.
+
+\section{Notices and the email outbox}
+\label{sec:impl-notices}
+
+The notices of section~\ref{sec:design-communications} are composed during the transition from facts the
+transaction already holds: the customer, the amounts, the clocks and the provision that requires the notice. A notice
+is stored as structured paragraphs rather than as rendered text, so the same row produces the email and the
+printable letter, and golden files pin the paragraphs for every regime and state that owes one.
+
+The emails leave through an outbox table drained by a dispatcher that is woken after every commit and also runs on
+a timer. Claiming a batch is one statement (figure~\ref{fig:outbox}): it picks the emails that are due, skips any
+row another replica has already locked, and pushes each one's next attempt back exponentially, from 30 seconds
+to at most an hour, before the send is even tried. A process that dies mid-send therefore leaves the email to be
+claimed again later rather than lost, and a relay that is down receives fewer and fewer attempts rather than a flood.
+The dispatcher has no tenant of its own, so the claim is a function owned by the schema's owner, granted to the
+service and nothing else.
+
+\begin{figure}[htbp]
+\begin{lstlisting}[language=SQL]
+UPDATE notices n
+SET attempts = n.attempts + 1,
+    next_attempt_at = now()
+        + make_interval(secs => least(3600, 30 * power(2, n.attempts)))
+WHERE n.id IN (
+    SELECT id FROM notices
+    WHERE sent_at IS NULL AND channel = 'EMAIL' AND next_attempt_at <= now()
+    ORDER BY next_attempt_at
+    LIMIT batch
+    FOR UPDATE SKIP LOCKED)
+RETURNING n.*;
+\end{lstlisting}
+\caption{Claiming a batch of emails from the outbox (\code{claim\_notices}, \code{migrations/0020\_notice\_trace.sql}).
+Each row stores the trace context of the transition that owed it, so its delivery joins that transition's trace.}
+\label{fig:outbox}
+\end{figure}
+
+\section{Fraud signals and the hold}
+\label{sec:impl-fraud}
+
+\code{domain.Assess} is a function from a set of facts about the dispute, its account and its questionnaire to an
+assessment: a list of signals, each with its maximum weight, the points it contributed and a sentence saying why,
+and the tier the total falls into, medium from 20 points and high from 45. The sentences are what the dispute page
+shows beside the score (figure~\ref{fig:dispute}), so an analyst never sees a number without its reasons. The
+facts are read inside the transaction that opens the dispute and again in the one that records the questionnaire,
+and each assessment is stored as a new row, never updated.
+
+The hold is a single check in the refund step of figure~\ref{fig:apply-event}: if the latest assessment is high, a
+refund or credit is refused with a \code{422} problem that names the missing field unless the request carries a non-empty justification, which is then
+stored in the event's payload and shown in the log. The score has no other effect on the code path.
+
+\section{Policies in code}
+\label{sec:impl-policies}
+
+The guardrails of section~\ref{sec:design-authorization} are a Cedar file compiled into the binary
+(figure~\ref{fig:guardrails}). Each policy carries an identifier, and the identifiers of the policies that decided a
+request are what the event log and a refusal report. The policy set is validated against a Cedar schema in
+continuous integration, so a policy that names an attribute the engine never supplies fails the build rather than
+silently denying.
+
+\begin{figure}[htbp]
+\begin{lstlisting}
+// Separation of duties: the investigator never issues the final credit.
+@id("sod-final-credit")
+forbid (principal is Analyst, action == Action::"ISSUE_FINAL_CREDIT",
+        resource is Dispute)
+when { resource.investigationOpenedBy == principal.id };
+
+// Only a lead of the dispute's team may move it to another team.
+@id("reassign-leads-only")
+forbid (principal, action == Action::"reassign", resource is Dispute)
+unless { principal is Analyst && principal.leadOf.contains(resource.team) };
+
+// compiled from one grant row: seniors of "cards" refund up to 5000
+@id("grant:cards/senior/ISSUE_REFUND")
+permit (principal in TeamRole::"cards/senior",
+        action == Action::"ISSUE_REFUND",
+        resource in Team::"cards")
+when { resource.amount.lessThanOrEqual(decimal("5000.0000")) };
+\end{lstlisting}
+\caption{Two of the guardrails (\code{authz/policy/guardrails.cedar}) and a permit compiled from a grant row by
+\code{authz.Compile}.}
+\label{fig:guardrails}
+\end{figure}
+
+Grants are compiled per tenant into permits like the last one in the figure, and the compiled set is cached per tenant
+under the version of its grants, so a change to a grant takes effect on the next request. The compiler accepts only the roles the engine knows and team names and actions made of a
+small set of safe characters, and it skips any row outside them rather than escaping it, so a grant can never
+inject policy text. The property tests of section~\ref{sec:design-authorization} generate grant sets, compile them
+and check the three properties through the same engine the service uses.
 
 \section{One contract, two generated sides}
 \label{sec:impl-contract}
@@ -95,7 +400,7 @@ last line compiles only if the schema's type equals the type generated for the s
 \label{sec:impl-sessions}
 
 An analyst signs in through an address ending in the tenant's short name (figure~\ref{fig:signin}), which starts
-the authorization-code flow with proof-key protection against that tenant's realm. The callback validates the identity token, creates a new
+the authorisation-code flow with Proof Key for Code Exchange (PKCE) against that tenant's realm. The callback validates the identity token, creates a new
 session identifier and gives the browser a cookie carrying only that identifier, which scripts cannot read and
 which the browser does not attach to requests other sites make in the background.
 
@@ -114,8 +419,8 @@ engine stores the session sealed and cannot read it, and the browser holds only 
 \end{figure}
 
 Tokens are refreshed only on the server. A session ends in
-one of four ways: the analyst signs out, which also ends the identity provider's session; thirty minutes pass
-without activity; the identity provider's ten-hour maximum session ends; or the identity provider tells the
+one of four ways: the analyst signs out, which also ends the identity provider's session; 30 minutes pass
+without activity; the identity provider's 10-hour maximum session ends; or the identity provider tells the
 workbench directly, by back-channel logout, that the analyst was signed out elsewhere or disabled, which ends the
 workbench sessions tied to that identity-provider session.
 
@@ -137,7 +442,7 @@ every other failure is rendered once, as a banner.
 What the analyst sees is a grid and a small number of panels (figure~\ref{fig:workbench}). The page a dispute
 opens onto is a stack of panels, one per concern: the summary, the fraud score and its signals, the regulatory
 clocks with their legal basis, the allowed actions, the ledger, the letters and emails sent, and the event log
-(appendix, figure~\ref{fig:dispute}). The actions offered are the transitions the service reports as allowed for that
+(figure~\ref{fig:dispute}). The actions offered are the transitions the service reports as allowed for that
 dispute in that state, so the interface cannot offer a move the domain would refuse.
 
 \begin{figure}[htbp]
@@ -147,6 +452,29 @@ dispute in that state, so the interface cannot offer a move the domain would ref
 with its toolbar and pager on the right. Captured against the local stack by
 \code{pnpm screenshot}, so it can be retaken after a change rather than going stale.}
 \label{fig:workbench}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{dispute.jpg}
+\caption{One dispute: the summary, the fraud score with the signals that produced it, the
+regulatory clocks with their legal basis, and the transitions the state machine allows from the
+current state.}
+\label{fig:dispute}
+\end{figure}
+
+A dispute can also be found directly (figure~\ref{fig:search}): by its identifier, which opens it, or by state and
+reason. The grid shows the regime, the amount, the fraud tier with its score and the next running clock with the
+time it has left, so an analyst can see which disputes are closest to a legal deadline without opening them. The
+list is paginated by the service and ordered by when the dispute opened; the filters are query parameters of the
+same list operation the grid uses, so a search result is an ordinary page of the workbench and can be bookmarked.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{search.jpg}
+\caption{Searching the tenant's disputes by identifier, state or reason. Each row shows its fraud tier and score and
+the status of its next clock.}
+\label{fig:search}
 \end{figure}
 
 \section{Proposals from a typed-decision model}
@@ -161,7 +489,9 @@ probability in one pass, generating no text, so there is nothing to parse.
 The model sits behind a port in the application layer beside the banking core of section~\ref{sec:design-core},
 for the same reasons: it is someone else's system, it can be slow or down, and the domain must not know which one
 it is. It proposes and a person disposes: no transition, clock, posting or letter may depend on it, every use is a
-pre-filled field that can be changed, and what is stored is always the value the person left. The port is
+pre-filled field that can be changed, and what is stored is always the value the person left. The adapter behind
+it calls the hosted jev-1.13 model through OpenRouter, pinned to that released version so that a recorded
+proposal names the exact model that made it. The port is
 optional, so with no model configured these fields are simply empty. A proposal below three quarters
 probability is dropped, because a wrong pre-filled answer costs an analyst more attention than an empty one.
 
@@ -185,8 +515,8 @@ Telemetry was part of the first commit, because a regulated system must be able 
 server use OpenTelemetry \cite{otelspec}, configured only through the standard environment variables; without
 them the engine still creates spans but exports nothing, and the workbench server does not start its telemetry at
 all. Every request is a span named after its route pattern rather than its address. Every database statement is a
-child span named after its query, or after its SQL text when it has no name, with no values recorded (appendix,
-figure~\ref{fig:trace}). Logs go to standard output and, with the trace's identifiers attached, to the same
+child span named after its query, or after its SQL text when it has no name, with no values recorded
+(figure~\ref{fig:trace}). Logs go to standard output and, with the trace's identifiers attached, to the same
 backend as the traces, after a redaction step that runs before any destination.
 
 A request from the workbench is one trace across both services: the workbench server opens a span per request and
@@ -195,24 +525,42 @@ is its own trace, linked to the request that caused it: each queued email stores
 transition that owed it, and its delivery links back. No attribute is written with a credential or a customer's
 personal data; the redaction step itself is tested on the logs.
 
-Locally the signals land in a Grafana stack that provisions two dashboards, one per service (appendix,
-figure~\ref{fig:dashboard}), and three alert rules from the repository: more than one percent of responses
+Locally the signals land in a Grafana stack that provisions two dashboards, one per service
+(figure~\ref{fig:dashboard}), and three alert rules from the repository: more than 1\% of responses
 failing with a server error, a 99th-percentile latency above one second, and an outbox that is not draining. The
 evaluation
 of chapter~\ref{ch:evaluation} reads its latency numbers back from these same metrics rather than from a separate
-harness.
+harness. Both figures were captured from the running system with \code{pnpm screenshot:ops} after a load run, so
+they can be retaken after a change.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{trace.jpg}
+\caption{One transition traced in Tempo: the request, authentication by tenant key, the rate-limit counter, the use
+case, and each database statement it ran inside one transaction, 12~ms in total.}
+\label{fig:trace}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{dashboard.jpg}
+\caption{The engine's dashboard during a load run: request rate by route, latency percentiles, the share of client
+and server errors (the 4xx line is the run's deliberate refused transitions), transitions by regime and event, time
+spent in each state, and disputes by state.}
+\label{fig:dashboard}
+\end{figure}
 
 \section{Review and release discipline}
 \label{sec:impl-ci}
 
 Every change reached the main branch as a pull request, squashed into one commit whose message is the pull
-request's title and body; by the time of writing that was 95 merged pull requests and 28 decision records. A
+request's title and body; at the time of writing there were 111 merged pull requests and 28 decision records. A
 ruleset forbids direct and force pushes, requires signed commits, and requires eight checks to pass on a branch
 that is up to date with the main branch, so a change is tested against what it will be merged into.
 
 Continuous integration runs one job per area, with a named step per check, so a failure names its cause
-(appendix, figure~\ref{fig:ci}). The backend jobs cover formatting, generated code being current, static
-analysis, linting, the dependency vulnerability database and the authorization policies, then run the unit and
+(figure~\ref{fig:ci}). The backend jobs cover formatting, generated code being current, static
+analysis, linting, the dependency vulnerability database and the authorisation policies, then run the unit and
 database-backed suites with the race detector against a real PostgreSQL service. The image job smoke-tests the
 backend image the way a deployment would run it: migrations as the owner, then the service as its
 least-privileged login, until the readiness endpoint answers. The frontend job generates, type-checks, lints,
@@ -224,3 +572,12 @@ integration checks and the image builds are left to continuous integration). Dep
 frontend packages, the workflows and the deployment's container images weekly, and its updates pass the same gate.
 Releasing ends at the images, which are built and smoke-tested from any commit on the main branch; the deployment
 they would go into is outside the scope of this thesis (section~\ref{sec:req-scope}).
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{ci.jpg}
+\caption{The continuous-integration jobs of one pull request (the Go toolchain update of
+section~\ref{sec:impl-ci}, pull request 107): change detection gates the backend and frontend jobs, and the
+version check runs alongside them.}
+\label{fig:ci}
+\end{figure}

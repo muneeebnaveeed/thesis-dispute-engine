@@ -18,17 +18,17 @@ requires of the issuer.
 \label{sec:bg-eu}
 
 Under the second Payment Services Directive (PSD2) \cite{psd2}, a payer may report an
-unauthorised payment up to thirteen months after the debit \cite[art.~71(1)]{psd2}, and the bank
+unauthorised payment up to 13 months after the debit \cite[art.~71(1)]{psd2}, and the bank
 must then refund by the end of the following business day at the latest \cite[art.~73(1)]{psd2}, unless it reasonably suspects
-fraud by the payer. The payer's share of the loss is capped at fifty euro, except for fraud or
+fraud by the payer. The payer's share of the loss is capped at EUR~50, except for fraud or
 gross negligence \cite[art.~74(1)]{psd2}, and the complaint must be answered in writing within
-fifteen business days \cite[art.~101(2)]{psd2}. There is no provisional credit: the refund is the
+15 business days \cite[art.~101(2)]{psd2}. There is no provisional credit: the refund is the
 customer's, and the bank can only recover it through the card network.
 
 For a SEPA direct debit the right to a refund is unconditional \cite[art.~76(1)]{psd2}: within
-eight weeks of the debit \cite[art.~77(1)]{psd2} the payer can claim it back without a reason, and
+8 weeks of the debit \cite[art.~77(1)]{psd2} the payer can claim it back without a reason, and
 the merchant has no defence \cite{sepacore}. The bank must refund, or justify a refusal, within
-ten business days \cite[art.~77(2)]{psd2}. In law a SEPA claim inside the eight weeks therefore has
+10 business days \cite[art.~77(2)]{psd2}. In law a SEPA claim inside the 8 weeks therefore has
 no evidence step, no chargeback and no possible defeat. The engine does not check the window
 itself, so it also lets an analyst investigate a SEPA claim and close it without a refund, which
 is the path for a claim made too late.
@@ -36,13 +36,13 @@ is the path for a claim made too late.
 \section{The US regimes, for comparison}
 \label{sec:bg-us}
 
-Two American regulations are included for comparison. Under Regulation~E, for debit cards, a bank that needs longer than ten business days to
-investigate, up to forty-five days, must provisionally credit the customer within the first ten
+Two American regulations are included for comparison. Under Regulation~E, for debit cards, a bank that needs longer than 10 business days to
+investigate, up to 45 days, must provisionally credit the customer within the first 10
 \cite[\S~1005.11(c)]{rege}, and may take the credit back after notice if no error is found. The
-customer's liability for an unauthorised transfer is limited, to fifty dollars where a lost or
+customer's liability for an unauthorised transfer is limited, to USD~50 where a lost or
 stolen card is reported promptly \cite[\S~1005.6]{rege}. Regulation~Z, for credit cards, requires
-a billing-error notice to be acknowledged within thirty days and resolved within two billing
-cycles, at most ninety days \cite[\S~1026.13(c)]{regz}. Nothing is credited; the issuer instead may
+a billing-error notice to be acknowledged within 30 days and resolved within two billing
+cycles, at most 90 days \cite[\S~1026.13(c)]{regz}. Nothing is credited; the issuer instead may
 not collect the disputed amount or report it as delinquent meanwhile, so a credit-card dispute has
 no refund state at all.
 
@@ -84,3 +84,29 @@ Regulation E & card, USD & provisional credit & 10 business, 45 calendar days & 
 Regulation Z & credit card, USD & none (collection suspended) & 30 and 90 calendar days & yes & none
 \end{NiceTabular}
 \end{table}
+
+\section{Related work}
+\label{sec:bg-related}
+
+Modelling a business process as a finite state machine is long-established practice. Harel's statecharts
+\cite{harel1987} extended flat state machines with hierarchy and concurrency so that large reactive systems could
+be specified without an explosion of states, and workflow research modelled business processes as Petri nets so
+that properties such as every case reaching an end could be checked before the process ran \cite{aalst1998}. The
+engine described here uses neither extension: its lifecycle is a flat machine of 15 states, small enough that the
+property workflow nets are used to establish, that every state can reach the end, is checked by a test over
+the reachable states of each regime (section~\ref{sec:eval-correctness}). What it adds is the parameterisation: one machine whose
+reachable part is chosen by a regime's rules, rather than one model per process.
+
+General-purpose engines run long processes with timers and retries: Camunda executes BPMN models, and Temporal
+runs durable code. Either could have carried the clocks and the outbox, but it would have placed the lifecycle in
+a second system beside the ledger and the event log, which the design keeps inside one database transaction
+(section~\ref{sec:design-core}).
+
+Published material on disputes mostly takes the merchant's side. Stripe's documentation \cite{stripe} is written
+for merchants answering a chargeback, with the evidence and deadlines the card networks set: the mirror image of
+the issuer's duties to its own customer that this thesis models. The networks' pre-dispute services, such as
+Visa's Verifi and Mastercard's Ethoca, sit between issuer and merchant rather than inside the issuer, and issuers'
+own dispute systems are commercial products whose internals are not published. An open description of an
+issuer-side engine that treats several regulatory regimes as configuration of one lifecycle is therefore the
+contribution this thesis offers, as a prototype rather than a product.
+

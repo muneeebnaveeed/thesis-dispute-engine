@@ -1,14 +1,18 @@
+% The faculty's title page (inf.unideb.hu/en/node/1086, "Title page 2026"), reproduced at the template's positions:
+% every line is placed on the page itself, in points from the top-left corner, so the body's margins do not move it.
 \begin{titlepage}
-  \centering
-  {\large University of Debrecen\\Faculty of Informatics\par}
-  \vspace{4cm}
-  {\LARGE\bfseries The Customer Is Always Right,\\Except When It's Not\par}
-  \vspace{0.5cm}
-  {\large Finite State Machines for Payment Dispute Resolution and First-Party Fraud Detection\par}
-  \vfill
-  {\large Muneeb Naveed\par}
-  \vspace{0.5cm}
-  {\large Supervisor: Dr.\ T\'oth R\'obert\par}
-  \vfill
-  {\large Debrecen, 2027\par}
+\begin{tikzpicture}[remember picture,overlay,every node/.style={inner sep=0pt,outer sep=0pt}]
+  % #1 x, #2 y (top of the text), #3 size, #4 leading, #5 text; the font is a node option so it survives each \\
+  \newcommand{\tp}[5]{\node[anchor=north,align=center,text width=16cm,font=\linespread{1}\fontsize{#3}{#4}\selectfont]
+    at ([xshift=#1pt,yshift=-#2pt]current page.north west) {#5};}
+  \newcommand{\tpl}[5]{\node[anchor=north west,align=left,font=\linespread{1}\fontsize{#3}{#4}\selectfont]
+    at ([xshift=#1pt,yshift=-#2pt]current page.north west) {#5};}
+  \tp{297.66}{72}{26}{30}{\bfseries UNIVERSITY OF DEBRECEN\\\bfseries FACULTY OF INFORMATICS}
+  \tp{297.66}{233}{22}{25.3}{\bfseries THESIS}
+  \tp{297.66}{279.5}{22}{25.3}{Automated Fraud Dispute Resolution Engine}
+  \tpl{70.8}{508}{22}{25.3}{Supervisor:\\Dr.\ T\'oth R\'obert\\assistant professor}
+  % the name is longer than the template's column; it wraps at the 2 cm right margin, as the Word template would
+  \tpl{340.3}{508}{22}{25.3}{Candidate:\\Naveed Muhammad\\Muneeb\\Computer Science BSc}
+  \tp{297.66}{711.5}{22}{25.3}{DEBRECEN\\2026}
+\end{tikzpicture}
 \end{titlepage}

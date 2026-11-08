@@ -9,13 +9,13 @@
 The thesis set out to show that payment disputes under different regulatory regimes do not need different
 software: that one finite state machine, parameterised by the regime, can carry PSD2 card disputes, SEPA
 direct-debit claims, Regulation~E debit-card errors and Regulation~Z billing errors. The engine carries all four.
-Its fifteen states are shared, and each regime reaches the part of them its rules describe: six under SEPA, eleven
-under PSD2, thirteen under Regulation~E and ten under Regulation~Z. None of the differences is written as a test of
+Its 15 states are shared, and each regime reaches the part of them its rules describe: 6 under SEPA, 11
+under PSD2, 13 under Regulation~E and 10 under Regulation~Z. None of the differences is written as a test of
 a regime's name; each is a property of the rules. Every one of the 64 transitions in the four regimes' tables is
 walked by a named scenario that ends in a closed dispute, and every pair of state and event a regime forbids is
 refused (section~\ref{sec:eval-correctness}).
 
-The lifecycle held this way also bears the weight of an issuer's process. Deadline compliance can be read at any
+A lifecycle modelled this way also carries the rest of an issuer's process. Deadline compliance can be read at any
 moment rather than assembled afterwards; the ledger's suspense account is zero whenever a dispute closes; the
 database rather than the code keeps tenants apart; and the analyst who investigated a dispute cannot issue its
 final credit. Each of these is checked by a test, against the real database wherever the database is what
@@ -24,16 +24,16 @@ enforces it (sections~\ref{sec:eval-log} and~\ref{sec:eval-isolation}).
 \section{What the decisions cost}
 \label{sec:conclusion-costs}
 
-Several decisions bought correctness at a measured price. Taking each authorization decision inside the request's
-transaction doubled the median latency of a read from about two to about four milliseconds; the cost is extra
+Several decisions bought correctness at a measured price. Taking each authorisation decision inside the request's
+transaction doubled the median latency of a read, from 2.1 to 4.2 milliseconds in the September runs that isolate it; the cost is extra
 round trips rather than the policy engine itself, which shows where to recover it without moving the decision
 (section~\ref{sec:eval-latency}). Calling the banking core inside the transaction makes the engine as slow as the
 slowest core it talks to, in exchange for never recording a refund the core did not make. Keeping PostgreSQL as
 the only stateful dependency puts every counter, session and outbox beside the disputes; its queries stayed well
 under a millisecond at this load.
 
-Other decisions limited what the system claims rather than what it does. Fraud rules have judged rather than
-fitted weights and may only hold a credit, never deny a dispute. The decision model is offered only behind a
+Other decisions limited what the system claims rather than what it does. The fraud rules' weights are set by judgement
+rather than fitted to data, and the rules may only hold a credit, never deny a dispute. The decision model is offered only behind a
 confidence gate and was measured on a synthetic set its author labelled. The banking core is a simulator, and the
 card network's answers are entered by hand; these limits are collected in section~\ref{sec:limitations}. The two
 parts marked in the project plan as the first to cut, the fraud-scoring engine and the workbench, were both kept,
@@ -47,8 +47,8 @@ with deadlines from the card network's rules, and the statutory extensions of de
 event may extend. Both are additions to the rules rather than to the machine, which is the test the design was
 meant to pass.
 
-The next regulatory step is already visible. The European Union's proposed Payment Services Regulation would
-extend the issuer's liability to some payments a customer was deceived into authorising, such as those made to a
+The next regulatory step is already visible. The European Union's Payment Services Regulation \cite{psr}, proposed
+in 2023, politically agreed in November 2025 and not yet applicable, extends the issuer's liability to some payments a customer was deceived into authorising, such as those made to a
 fraudster impersonating the bank. A dispute may then arise from an authorised payment, and the question becomes
 whether the bank's own fraud controls met the expected standard. That is a new regime in the sense of this thesis,
 and a test of whether the existing gates are enough for a fifth.

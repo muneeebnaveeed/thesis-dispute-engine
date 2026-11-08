@@ -22,7 +22,7 @@ currently stands, and a mistake in any of them is a breach of a legal duty or a 
 First-party fraud, often called friendly fraud, complicates this further: a dispute raised in bad
 faith, or in error, by the legitimate cardholder, such as the parcel that did arrive. The
 regulation assumes good faith and frequently requires the refund to come first, yet some disputes
-are not what they claim to be. The position this thesis takes is in its title: the customer is
+are not what they claim to be. The position this thesis takes is that the customer is
 given the benefit of the doubt at the start, with the refund or credit the law requires, and the
 evidence then decides how the dispute ends.
 
@@ -31,7 +31,7 @@ evidence then decides how the dispute ends.
 
 The rules depend on the payment rail and the jurisdiction, and differ in more than their numbers.
 Under the European Payment Services Directive, an unauthorised card payment is refunded by the end
-of the next business day \cite{psd2}. A SEPA direct debit can be claimed back within eight weeks
+of the next business day \cite{psd2}. A SEPA direct debit can be claimed back within 8 weeks
 with no reason given and no defence available to the merchant \cite{sepacore}. The United States'
 Regulation~E, for debit cards, requires a provisional credit while the bank investigates
 \cite{rege}, and Regulation~Z, for credit cards, issues no credit at all and suspends collection of
@@ -51,7 +51,7 @@ The result is a dispute engine offered as a service to several institutions, who
 database itself keeps apart, with an analyst workbench in front of it. The engine gates the
 lifecycle by regime, runs the regulatory clocks in each institution's business-day calendar, posts
 every movement of money to a ledger and through a port to the core banking system, collects the
-customer's account through a questionnaire, sends the notices the customer is owed, and scores
+customer's version of events through a questionnaire, sends the notices the customer is owed, and scores
 each dispute with readable rules that can hold a credit until a person justifies it
 (chapter~\ref{ch:design}). Its claims are meant to be checkable: tests walk every transition each
 regime allows and refuse the ones it forbids, isolation is tested against the database, and every

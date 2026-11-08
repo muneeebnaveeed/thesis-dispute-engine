@@ -44,7 +44,7 @@ Open a dispute & tenant system & \code{createDispute} & \ref{sec:design-state-ma
 Work a dispute through its lifecycle & analyst & \code{getDispute}, \code{applyDisputeEvent} & \ref{sec:design-state-machine} \\
 Keep the regulatory deadlines & engine & (on every event) & \ref{sec:design-clocks} \\
 Move money for a credit or reversal & engine & (on every event) & \ref{sec:design-ledger}, \ref{sec:design-core} \\
-Collect the customer's account & analyst & \code{applyDisputeEvent} & \ref{sec:design-questionnaire} \\
+Collect the customer's version of events & analyst & \code{applyDisputeEvent} & \ref{sec:design-questionnaire} \\
 Hold a credit on a risky dispute & engine, analyst & \code{applyDisputeEvent} & \ref{sec:design-fraud} \\
 Find and filter disputes & analyst & \code{listDisputes} & \ref{sec:design-clocks} \\
 Notify the customer & engine, analyst & \code{composeEmail}, \code{resendNotice} & \ref{sec:design-communications} \\

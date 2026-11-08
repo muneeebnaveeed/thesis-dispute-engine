@@ -4,8 +4,7 @@ CM903S
 # Thesis 1: summary of the semester
 
 Theme: Implementing Business Logic using Modern Technologies (Automated Fraud Dispute Resolution Engine).
-Working title: The Customer Is Always Right, Except When It's Not: Finite State Machines for Payment Dispute
-Resolution and First-Party Fraud Detection.
+Title: Automated Fraud Dispute Resolution Engine.
 
 Repository: https://github.com/muneeebnaveeed/thesis-dispute-engine
 
