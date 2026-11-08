@@ -108,7 +108,7 @@ the API and the overdue gauge all ask the same question of the same rows.
 
 The ledger says what should move; a bank's core system moves it. What matters is the port between the engine and
 whatever core a tenant has. An \emph{instruction} is one movement on the customer's account;
-a \emph{receipt} answers in ISO 8583's vocabulary, with a retrieval reference (field 37), a response code
+a \emph{receipt} answers in the vocabulary of ISO 8583 \cite{iso8583}, with a retrieval reference (field 37), a response code
 (field 39) and whether the core recognised the reference as one it had already carried out (code 94, duplicate
 transmission). Only postings that touch the customer's account cross the port. Each tenant names its core in its
 settings, and the simulator behind the port (\code{infrastructure/mockcore}) can be told per tenant to decline, to
@@ -201,7 +201,7 @@ with nobody is not describing an unauthorised payment), and its findings become 
 
 The engine is written in Go and the workbench in TypeScript; what they must share is an agreement about which
 requests exist, what their bodies look like and what each failure means. That agreement lives in one OpenAPI
-document. The server's interface is generated from it, so a route not in the document does not compile, and
+document \cite{openapi}. The server's interface is generated from it, so a route not in the document does not compile, and
 every request is validated against it before a handler runs; the client's types, request functions and form
 schemas are generated from the same document. The build fails if regenerating would change anything, so neither
 side can drift for longer than one failed check.

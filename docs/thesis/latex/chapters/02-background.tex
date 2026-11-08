@@ -84,3 +84,29 @@ Regulation E & card, USD & provisional credit & 10 business, 45 calendar days & 
 Regulation Z & credit card, USD & none (collection suspended) & 30 and 90 calendar days & yes & none
 \end{NiceTabular}
 \end{table}
+
+\section{Related work}
+\label{sec:bg-related}
+
+Modelling a business process as a finite state machine is long-established practice. Harel's statecharts
+\cite{harel1987} extended flat state machines with hierarchy and concurrency so that large reactive systems could
+be specified without an explosion of states, and workflow research modelled business processes as Petri nets so
+that properties such as every case reaching an end could be checked before the process ran \cite{aalst1998}. The
+engine described here uses neither extension: its lifecycle is a flat machine of 15 states, small enough that the
+property workflow nets are used to establish, that every state can reach the end, is checked by a test over
+the reachable states of each regime (section~\ref{sec:eval-correctness}). What it adds is the parameterisation: one machine whose
+reachable part is chosen by a regime's rules, rather than one model per process.
+
+General-purpose engines run long processes with timers and retries: Camunda executes BPMN models, and Temporal
+runs durable code. Either could have carried the clocks and the outbox, but it would have placed the lifecycle in
+a second system beside the ledger and the event log, which the design keeps inside one database transaction
+(section~\ref{sec:design-core}).
+
+Published material on disputes mostly takes the merchant's side. Stripe's documentation \cite{stripe} is written
+for merchants answering a chargeback, with the evidence and deadlines the card networks set: the mirror image of
+the issuer's duties to its own customer that this thesis models. The networks' pre-dispute services, such as
+Visa's Verifi and Mastercard's Ethoca, sit between issuer and merchant rather than inside the issuer, and issuers'
+own dispute systems are commercial products whose internals are not published. An open description of an
+issuer-side engine that treats several regulatory regimes as configuration of one lifecycle is therefore the
+contribution this thesis offers, as a prototype rather than a product.
+
